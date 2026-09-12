@@ -9,14 +9,8 @@ One slide's worth: every technology the game runs on and how they connect. No in
 for those see [MODULES.md](MODULES.md).
 
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 48, "rankSpacing": 56, "htmlLabels": true, "curve": "basis"}} }%%
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111111","primaryBorderColor":"#111111","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","lineColor":"#111111","textColor":"#111111","clusterBkg":"#ffffff","clusterBorder":"#b8b8b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":48,"rankSpacing":56,"htmlLabels":true,"curve":"basis"}} }%%
 flowchart LR
-
-classDef device fill:#0d212b,stroke:#7fd4c1,stroke-width:2px,color:#eaf6f2
-classDef client fill:#11232b,stroke:#9ec7d6,stroke-width:2px,color:#eaf6f2
-classDef shared fill:#1b2a1d,stroke:#ceff83,stroke-width:2px,color:#f2ffe2
-classDef server fill:#241a2b,stroke:#c6a0ff,stroke-width:2px,color:#f4ecff
-classDef plat fill:#2b1d1d,stroke:#ff9a7a,stroke-width:2px,color:#ffeee8
 
 subgraph D["CLIENTS"]
   direction TB
@@ -84,11 +78,6 @@ FLY --> NODE
 AST --> THREE
 TST -.-> SIM
 
-class Q,L,P device
-class THREE,XR,IN,AUD,DOM,ESM client
-class SM,PR,WSC,VID shared
-class NODE,WSS,RAP,SIM server
-class FLY,AST,TST plat
 ```
 
 ## 2. How a tower comes down
@@ -97,13 +86,8 @@ Four stages. Damage peels the skins before it ever reaches structure, and struct
 load model rather than on hit points alone — which is why collapses read as progressive.
 
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 44, "rankSpacing": 62, "htmlLabels": true, "curve": "basis"}} }%%
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111111","primaryBorderColor":"#111111","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","lineColor":"#111111","textColor":"#111111","clusterBkg":"#ffffff","clusterBorder":"#b8b8b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":44,"rankSpacing":62,"htmlLabels":true,"curve":"basis"}} }%%
 flowchart LR
-
-classDef hit fill:#2b1d1d,stroke:#ff9a7a,stroke-width:2px,color:#ffeee8
-classDef skin fill:#11232b,stroke:#9ec7d6,stroke-width:2px,color:#eaf6f2
-classDef load fill:#241a2b,stroke:#c6a0ff,stroke-width:2px,color:#f4ecff
-classDef out fill:#1b2a1d,stroke:#ceff83,stroke-width:2px,color:#f2ffe2
 
 subgraph A["1 · IMPACT"]
   direction TB
@@ -145,10 +129,6 @@ GRAPH --> ISLAND
 CREAK --> CRUSH
 DOMINO -->|"cascades back in"| SRC
 
-class SRC,SIDE,DOMINO hit
-class GLASS,FACADE,OPEN skin
-class FRAME,GRAPH,LOADM,CREAK load
-class CRUSH,ISLAND,BREAKUP out
 ```
 
 ## 3. One authoritative tick
@@ -157,6 +137,7 @@ The server owns everything. The client only predicts its own raider, using the s
 model, and reconciles on the next snapshot.
 
 ```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111111","primaryBorderColor":"#111111","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","lineColor":"#111111","textColor":"#111111","clusterBkg":"#ffffff","clusterBorder":"#b8b8b8","edgeLabelBackground":"#ffffff","actorBkg":"#ffffff","actorBorder":"#111111","actorTextColor":"#111111","signalColor":"#111111","signalTextColor":"#111111","labelBoxBkgColor":"#ffffff","labelBoxBorderColor":"#111111","labelTextColor":"#111111","noteBkgColor":"#f2f2f2","noteBorderColor":"#999999","noteTextColor":"#111111","sequenceNumberColor":"#ffffff","activationBkgColor":"#ffffff","activationBorderColor":"#111111"}} }%%
 sequenceDiagram
   autonumber
   participant P as Phone / Laptop raider
@@ -190,18 +171,16 @@ sequenceDiagram
 
 ## Reading the stack
 
-- **Teal** is the three devices. One codebase serves all of them; the role and the input scheme
-  are decided at runtime, not at build time.
-- **Blue** is the browser runtime — platform APIs plus Three.js. There is no bundler and no build
-  step: the browser loads ES modules through an importmap, which is why a hackathon checkout runs
-  with `npm start` and nothing else.
-- **Green** is the contract, and it is the load-bearing idea. `shared/` is pure logic with no
-  Three.js, Rapier, DOM or Node in it, imported unchanged by both sides — that is why the client
-  can predict flight exactly and why the server never has to trust a client. Alongside it sits the
-  wire: reliable JSON for events, a versioned binary snapshot for transforms.
-- **Purple** is authority. Nothing in the client decides damage, position or structural failure.
-- **Orange** is everything around the game: hosting, CC0 art, and the test rigs that run real
-  physics and an emulated Quest 2.
+- **Clients** — one codebase serves all three. The role and the input scheme are decided at
+  runtime from the device, not at build time.
+- **Browser runtime** — platform APIs plus Three.js. No bundler and no build step: the browser
+  loads ES modules through an importmap, which is why a fresh checkout runs on `npm start` alone.
+- **Shared contract** — the load-bearing idea. `shared/` is pure logic with no Three.js, Rapier,
+  DOM or Node in it, imported unchanged by both sides; that is why the client can predict flight
+  exactly and why the server never has to trust a client. Beside it sits the wire: reliable JSON
+  for events, a versioned binary snapshot for transforms.
+- **Authoritative server** — nothing in the client decides damage, position or structural failure.
+- **Platform** — hosting, CC0 art, and the test rigs that run real physics and an emulated Quest 2.
 
 See [MODULES.md](MODULES.md) for the file-by-file map and the rules for changing each layer,
 and [ARCHITECTURE.md](ARCHITECTURE.md) for the budgets and failure modes.
