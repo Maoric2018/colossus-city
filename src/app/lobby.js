@@ -13,7 +13,7 @@ export function bindLobby(actions){
  $('turn-speed').value = localStorage.getItem('colossus-turn') || '90'; $('hand-reach').value = localStorage.getItem('colossus-reach') || '1'; $('turn-speed').oninput = settings; $('hand-reach').oninput = settings; settings();
  const params = new URLSearchParams(location.search); $('room-input').value = params.get('room') || '';
  setRole(params.get('role') === 'boss' || (quest && !touch) ? 'boss' : 'raider');
- if(touch){ $('lobby').querySelector('[data-role="raider"] span').textContent = '01 / PHONE'; $('lobby').querySelector('[data-role="boss"] span').textContent = '02 / PHONE TITAN'; }
+ if(touch){ $('lobby').querySelector('[data-role="raider"] span').textContent = '01 / PHONE'; $('lobby').querySelector('[data-role="boss"] span').textContent = '02 / PHONE COLOSSUS'; }
  return {setRole, params};
 }
 export function notice(text){ $('notice').textContent = text; }

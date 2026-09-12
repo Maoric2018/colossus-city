@@ -17,7 +17,7 @@
 #scoreboard caption{padding:14px;color:var(--acid);font-size:14px;letter-spacing:3px;border-bottom:1px solid #abcdb733}#scoreboard th{color:var(--dim);font-weight:normal;font-size:9px;padding:8px 16px;text-align:left}#scoreboard td{padding:8px 16px;border-top:1px solid #abcdb71a}#scoreboard td:not(:first-child){text-align:right;color:var(--acid)}
 #flight-status{gap:4px}#flight-status #score-readout{color:var(--acid);font-size:9px}
 
-/* --- Attack on Titan retheme. Scoped to the landing page and the spectator
+/* --- Lobby and spectator theme. Scoped to the landing page and the spectator
    panel: the city, the titan and the in-game HUD keep their own palette. --- */
 #lobby,#spectator-panel{--acid:#d9c18d;--line:#d9c18d33}
 #brand .brand-mark{color:#d9c18d;letter-spacing:-2px}

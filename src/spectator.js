@@ -27,7 +27,7 @@ export class SpectatorViews{
  updateRoster(roster){
   this.roster=roster;const ids=new Set();for(const p of roster){if(p.role==='spectator')continue;ids.add(p.id);if(this.cards.has(p.id))continue;
    const card=document.createElement('article'),title=document.createElement('header'),video=document.createElement('video'),surface=document.createElement('canvas'),status=document.createElement('p');
-   title.textContent=`${p.role==='boss'?'TITAN':p.role==='bot'?'DRONE':'SCOUT'} / ${p.name}`;
+   title.textContent=`${p.role==='boss'?'COLOSSUS':p.role==='bot'?'DRONE':'DEFENDER'} / ${p.name}`;
    video.autoplay=true;video.muted=true;video.playsInline=true;video.hidden=true;video.setAttribute('aria-label',`${p.name}'s live game view`);surface.width=640;surface.height=400;
    status.textContent=p.role==='bot'?'AI camera · simulated':'Connecting live video…';card.append(title,video,surface,status);card.className=p.role==='boss'?'view-card colossus-view':'view-card';card.tabIndex=0;card.title='Select to enlarge';const focus=()=>card.classList.toggle('expanded');card.onclick=focus;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();focus();}};this.grid.append(card);this.cards.set(p.id,{card,video,surface,status,role:p.role,received:0,frames:0});
   }
@@ -84,7 +84,7 @@ export class SpectatorViews{
  }
  drawHUD(){
   const state=this.getState();if(!state)return;const p=state.players.find(p=>p.id===this.getPlayerId()),ctx=this.context;
-  ctx.fillStyle='#07191bcc';ctx.fillRect(0,369,640,31);ctx.fillStyle='#d3ff9d';ctx.font='12px monospace';ctx.fillText(p?`${Math.round(p.hp)} HP · ${Math.round(p.fuel*100)}% THRUST · ${p.flags&16?'SOARING ∞':'HOVER'} · ${Math.round(Math.hypot(...p.v))} m/s`:`TITAN · ${Math.ceil(bossHealthFraction(state)*100)}% NAPE`,14,389);
+  ctx.fillStyle='#07191bcc';ctx.fillRect(0,369,640,31);ctx.fillStyle='#d3ff9d';ctx.font='12px monospace';ctx.fillText(p?`${Math.round(p.hp)} HP · ${Math.round(p.fuel*100)}% THRUST · ${p.flags&16?'SOARING ∞':'HOVER'} · ${Math.round(Math.hypot(...p.v))} m/s`:`COLOSSUS · ${Math.ceil(bossHealthFraction(state)*100)}% CORE`,14,389);
   if(p){ctx.strokeStyle='#d8ffb9';ctx.beginPath();ctx.moveTo(315,200);ctx.lineTo(325,200);ctx.moveTo(320,195);ctx.lineTo(320,205);ctx.stroke();}
   if(this.getPaused()){ctx.fillStyle='#07191b99';ctx.fillRect(0,0,640,45);ctx.fillStyle='white';ctx.fillText('PLAYER MENU OPEN',225,27);}
  }
