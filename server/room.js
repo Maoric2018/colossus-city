@@ -17,9 +17,9 @@ import {v, len, arr, vec, clamp, norm, sub, mul, finiteVector, sanitizeInput, qu
 import {updateMissiles} from './abilities.js';
 import {initialBoss, updateBoss} from './boss.js';
 import {shoot, knockdown, makeRag, ragMeta, removeRag} from './combat.js';
-import {buildCity, breakCells, splitDebris, crumble, damageCell, removeBody, debrisMeta, bodyPose, scheduleFailures, processFailures, flushSkinEvents, damagedSkins, updateDebris, resolveCell} from './destruction.js';
+import {buildCity, breakCells, splitDebris, crumble, damageCell, removeBody, debrisMeta, bodyPose, scheduleFailures, processFailures, flushSkinEvents, damagedSkins, updateDebris, resolveCell, contactFromTag, collisionContact, debrisImpactSpeed} from './destruction.js';
 import {noInput, newPlayer, spawn, removePlayer, addBots, updatePlayer} from './players.js';
-import {sideBit, ALL_SIDES} from '../shared/city/materials.js';
+import {sideBit} from '../shared/city/materials.js';
 export const physicsReady = RAPIER.init();
 const G = C.COLLISION;
 
@@ -140,27 +140,29 @@ export class Room {
   this.stream?.update();
   updateBoss(this);
   for(const p of this.players.values()) updatePlayer(this, p);
-  for(const e of this.debris.values()) e.preImpactSpeed = len(e.body.linvel());
+  for(const e of this.debris.values()){e.preImpactVelocity=e.body.linvel();e.preImpactAngular=e.body.angvel();e.preImpactSpeed=len(e.preImpactVelocity);}
   for(const c of this.cars.values())if(c.body)c.preImpactSpeed=len(c.body.linvel());
   updateMissiles(this);
   this.world.step(this.queue,this.physicsHooks);
   const hits = [], fractures = new Set(), crumbles = new Set();
   this.queue.drainCollisionEvents((a, b, started) => {
    if(!started) return;
-   const ta = this.colliderTags.get(a), tb = this.colliderTags.get(b);
+   const ta=this.colliderTags.get(a),tb=this.colliderTags.get(b),contact=collisionContact(this,a,b);
    if(ta?.car&&!tb?.player)crashCar(this,ta.car);if(tb?.car&&!ta?.player)crashCar(this,tb.car);
    const pt = ta?.player ? ta : tb?.player ? tb : null;
-   for(const [tag, other] of [[ta, tb], [tb, ta]]){
+   for(const [tag,other,otherHandle] of [[ta,tb,b],[tb,ta,a]]){
     if(!tag?.cell) continue;
     const c = this.cellMap.get(tag.cell), e = this.debris.get(c?.entity);
     if(!e) continue;
-    if(e.cells.length > 1 && e.preImpactSpeed > C.SPLIT_SPEED && this.time - e.born > .5) fractures.add(e.id);
-    else if(e.cells.length === 1 && e.preImpactSpeed > C.CRUMBLE_SPEED && this.time - e.born > .3) crumbles.add(e.id);
-    // Falling structure batters whatever it lands on: domino collapses are intended.
-    const oc = other && !other.player ? resolveCell(this, other, e.body.translation()) : null;
-    if(oc && !oc.entity && !this.detached.has(oc.id) && e.preImpactSpeed > 6 && this.time - oc.lastHit > .28){
-     oc.lastHit = this.time; damageCell(this, oc, e.preImpactSpeed * Math.sqrt(e.cells.length) * 1.3, ALL_SIDES, this.cellMap.get(e.cells[0]).lastHitBy);
-     this.event({type:'strike', p:oc.p, material:oc.material, power:Math.min(1, e.preImpactSpeed / 25), broke:oc.skin.hp <= 0});
+    if(!contact||other?.player||this.world.getCollider(otherHandle)?.parent()?.isKinematic())continue;
+    const speed=debrisImpactSpeed(e,contact);
+    if(e.cells.length>1&&speed>C.SPLIT_SPEED&&this.time-e.born>.5)fractures.add(e.id);
+    else if(e.cells.length===1&&speed>C.CRUMBLE_SPEED&&this.time-e.born>.3)crumbles.add(e.id);
+    const oc=resolveCell(this,other,contact.point);
+    if(oc&&!oc.entity&&!this.detached.has(oc.id)&&speed>6&&this.time-oc.lastHit>.28){
+     const surface=contactFromTag(other);oc.lastHit=this.time;
+     damageCell(this,oc,Math.min(120,speed*Math.sqrt(Math.min(16,e.cells.length))*1.3),surface.side==null?0:sideBit(surface.side),c.lastHitBy,surface);
+     this.event({type:'strike',cell:oc.id,p:arr(contact.point),material:oc.material,power:Math.min(1,speed/25),broke:oc.skin.hp<=0});
     }
    }
    const ct = ta?.cell ? ta : tb?.cell ? tb : null;
@@ -171,7 +173,7 @@ export class Room {
   });
   for(const [p, kick, damage] of hits) if(p.body) knockdown(this, p, kick, damage, -1);
   updateCars(this);updateDebris(this, hits, fractures, crumbles);
-  processFailures(this); scheduleFailures(this); flushSkinEvents(this);
+  scheduleFailures(this); processFailures(this); flushSkinEvents(this);
   for(const [id, r] of this.rags) if(this.time - r.born > 9) removeRag(this, id);
   if(this.bossHP <= 0 || this.remaining <= 0){ this.missiles.clear(); this.phase = this.bossHP <= 0 ? 1 : 2; this.endedAt = this.time; this.event({type:'end', winner:this.phase === 1 ? 'raiders' : 'giant', players:this.scoreboard()}); }
  }
@@ -194,7 +196,7 @@ export class Room {
  breakCells(ids, kick, hint){ return breakCells(this, ids, kick, hint); }
  splitDebris(id){ return splitDebris(this, id); }
  crumble(id){ return crumble(this, id); }
- damageCell(c, energy, sides, by){ return damageCell(this, c, energy, sides, by); }
+ damageCell(c, energy, sides, by, contact){ return damageCell(this, c, energy, sides, by, contact); }
  knockdown(p, kick, damage, by){ return knockdown(this, p, kick, damage, by); }
  makeRag(p, at, velocity, flightVelocity){ return makeRag(this, p, at, velocity, flightVelocity); }
  removeRag(id){ return removeRag(this, id); }

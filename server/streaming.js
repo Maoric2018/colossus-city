@@ -72,7 +72,7 @@ export class CityStreaming{
  }
  capture(tile){
   const r=this.room,damage=[];
-  for(const c of tile.cells){const s=initialSkin(c);if(c.skin.hp!==s.hp||c.skin.glass!==s.glass||c.skin.facade!==s.facade||c.skin.facadeHp.some((h,i)=>h!==s.facadeHp[i]))damage.push([c.id,{...c.skin,facadeHp:[...c.skin.facadeHp]}]);}
+  for(const c of tile.cells){const s=initialSkin(c);if(c.skin.hp!==s.hp||c.skin.glass!==s.glass||c.skin.facade!==s.facade||c.skin.facadeHp.some((h,i)=>h!==s.facadeHp[i])||c.skin.glassHp.some((h,i)=>h!==s.glassHp[i]))damage.push([c.id,{...c.skin,facadeHp:[...c.skin.facadeHp],glassHp:[...c.skin.glassHp]}]);}
   return {x:tile.x,z:tile.z,key:tile.key,landmark:tile.landmark,damage,detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
  }
  meta(tile){const saved=this.capture(tile);return this.publicState(saved,tile.indices);}

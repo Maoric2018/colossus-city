@@ -20,7 +20,7 @@ export function generateCells(env){
      const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, architecture:b.architecture || 'urban', variant:b.variant || 0, roofYaw:env.cellBase?b.variant%4:undefined, buildingFloors:totalFloors, ground:floor === 0,
       p:[originX + ix * b.bay, .15 + floor * b.story + b.story / 2, originZ + iz * b.bay],
       size:[b.bay, b.story, b.bay], walls:[false, false, false, false], neighbors:[], below:0, above:0, lateral:[],
-      roof:false, stackAbove:0, frameScale:C.BUILDING_STRENGTH * (b.strength || 1) * (1 + .7 * (1 - floor / Math.max(1, totalFloors - 1)))};
+      roof:false, stackAbove:0, frameScale:C.BUILDING_STRENGTH * (b.strength || 1) * Math.max(.55,Math.min(1.25,(b.bay/6)**1.25)) * (.68+.32*Math.min(1,totalFloors/16)) * (1 + .7 * (1 - floor / Math.max(1, totalFloors - 1)))};
      shapeModernCell(cell,b);
      ids.set(`${ix}:${floor}:${iz}`, cell.id); cells.push(cell);
     }
@@ -47,7 +47,7 @@ export function generateCells(env){
 // Per-cell mutable damage state, kept separately so the static cell table stays shareable.
 export function initialSkin(c){
  const m = MATERIALS[c.material], mask = c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
- return {glass:mask, facade:m.facadeHP > 0 ? mask : 0, hp:m.frameHP * c.frameScale, maxHp:m.frameHP * c.frameScale, facadeHp:c.walls.map(w => w ? m.facadeHP : 0)};
+ return {glass:mask, facade:m.facadeHP > 0 ? mask : 0, hp:m.frameHP * c.frameScale, maxHp:m.frameHP * c.frameScale, glassHp:c.walls.map(w=>w?m.glassHP:0), facadeHp:c.walls.map(w => w ? m.facadeHP : 0)};
 }
 export const exteriorMask = c => c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
 // Cuboid components in LOCAL space: [center x,y,z, half x,y,z]. A wall is present only
@@ -61,7 +61,9 @@ export function cellColliders(c, skin){
  if(solid(1)) out.push([w / 2 - .06, 0, 0, .06, h / 2 - .22, d / 2 - .3]);
  if(solid(2)) out.push([0, 0, d / 2 - .06, w / 2 - .3, h / 2 - .22, .06]);
  if(solid(3)) out.push([-w / 2 + .06, 0, 0, .06, h / 2 - .22, d / 2 - .3]);
- out.push(...roofColliders(c));
+ for(let i=0;i<5;i++)out[i].kind='frame';
+ let index=5;for(let side=0;side<4;side++)if(solid(side)){out[index].kind='wall';out[index++].side=side;}
+ for(const a of roofColliders(c)){a.kind='attachment';out.push(a);}
  return out;
 }
 // Which exterior side of a bay faces a world point (dominant horizontal axis).

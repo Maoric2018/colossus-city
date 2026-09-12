@@ -9,10 +9,9 @@ import {launchMissile} from './abilities.js';
 import {knockdown} from './combat.js';
 import {damageCell, breakCells, buildingsAlong} from './destruction.js';
 import {sideBit} from '../shared/city/materials.js';
-import {facingSide} from '../shared/city/cells.js';
 import {noInput} from './players.js';
 export function initialBoss(){
- return {x:0, z:0, yaw:0, head:v(0, 23.8, 0), left:v(-5.6, 16, -4), right:v(5.6, 16, -4), lastPose:-100, input:noInput(), lastInput:-100, missileReady:0, stagger:0, combo:0, comboAt:-10, stepDistance:0, leftQuaternion:[...identity], rightQuaternion:[...identity], pressed:{}};
+ return {x:0, z:0, yaw:0, head:v(0, 23.8, 0), left:v(-5.6, 16, -4), right:v(5.6, 16, -4), lastPose:-100, input:noInput(), lastInput:-100, missileReady:0, stagger:0, combo:0, comboAt:-10, stepDistance:0, leftQuaternion:[...identity], rightQuaternion:[...identity], pressed:{}, strikes:{left:new Map(),right:new Map()}};
 }
 export function updateBoss(room){
  const b = room.boss, prevL = {...b.left}, prevR = {...b.right}, before = v(b.x, 0, b.z), rawPrevious = {left:b.rawLeft || prevL, right:b.rawRight || prevR},previousHead={...b.head};
@@ -43,6 +42,7 @@ export function updateBoss(room){
  if(b.desktop || !room.bossClient) for(const side of ['left', 'right']) b[side + 'Quaternion'] = handQuaternion(null, b.yaw);
  if(room.bossClient && !b.desktop && room.time - b.lastPose < .4 && !b.resetPose){ for(const side of ['left', 'right']) if(b.triggers?.[side] && b.aims?.[side]) launchMissile(room, side, b.aims[side]); }
  if(room.bossClient && b.desktop && room.time - b.lastInput < .45 && b.input.missile) launchMissile(room, 'right', lookDir(b.yaw, b.input.pitch));
+ const poseDt=!b.desktop?clamp(b.lastPose-(b.consumedPose??(b.lastPose-C.TICK)),C.TICK,.1):C.TICK;
  const canAttack = (!room.bossClient || (b.desktop ? room.time - b.lastInput < .45 : room.time - b.lastPose < .4)) && !(room.time < b.noContactUntil);
  // Raiders cannot fly through the giant's torso/head as if they were non-solid visuals.
  for(const p of room.players.values()) if(canAttack && p.body){
@@ -57,7 +57,7 @@ export function updateBoss(room){
    for(let i=0;i<hand.numColliders();i++)hand.collider(i).setEnabled(canAttack);
    const rotation=b[key+'Quaternion'],q={x:rotation[0],y:rotation[1],z:rotation[2],w:rotation[3]},raw={...b[key]};
    const previousRaw=rawPrevious[key],rawPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(previousRaw,b.head),b.turnDelta)):previousRaw;
-   const displacement=sub(raw,rawPrev),physical=sub(sub(raw,b.head),rotateYaw(sub(previousRaw,previousHead),b.turnDelta||0)),speed=Math.min(C.MAX_HAND_SPEED,len(physical)/C.TICK);
+   const displacement=sub(raw,rawPrev),physical=sub(sub(raw,b.head),rotateYaw(sub(previousRaw,previousHead),b.turnDelta||0)),speed=Math.min(C.MAX_HAND_SPEED,len(physical)/poseDt);
    b[idx?'rawRight':'rawLeft']=raw;
    if(b.resetPose||!canAttack){b.pressed[key]=false;hand.setTranslation(raw,true);hand.setRotation(q,true);hand.setNextKinematicTranslation(raw);hand.setNextKinematicRotation(q);continue;}
    const collisionPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(prev,b.head),b.turnDelta)):prev;
@@ -71,17 +71,20 @@ export function updateBoss(room){
     const hit=p.body.collider(0).castShape(v(),new RAPIER.Cuboid(...GIANT.handHalf),collisionPrev,q,stoppedDisplacement,0,1,true);
     if(hit){const direction=speed>3?norm(displacement):norm(sub(p.body.translation(),b[key]));const kick=add(mul(direction,clamp(speed*.65,8,35)),v(0,6,0));knockdown(room,p,kick,25+speed*1.15,-1);}else if(speed>9&&segmentDistance(p.body.translation(),collisionPrev,b[key])<C.HAND_RADIUS+3.4&&room.time-p.closeCallAt>2.5&&!p.bot){p.closeCallAt=room.time;p.fuel=Math.min(1,p.fuel+.18);room.event({type:'closecall',player:p.id,p:arr(p.body.translation())});}
    }
-   const blocked=dist(raw,b[key])>.025;
+   const blocked=contact.contacts.length>0;
    if(!blocked)b.pressed[key]=false;else if(speed>.2)b.pressed[key]=true;
    if(contact.contacts.length&&b.pressed[key]&&speed>.75&&(!b.desktop||b.input.fire||b.input.up>0)){
-    const hit=[],touched=new Set();
-    for(const point of contact.contacts){const c=room.cellMap.get(point.cell);if(!c||touched.has(c.id)||room.detached.has(c.id)||room.time-c.lastHit<=C.HAND_CONTACT_INTERVAL)continue;touched.add(c.id);
-     c.lastHit=room.time;
-     const sides=sideBit(facingSide(c,point.point));
-     if(damageCell(room,c,speed*.95+5,sides,0))hit.push(c.id);
-     room.event({type:'strike',p:point.point,power:Math.max(.15,Math.min(1,speed/30)),material:c.material,broke:c.skin.hp<=0});
-     if(hit.length>=5)break;
+    const hit=[],touched=new Set(),strikes=b.strikes[key];
+    for(const point of [...contact.contacts].sort((a,c)=>dist(vec(a.point),b[key])-dist(vec(c.point),b[key]))){
+     const c=room.cellMap.get(point.cell),inward=-(physical.x*point.normal[0]+physical.y*point.normal[1]+physical.z*point.normal[2])/poseDt;
+     if(!c||touched.has(c.id)||room.detached.has(c.id)||inward<=.75||room.time-(strikes.get(c.id)??-100)<C.HAND_CONTACT_INTERVAL)continue;
+     touched.add(c.id);strikes.set(c.id,room.time);c.lastHit=room.time;
+     const sides=point.side==null?0:sideBit(point.side),impactSpeed=Math.min(C.MAX_HAND_SPEED,inward);
+     if(damageCell(room,c,8+impactSpeed*2.1,sides,0,point))hit.push(c.id);
+     room.event({type:'strike',cell:c.id,side:point.side,normal:point.normal,p:point.point,power:Math.max(.15,Math.min(1,impactSpeed/30)),material:c.material,broke:c.skin.hp<=0});
+     if(touched.size>=5)break;
     }
+    for(const [id,at] of strikes)if(room.time-at>1)strikes.delete(id);
     if(hit.length){breakCells(room,hit,mul(norm(displacement),Math.min(16,Math.max(2,speed*.28))),{at:b[key]});registerCombo(room,hit.length);}
    }
   }
@@ -90,11 +93,12 @@ export function updateBoss(room){
  if(canAttack)pushCarsWithBody(room,before,v(b.x,0,b.z),moved);
  if(canAttack && b.walkContacts?.length && room.time-(b.lastWalkChip || -10)>C.WALK_CHIP_INTERVAL){
   const c=b.walkContacts[0],hp=c.skin.hp; b.lastWalkChip=room.time;
-  if(hp>c.skin.maxHp*.95){damageCell(room,c,C.WALK_CHIP,sideBit(facingSide(c,[b.x,8,b.z])),0);c.skin.hp=Math.max(c.skin.hp,c.skin.maxHp*.95);}
+  if(hp>c.skin.maxHp*.95){damageCell(room,c,C.WALK_CHIP,0,0,{kind:'frame'});c.skin.hp=Math.max(c.skin.hp,c.skin.maxHp*.95);}
   room.event({type:'strike',p:[b.x,6,b.z],material:c.material,power:.08,broke:false});
  }
  b.stepDistance += moved * C.TICK;
  if(b.stepDistance > 7){ b.stepDistance = 0; room.event({type:'stomp', p:[b.x, 0, b.z]}); }
+ b.consumedPose=b.lastPose;
  b.resetPose = false; b.turnDelta = 0;
 }
 export function registerCombo(room, n){

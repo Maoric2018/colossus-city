@@ -22,7 +22,7 @@ export class HandWorld{
   const pose=[...position,...rotation];if(entry.pose?.every((v,i)=>v===pose[i]))return;this.unindex(entry);entry.pose=pose;
   entry.bounds=box(position,entry.half,rotation);
   for(let x=Math.floor((entry.bounds.center[0]-entry.bounds.extent[0])/35);x<=Math.floor((entry.bounds.center[0]+entry.bounds.extent[0])/35);x++)for(let z=Math.floor((entry.bounds.center[2]-entry.bounds.extent[2])/35);z<=Math.floor((entry.bounds.center[2]+entry.bounds.extent[2])/35);z++){const key=`${x},${z}`;if(!this.buckets.has(key))this.buckets.set(key,new Set());this.buckets.get(key).add(entry);(entry.keys??=[]).push(key);}
-  entry.boxes=entry.local.map(a=>({...box(plus(position,rotate(a.slice(0,3),rotation)),a.slice(3),rotation,id),debris:!!entry.debris}));
+  entry.boxes=entry.local.map(a=>({...box(plus(position,rotate(a.slice(0,3),rotation)),a.slice(3),rotation,id),debris:!!entry.debris,kind:a.kind||'frame',side:a.side}));
  }
  unindex(entry){for(const key of entry.keys||[]){const bucket=this.buckets.get(key);bucket?.delete(entry);if(!bucket?.size)this.buckets.delete(key);}entry.keys=[];}
  *near(from,to){

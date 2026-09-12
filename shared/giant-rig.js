@@ -29,15 +29,22 @@ export function sweepBox(from,to,basis,half,other,padding=.015){
 export function handRay(origin,direction,center,q,maxDistance=Infinity){const basis=axes(q),offset=minus(origin,center);let lo=0,hi=maxDistance;for(let i=0;i<3;i++){const d=dot(offset,basis[i]),v=dot(direction,basis[i]),h=GIANT.handHalf[i];if(Math.abs(v)<1e-9){if(Math.abs(d)>h)return Infinity;}else{let a=(-h-d)/v,b=(h-d)/v;if(a>b)[a,b]=[b,a];lo=Math.max(lo,a);hi=Math.min(hi,b);if(lo>hi)return Infinity;}}return lo;}
 // Stop at the first surface, then slide along it. A bent wrist may require a
 // small separation correction; tracked targets themselves are never overwritten.
+// Contact points are clamped to the actual obstacle, including glancing knuckles.
+export function closestBoxPoint(point,other){const delta=minus(point,other.center);let result=[...other.center];for(let i=0;i<3;i++)result=plus(result,times(other.basis[i],Math.max(-other.half[i],Math.min(other.half[i],dot(delta,other.basis[i])))));return result;}
 export function resolveHand(from,target,q,world){
  const basis=axes(q),half=GIANT.handHalf,contacts=new Map();let position=[...from];
  for(let iteration=0;iteration<6;iteration++){
-  let nearest=null,obstacle=null;
-  for(const other of world.near(position,target)){const hit=sweepBox(position,target,basis,half,other);if(hit&&(!nearest||hit.t<nearest.t||(hit.t===0&&hit.depth>nearest.depth))){nearest=hit;obstacle=other;}}
+  let nearest=null;const hits=[];
+  for(const other of world.near(position,target)){const hit=sweepBox(position,target,basis,half,other);if(!hit)continue;hits.push({hit,other});if(!nearest||hit.t<nearest.t||(hit.t===0&&hit.depth>nearest.depth))nearest=hit;}
   if(!nearest){position=[...target];break;}
   const motion=minus(target,position);position=plus(position,times(motion,nearest.t));
   position=plus(position,times(nearest.normal,nearest.depth+.002));
-  const point=minus(position,times(nearest.normal,support(basis,half,nearest.normal)));contacts.set(obstacle,{cell:obstacle.cell,point,normal:nearest.normal});
+  // A fist straddling two coplanar bays really touches both. Do not let iteration
+  // order choose one arbitrary bay, or carry the sweep through the front wall.
+  for(const {hit,other} of hits)if(Math.abs(hit.t-nearest.t)<1e-5&&dot(hit.normal,nearest.normal)>.95){
+   const point=closestBoxPoint(minus(position,times(hit.normal,support(basis,half,hit.normal))),other);
+   contacts.set(other,{cell:other.cell,point,normal:hit.normal,kind:other.kind||'frame',side:other.side});
+  }
   const rest=minus(target,position),into=dot(rest,nearest.normal);target=into<0?minus(target,times(nearest.normal,into)):target;
   if(Math.hypot(...minus(target,position))<.0001)break;
  }

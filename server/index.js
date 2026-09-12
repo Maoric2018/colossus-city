@@ -84,10 +84,12 @@ const interval=setInterval(()=>{
    if(room.emptySince&&Date.now()-room.emptySince>60000){room.dispose();rooms.delete(code);continue;}
    if(!room.clients.size)continue;
    room.step();
+   // Hits and broken skins leave on the current physics tick; pose snapshots keep
+   // their lower bandwidth cadence. Destruction need not wait another 50 ms.
+   const events=room.drainEvents();
+   if(events.some(e=>e.type==='reset'))for(const c of room.clients.values())send(c.ws,room.welcome(c));
+   if(events.length)broadcast(room,{type:'events',events});
    if(room.tick%C.SNAPSHOT_EVERY===0){
-    const events=room.drainEvents();
-    if(events.some(e=>e.type==='reset'))for(const c of room.clients.values())send(c.ws,room.welcome(c));
-    if(events.length)broadcast(room,{type:'events',events});
     const snapshot=Buffer.from(encodeSnapshot(room.snapshot()));
     for(const c of room.clients.values())if(c.ws.readyState===WebSocket.OPEN&&c.ws.bufferedAmount<128*1024)c.ws.send(snapshot);
    }

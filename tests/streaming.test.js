@@ -21,11 +21,12 @@ test('procedural addresses are deterministic, disjoint, detailed and vary across
 test('unloaded blocks restore structural HP, open skins, persistent debris and stable cell IDs',()=>{
  const room=new Room('SAVE');try{
   const tile=room.stream.load(4,-3),c=tile.cells.find(c=>c.floor===1&&c.walls[0]),other=tile.cells.find(c=>c.floor===3&&c.walls[2]);
+  const partial=tile.cells.find(c=>c.floor===2&&c.walls[0]);room.damageCell(partial,2,1);const partialSkin=structuredClone(partial.skin);
   room.damageCell(c,70,1);const skin=structuredClone(c.skin);const pieces=room.breakCells([other.id],v(2,1,0));assert.ok(pieces.length);
   const piece=pieces[0],pose=room.debrisMeta(piece),baseCells=room.cells.length-tile.cells.length;
   room.stream.unload(tile.key);assert.equal(room.cells.length,baseCells);assert.ok(!room.cellMap.has(c.id));assert.ok(!room.debris.has(piece.id));
   const saved=room.stream.welcome().find(t=>t.key===tile.key);assert.ok(saved.entities.some(e=>e.id===piece.id));assert.ok(saved.skins.some(s=>s[0]===c.id));
-  const restored=room.stream.load(4,-3);assert.deepEqual(restored.cells.map(c=>c.id),tile.cells.map(c=>c.id));assert.deepEqual(room.cellMap.get(c.id).skin,skin);assert.deepEqual(room.debrisMeta(room.debris.get(piece.id)).p,pose.p);assert.ok(room.detached.has(other.id));
+  const restored=room.stream.load(4,-3);assert.deepEqual(restored.cells.map(c=>c.id),tile.cells.map(c=>c.id));assert.deepEqual(room.cellMap.get(c.id).skin,skin);assert.deepEqual(room.cellMap.get(partial.id).skin,partialSkin);assert.deepEqual(room.debrisMeta(room.debris.get(piece.id)).p,pose.p);assert.ok(room.detached.has(other.id));
   for(const cell of restored.cells)if(!room.detached.has(cell.id))assert.ok(room.handWorld.cells.get(cell.id).pose);
  }finally{room.dispose();}
 });

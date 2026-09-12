@@ -16,10 +16,10 @@ test('visible knuckles and rotated corners stop at the surface and slide without
 });
 test('gentle contact chips at the visible face; repeated deliberate punches break it',()=>{
  const {room,client,pose,cell}=fixture();try{
-  for(let i=0;i<30;i++){pose.right[2]-=.025;room.input(client,pose);room.step();if(cell.skin.hp<cell.skin.maxHp)break;}
-  assert.ok(cell.skin.hp<cell.skin.maxHp&&cell.skin.hp>0,'First slow touch must register without requiring a fast swing');assert.ok(Math.abs(room.boss.right.z-(-16+GIANT.handHalf[2]+.017))<.005);
+  for(let i=0;i<30;i++){pose.right[2]-=.025;room.input(client,pose);room.step();if(cell.skin.glassHp[2]<6)break;}
+  assert.ok(cell.skin.glassHp[2]<6,'First slow touch must chip the contacted window');assert.equal(cell.skin.hp,cell.skin.maxHp,'An intact facade must protect the frame');assert.ok(Math.abs(room.boss.right.z-(-16+GIANT.handHalf[2]+.017))<.005);
   assert.ok(room.drainEvents().some(e=>e.type==='strike'),'Contact must provide immediate feedback before collapse');
-  const hp=cell.skin.hp;for(let i=0;i<90;i++){room.input(client,pose);room.step();}assert.equal(cell.skin.hp,hp,'A held hand must not grind the frame away');
+  const skin=structuredClone(cell.skin);for(let i=0;i<90;i++){room.input(client,pose);room.step();}assert.deepEqual(cell.skin,skin,'A held hand must not grind the wall or frame away');
   for(let jab=0;jab<12&&!room.detached.has(cell.id);jab++){pose.right=[0,7.5,-13];for(let i=0;i<25;i++){room.input(client,pose);room.step();}pose.right=[3.85,7.5,-24];room.input(client,pose);room.step();}
   assert.ok(room.detached.has(cell.id),'Deliberate strikes on the remaining columns demolish the stronger bay');
  }finally{room.dispose();}
@@ -53,7 +53,7 @@ test('layered wall openings update the authoritative and fresh-client hand geome
  const {room,cell}=fixture();try{
   const start=[0,cell.p[1],-12],end=[0,cell.p[1],-19],before=resolveHand(start,end,identity,room.handWorld);
   assert.ok(before.contacts.some(p=>p.cell===cell.id));
-  room.damageCell(cell,60,4); // South facade breaks, frame stays standing.
+  room.damageCell(cell,70,4); // South facade breaks, frame stays standing.
   assert.ok(!room.detached.has(cell.id));assert.equal(cell.skin.facade&4,0);
   assert.equal(resolveHand(start,end,identity,room.handWorld).contacts.length,0);
   const client=new HandWorld(environment,generateCells(environment)),welcome=room.welcome({id:1,role:'boss'});

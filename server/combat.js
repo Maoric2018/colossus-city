@@ -5,8 +5,8 @@ import {raiderParts, raiderLinks, raiderGear} from '../shared/raider-rig.js';
 import {raiderPose,composeRotation} from '../shared/raider-pose.js';
 import {C, group} from '../shared/config.js';
 import {v, add, sub, mul, arr, vec, clamp, quatYaw, quatEuler, rotateYaw, raySphere, lookDir} from '../shared/math.js';
-import {damageCell, damageSphere, facingSide, removeBody, resolveCell, bodyPose} from './destruction.js';
-import {sideBit, ALL_SIDES} from '../shared/city/materials.js';
+import {damageCell, damageSphere, removeBody, resolveCell, contactFromTag, bodyPose} from './destruction.js';
+import {sideBit} from '../shared/city/materials.js';
 const G = C.COLLISION;
 function giantTargets(b){
  return [[b.head, C.HEAD_RADIUS, 1.8], [v(b.head.x, b.head.y - 7.2, b.head.z), 4.1, 1]];
@@ -24,11 +24,12 @@ export function shoot(room, p, heavy = false){
  let structure = false;
  if(obstruction){
   distance = obstruction.timeOfImpact ?? obstruction.toi; damage = 0; weak = false;
-  const at = add(origin, mul(direction, distance)), c = resolveCell(room, room.colliderTags.get(obstruction.collider.handle), at);
+  const at=add(origin,mul(direction,distance)),tag=room.colliderTags.get(obstruction.collider.handle),c=resolveCell(room,tag,at);
   if(c && !room.detached.has(c.id)){
-   const side = sideBit(facingSide(c, arr(at)));
-   if(heavy){ structure = true; damageCell(room, c, C.HEAVY_STRUCTURE, ALL_SIDES, p.id); for(const n of c.lateral) damageCell(room, room.cellMap.get(n), C.HEAVY_STRUCTURE * .35, ALL_SIDES, p.id); if(c.below) damageCell(room, room.cellMap.get(c.below), C.HEAVY_STRUCTURE * .25, ALL_SIDES, p.id); room.event({type:'impact', p:arr(at), power:.5, material:c.material}); }
-   else damageCell(room, c, 6, side, p.id); // bullets only pop windows
+   const contact=contactFromTag(tag),side=contact.side==null?0:sideBit(contact.side);
+   if(heavy){structure=true;damageSphere(room,at,2.4,C.HEAVY_STRUCTURE,p.id,6);room.event({type:'impact',p:arr(at),power:.5,material:c.material});}
+   else damageCell(room,c,6,side,p.id,contact);
+
   }
  }
  if(damage){
