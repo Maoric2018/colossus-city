@@ -33,7 +33,7 @@ const renderer = gr.renderer, tier = gr.tier;
 const scene = new T.Scene(); scene.background = new T.Color(city.sky.horizon);
 const camera = new T.PerspectiveCamera(72, innerWidth / innerHeight, .05, tier.far), rig = new T.Group(); rig.add(camera); scene.add(rig);
 const cityView = new CityView(scene, city, {tier, quest});
-const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
+const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(scene), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
 const net = new Connection(onMessage, onDisconnect), hud = new HUD(), cameraRig = new CameraRig(camera, rig, cityView, shake, prediction);
 const players = new Map(), rags = new Map();
 let lastNow = performance.now(), lastHUD = 0, lastInput = 0, frameCount = 0, frameStart = performance.now(), lastReconciled = -1;
@@ -51,6 +51,12 @@ const views = new SpectatorViews(renderer, scene, camera, {getState:() => state.
 views.noCapture = touch;
 const listenerPosition = () => [camera.matrixWorld.elements[12], camera.matrixWorld.elements[13], camera.matrixWorld.elements[14]];
 const handleEvent = makeEventHandler({city:cityView, fx, audio, hud, shake, xr, missiles, flightFX, giant, addRag, rags, listenerPosition});
+// The lobby camera orbits high above the city, well past the gameplay fog
+// distance, so the intro view gets its own longer range and restores it on drop-in.
+const gameFog = scene.fog ? {near:scene.fog.near, far:scene.fog.far} : null;
+const setFog = (near, far) => { if(scene.fog){ scene.fog.near = near; scene.fog.far = far; } };
+const lobbyFog = () => setFog(150, 420);
+lobbyFog();
 const lobby = bindLobby({
  start, leave, toggleCamera, resume(){ if(state.role === 'boss' && quest) hud.hideOverlay(); else pointer(); }, menu(){ input.reset(); hud.showOverlay(undefined, undefined, {renderer, net}); },
  openSpectator(){ if(state.role === 'spectator'){ document.exitPointerLock?.(); hud.hideOverlay(); input.reset(); views.setVisible(true); } else { const url = new URL(location.href); url.searchParams.set('spectator', '1'); window.open(url.toString(), '_blank', 'noopener'); } },
@@ -76,6 +82,7 @@ async function start(create = false, practice = false, spectator = false){
  try{
   const wanted = spectator ? 'spectator' : state.selectedRole;
   const m = await net.connect({create, practice, role:wanted, room:$('room-input').value.trim().toUpperCase(), name:callsign(wanted)});
+  if(gameFog) setFog(gameFog.near, gameFog.far);
   state.playing = true; document.body.classList.add('playing'); $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden');
   const role = state.role;
   $('controls').textContent = role === 'boss' ? 'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY' : role === 'spectator' ? 'WASD FLY · SPACE UP · C DOWN · SHIFT FAST · MOUSE LOOK' : 'WASD MOVE · SPACE FLY · HOLD SHIFT SOAR · E DODGE · CLICK FIRE · HOLD RIGHT CLICK: BREACH SHOT · V CAMERA · TAB SCORES';
@@ -131,6 +138,7 @@ function aim(){
 }
 const localOverride = {p:[0, 0, 0], v:[0, 0, 0]};
 function frame(now, xrFrame){
+ const frameStartCPU=performance.now();
  const dt = Math.min((now - lastNow) / 1000, .05); lastNow = now; frameCount++;
  if(now - frameStart > 1000){ hud.fps = Math.round(frameCount * 1000 / (now - frameStart)); frameCount = 0; frameStart = now; }
  gr.adapt(dt, now);
@@ -166,14 +174,15 @@ function frame(now, xrFrame){
  }else if(!state.playing){
   const t = now * .0001;
   giant.update({head:[0, 24, 0], left:[-6, 13 + Math.sin(t * 5), -3], right:[6, 12 + Math.cos(t * 5), -4], bossYaw:-.35});
+  lobbyFog();
   cameraRig.intro(now, city);
  }
  // The full-screen streamline overlay repaints every frame; a phone spends that budget on the city.
- missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); if(!touch) flightFX.update(dt, me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
+ missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); if(!touch) flightFX.update(dt, state.role==='raider'&&prediction.active?localOverride:me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
  cityView.update(dt);cityView.cars.update(dt,fx); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
  renderer.info.reset();
  if(!(state.playing && state.role === 'spectator' && views.visible)) gr.render(scene, camera, dt);
- if(state.playing){ views.update(now); $('capture-status').classList.toggle('hidden', !views.active); }
+ if(state.playing){ views.update(now,frameStartCPU); $('capture-status').classList.toggle('hidden', !views.active); }
 }
 renderer.setAnimationLoop(frame);
 window.addEventListener('resize', () => gr.resize(camera));
@@ -184,7 +193,7 @@ if(!touch){
  canvas.addEventListener('click', () => { if(state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
  document.addEventListener('pointerlockchange', () => { if(state.playing && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
 }
-const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(''); });
+const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, fx.ready, flightFX.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(''); });
 if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.then(() => start(false, false, true));
 // Practice lost its lobby button in the retheme; keep a URL entry point for the drone tests.
 if(lobby.params.get('practice') === '1') artReady.then(() => start(true, true));

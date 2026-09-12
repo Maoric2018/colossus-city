@@ -60,18 +60,20 @@ export async function installRoofDressing(view){
  await Promise.all(tasks);
 }
 // Attached props are re-posed whenever their bay moves; register them with the buildings layer.
-function attachRoofProps(view, cells){
+export function attachRoofProps(view, cells){
  const {buildings} = view, matrix = new T.Matrix4(), offset = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0), temp = new T.Object3D();
  if(!buildings.attachmentHook){
-  const original = buildings.setCell.bind(buildings);
-  buildings.setCell = (id, p, q, hidden) => {
-   original(id, p, q, hidden);
-   const attached = view.attachments.get(id); if(!attached) return;
-   const e = buildings.entries.get(id); temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.set(1, 1, 1); temp.updateMatrix(); offset.copy(temp.matrix);
-   for(const part of attached){ matrix.multiplyMatrices(offset, part.local); part.batch.setMatrixAt(part.index, (hidden||e.fine) ? zero : matrix); part.batch.instanceMatrix.needsUpdate = true; }
+  buildings.writeAttachments = e => {
+   const attached = view.attachments.get(e.cell.id); if(!attached) return;
+   // Nearby off-camera props still cast shadows when enabled. In headset mode
+   // and beyond the fog cutoff they share their bay's stereo visibility.
+   const visible=!e.hidden&&!e.fine&&(e.rendered!==false||!!(buildings.lastShadows&&e.renderNear));
+   if(e.attachmentVisible===visible&&e.attachmentRevision===e.revision)return;e.attachmentVisible=visible;e.attachmentRevision=e.revision;
+   temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.set(1, 1, 1); temp.updateMatrix(); offset.copy(temp.matrix);
+   for(const part of attached){ matrix.multiplyMatrices(offset, part.local); part.batch.setMatrixAt(part.index, visible ? matrix : zero); part.batch.instanceMatrix.needsUpdate = true; }
   };
   buildings.attachmentHook = true;
  }
- for(const c of cells){view.fine?.refreshSource(c,buildings); const e = buildings.entries.get(c.id); buildings.setCell(c.id, null, null, e.hidden); }
+ for(const c of cells){view.fine?.refreshSource(c,buildings); const e = buildings.entries.get(c.id);e.attachmentVisible=undefined;buildings.writeAttachments(e); }
  buildings.commit();
 }

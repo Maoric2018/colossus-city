@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {ViewStream} from './view-stream.js';
 import {bossHealthFraction} from '../shared/boss-health.js';
+import {CaptureBudget} from './render/capture-budget.js';
 // Feed pixels come from each player's renderer. XR is rendered with the actual
 // left-eye matrices; it is not reconstructed from delayed multiplayer snapshots.
 export class SpectatorViews{
@@ -8,6 +9,7 @@ export class SpectatorViews{
   Object.assign(this,{renderer,scene,camera,getState,getRole,getPlayerId,getMode,getPaused,getTracking,players,giant,xr});
   this.canvas=document.createElement('canvas');this.canvas.width=640;this.canvas.height=400;this.context=this.canvas.getContext('2d');
   this.mirror=new T.PerspectiveCamera();
+  this.captureBudget=new CaptureBudget();
   this.panel=document.getElementById('spectator-panel');this.grid=document.getElementById('spectator-grid');this.cards=new Map();this.roster=[];this.lastFrame=0;this.botCursor=0;this.active=false;
  }
  connect(welcome,retry=false){
@@ -46,14 +48,14 @@ export class SpectatorViews{
   const r=this.renderer,previous={target:r.getRenderTarget(),enabled:r.xr.enabled,viewport:r.getViewport(new T.Vector4()),scissor:r.getScissor(new T.Vector4()),test:r.getScissorTest(),shadows:r.shadowMap.autoUpdate,visibility:this.scene.userData.reuseCityVisibility};
   // The desktop framebuffer applies the same tone mapping as direct XR rendering.
   // Rendering to a normal texture target would bypass material tone mapping.
-  const width=r.domElement.width,height=r.domElement.height,w=Math.min(width,640,height*aspect,400*aspect),h=w/aspect,vx=(width-w)/2,vy=(height-h)/2,dpr=r.getPixelRatio();
+  const width=r.domElement.width,height=r.domElement.height,scale=reuseCityVisibility?this.captureBudget.scale:1,w=Math.min(width,640*scale,height*aspect,400*scale*aspect),h=w/aspect,vx=(width-w)/2,vy=(height-h)/2,dpr=r.getPixelRatio();
   try{this.scene.userData.reuseCityVisibility=reuseCityVisibility;r.xr.enabled=false;r.shadowMap.autoUpdate=false;r.setRenderTarget(null);r.setViewport(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissor(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissorTest(true);r.clear();r.render(this.scene,camera);
    this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);const dw=Math.min(640,400*aspect),dh=dw/aspect;
    this.context.drawImage(r.domElement,vx,height-vy-h,w,h,(640-dw)/2,(400-dh)/2,dw,dh);
   }finally{this.scene.userData.reuseCityVisibility=previous.visibility;r.setRenderTarget(previous.target);r.setViewport(previous.viewport);r.setScissor(previous.scissor);r.setScissorTest(previous.test);r.shadowMap.autoUpdate=previous.shadows;r.xr.enabled=previous.enabled;}
  }
  captureXR(){const eye=this.renderer.xr.getCamera().cameras[0];if(!eye)return false;this.mirror.copy(eye,false);this.mirror.matrixAutoUpdate=false;this.mirror.matrixWorldAutoUpdate=false;this.renderCamera(this.mirror,eye.viewport?eye.viewport.z/eye.viewport.w:eye.projectionMatrix.elements[5]/eye.projectionMatrix.elements[0],true);return true;}
- update(now){
+ update(now,frameStart){
   if(this.role==='spectator'){
    if(!this.visible)return;
    const state=this.getState();
@@ -68,16 +70,17 @@ export class SpectatorViews{
    return;
   }
   // Publishing costs a second scene render plus an encode every frame. A phone watches, never publishes.
-  const stream=this.stream,headset=this.renderer.xr.isPresenting,interval=1000/(headset?24:30);
+  const stream=this.stream,headset=this.renderer.xr.isPresenting,interval=this.captureBudget.interval(headset?24:30),frameMS=1000/(headset?(this.xr?.session?.frameRate||72):60),workMS=frameStart===undefined?NaN:performance.now()-frameStart;
   if(!this.active||!stream||this.noCapture||now-this.lastFrame<interval-.5)return;
+  if(!this.captureBudget.allow(workMS,frameMS))return;
   this.lastFrame+=Math.max(1,Math.floor((now-this.lastFrame+.5)/interval))*interval;
-  try{
+  const captureStart=performance.now();try{
    if(headset){if(!this.captureXR())return;}
-   else{const source=this.renderer.domElement,aspect=source.width/source.height,w=Math.min(640,400*aspect),h=w/aspect,x=(640-w)/2,y=(400-h)/2;this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);this.context.drawImage(source,x,y,w,h);this.context.drawImage(document.getElementById('flight-effects'),x,y,w,h);this.drawHUD();}
+   else{const source=this.renderer.domElement,aspect=source.width/source.height,w=Math.min(640,400*aspect),h=w/aspect,x=(640-w)/2,y=(400-h)/2;this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);this.context.drawImage(source,x,y,w,h);this.drawHUD();}
    const info=JSON.stringify({type:'view-info',mode:headset?'Headset left eye':this.getMode(),paused:this.getPaused(),tracking:this.getTracking()});
    if(info!==this.lastInfo||now-(this.lastInfoAt||0)>1000){stream.send(JSON.parse(info));this.lastInfo=info;this.lastInfoAt=now;}
    stream.publish();if(now-(this.lastImage||0)>=1000/15){this.lastImage=now;stream.image();}
-  }catch(error){console.warn('View capture unavailable',error);}
+  }catch(error){console.warn('View capture unavailable',error);}finally{this.captureBudget.record(performance.now()-captureStart,workMS,frameMS);}
  }
  drawHUD(){
   const state=this.getState();if(!state)return;const p=state.players.find(p=>p.id===this.getPlayerId()),ctx=this.context;

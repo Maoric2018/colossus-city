@@ -75,7 +75,7 @@ Looking down smoothly makes your own torso, hips and legs translucent, clearing 
 
 Raiders start in first person. Press **V** or use the pause-menu camera button for the wider third-person shoulder view.
 
-**Flight:** hold Space to take off, hold Shift to soar. Soaring flies prone at 32 m/s along the mouse; S brakes. Entering soar produces a sonic boom and expanding shockwave; peripheral speed trails and condensation arcs continue during flight. Hover is 11 m/s. The giant walks at 13 m/s so it can catch a hovering raider. A full tank of hover thrust climbs about 115 m; soaring has unlimited thrust and works with an empty fuel meter. E dodges (12 % thrust, 1.2 s cooldown). Passing within a few metres of a swinging hand without being hit is a **close call** that refills thrust.
+**Flight:** hold Space to take off, hold Shift to soar. Soaring flies prone at 32 m/s along the mouse; S brakes. Entering soar plays a downloaded animated smoke shockwave; downloaded hyperspeed streaks stay around the edges of the view. An invisible 5.6 m-wide pressure field clears buildings up to about 8 m ahead, throwing loose pieces outward so the first-person and shoulder cameras have room to see. Hover is 11 m/s. The giant walks at 13 m/s so it can catch a hovering raider. A full tank of hover thrust climbs about 115 m; soaring has unlimited thrust and works with an empty fuel meter. E dodges (12 % thrust, 1.2 s cooldown). Passing within a few metres of a swinging hand without being hit is a **close call** that refills thrust.
 
 **Soaring through buildings:** while holding Shift, fly into a building to punch a narrow opening through its walls and structural bays. Glass and facade panels shatter, the broken structure remains as debris, and you keep flying through the opening. Normal flight and normal dodges cannot break walls. Terrain, cars and unrelated wreckage remain solid; only your freshly broken pieces briefly stop colliding with you.
 
@@ -97,7 +97,7 @@ Soaring animates the existing armored pilot: the helmet looks forward, the weapo
 
 The original **169 buildings and 5,827 structural bays** form the center of a continuously generated city. Travel in any horizontal direction to discover more 70 m blocks, each with eight street-front buildings, courtyards, alleys and connected streets. Some courtyards contain a Chrysler-style landmark. Sixteen building families vary footprints, heights, setbacks and facade details: brownstones, tenements, warehouses, cast-iron storefronts, Beaux-Arts, Art Deco, curtain-wall offices, terraces, brutalist buildings, hotels, apartments, factories, markets, Gothic buildings, copper-roofed buildings and modern offices. The custom twin towers, Empire State–style tower, Chrysler Building, 30 Hudson Yards and One Vanderbilt remain in Midtown.
 
-The **214-type architectural kit** supplies at least **75 distinct component types per building**: detailed entrances and windows, stairs, fire escapes, interior services, ornamental masonry, balconies, roof machinery and family-specific parts. Downloaded photographic textures and roof models are reused. Fine geometry is concentrated nearby; simpler distant buildings blend into matching horizon fog (105–230 m on Quest, 140–340 m on desktop).
+The **214-type architectural kit** supplies at least **75 distinct component types per building**: detailed entrances and windows, stairs, fire escapes, interior services, ornamental masonry, balconies, roof machinery and family-specific parts. Downloaded photographic textures and roof models are reused. Up to 25 detailed generated blocks surround the camera, with no simplified distant building ring. Distance fog fades from 64–120 m on Quest and 80–130 m on desktop.
 
 Nearby blocks have full destruction and collision. Distant blocks unload, retaining a sparse record of damage, broken skins and rubble for the current round. Returning players and late spectators see the same destruction. Offscreen physics pauses and resumes when the block reloads; round reset starts a fresh city. Raiders who die far from the start respawn near the giant.
 
@@ -115,7 +115,7 @@ Each Chrysler has **313 destructible bays and 35 custom component types**, inclu
 
 Buildings keep a connected support graph, but gameplay impacts break **individual panes, bricks, stone/concrete tiles, short steel sections and slab fragments**. Fine pieces are generated only when a bay is touched. Typical maximum sizes are 0.42 × 0.24 m for brick faces, 0.76 × 0.82 m for glass panes, and 0.62 m for steel lengths. Surviving surfaces and debris are cut from the actual original meshes, retaining their UVs, window layers, material colors, metalwork and roof details. Exposed cut faces retain these colors and textures inside the pieces, including the rims of holes and broken metal sections.
 
-Hands and soaring raiders cut their actual swept volume; rifle shots accumulate damage on the exact piece they hit. Removed pieces leave matching visible and physical openings. Wall damage leaves the structural frame intact; losing one short column section weakens the frame without immediately removing the entire storey. Severing all four supports releases that bay. Surviving connections retain the existing high cohesion and delayed overload behavior. **Walking stops at a wall and can chip at most 5% of a contacted frame; it cannot grind a building down.**
+Hands cut their actual swept volume; soaring raiders cut their wider leading pressure field; rifle shots accumulate damage on the exact piece they hit. Removed pieces leave matching visible and physical openings. Wall damage leaves the structural frame intact; losing one short column section weakens the frame without immediately removing the entire storey. Severing all four supports releases that bay. Surviving connections retain the existing high cohesion and delayed overload behavior. **Walking stops at a wall and can chip at most 5% of a contacted frame; it cannot grind a building down.**
 
 Broken pieces remain as rubble. Small nearby pieces share compact physics groups, with at most 96 active fine-debris bodies and 256 resting collision proxies; remaining rubble keeps its visible pieces and falls using a shared ballistic calculation. Settled rubble stays for the round and stops sending repeated poses. Removing its support makes it fall again; isolated wall pieces detach instead of floating. Unsupported upper sections release progressively, two bays per tick, to avoid a sudden tower-sized debris/network spike. Each section remains visible until its debris appears. Distant blocks preserve their individual holes and rubble across unloading, and late joiners receive the same piece identities. Fine debris also uses camera culling: off-screen pieces stay in the world and continue their physics, while the renderer skips them. Visibility is checked for both headset eyes and each spectator camera. See [fine destruction details and validation](docs/FINE_DESTRUCTION.md).
 
@@ -123,7 +123,7 @@ Robot missiles gently correct toward visible raiders inside a 22° forward cone,
 
 The 37 street cars have independent physics bodies. Gentle hand pushes move them; hard punches, full-speed footsteps, crashes after a shove and missile blasts make them explode. Each of the six vehicle models has its own crushed wreck with downloaded torn doors, bumpers, tires and engine parts. Fire and smoke fade; the solid wreck remains movable until the round resets. Moving cars, final resting poses and wreck state are shared with all players and late spectators. These explosions do not damage the colossus.
 
-This is a game structural model, not engineering analysis: no bending moments, fatigue, rebar or arbitrary cracks; bays are rigid compounds. Distant silhouettes become detailed, destructible buildings as you approach.
+This is a game structural model, not engineering analysis: no bending moments, fatigue, rebar or arbitrary cracks; bays are rigid compounds. Detailed buildings stream in as you approach.
 
 ### Game feel
 
@@ -131,11 +131,13 @@ Client-side prediction runs the shared flight model locally against the held inp
 
 ## 3. Performance and verification
 
-Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Hit and destruction events are sent on their physics tick without waiting for the next snapshot. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders and 37 cars; a maximal snapshot for this map is 9,260 bytes. Parked and sleeping cars send no repeated poses.
+Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Hit and destruction events are sent on their physics tick without waiting for the next snapshot. Remote interpolation starts at 100 ms and adapts between 60–150 ms to arrival jitter; the local raider is predicted. Caps: 144 legacy debris bodies, 96 active fine debris groups, eight ragdolls, eight raiders and 37 cars; a maximal snapshot with those pools is 12,332 bytes. Parked and sleeping cars send no repeated poses.
 
 Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1), `medium`, `high`. Adaptive resolution lowers the desktop pixel ratio under sustained load. All nearby blocks share the architectural detail batches; core geometry outside both headset views is removed from submitted instances. Render and physics neighborhoods follow players, while fog covers the distant cutoff. `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
 
 Building instances retain their slots while visible, upload only changed buffer ranges and reuse cached transforms. Empty effects skip rendering; persistent facade debris allocates storage on demand. Physics refreshes its ray-query tree only when gameplay needs it, and idle raiders can sleep. Assets use Brotli/gzip plus ETag validation; low tiers skip unused normal/roughness maps. See [measured before/after results and limits](docs/PERFORMANCE.md).
+
+Fine destruction reuses unchanged collision surfaces, applies only new geometry cuts, caches exact cut faces and shares repeated fragment geometry. Settlement queries run before collider changes, avoiding repeated query-tree rebuilds in one tick. Event packing is lossless. A worker prepares generated cells and component placements ahead of travel, with a synchronous fallback. Spectator capture yields under frame pressure while preserving the player's rendering. See [the fine-destruction performance pass](docs/PERFORMANCE_FINE.md) for matched measurements and limits.
 
 ```sh
 npm run check          # Syntax and local import existence, no packages needed
@@ -148,6 +150,8 @@ npm run test:giant     # Rendered hand anatomy and real Midtown contact in Quest
 npm run test:city
 npm run test:streaming # Generated blocks, stereo visibility, return-trip rubble and Quest travel
 npm run test:cars      # Moving cars, crushed models, explosions, collision queries and late joins
+npm run test:traffic   # Driving circuits, obstacle braking and shared multiplayer poses
+npm run test:streets   # Continuous textured streets, solid sidewalks and Quest rendering
 npm run test:visual    # Imported art, roof movement, props and lasers
 npm run test:ragdoll   # Matching pilot/ragdoll skin and physics
 npm run test:flight-animation # Soaring limbs, transitions, nozzles and animation preview
@@ -156,6 +160,8 @@ npm run test:xr-view   # Smooth yaw, rigid armor and local look-down body fade
 npm run bench          # Server physics: intact city, staged collapses, active hand contact
 npm run profile        # Real GPU frame times in a visible Chromium, per quality tier
 npm run profile:optimization # Repeatable city CPU/upload samples and asset transfer sizes
+npm run profile:destruction # Repeated fine hits and fragment settlement, actual server ticks
+npm run profile:destruction-render # Incremental cuts, exact shadows and 480 retained fragments
 ```
 
 Real desktop rendering and Quest 2 emulation test (starts its own isolated server):

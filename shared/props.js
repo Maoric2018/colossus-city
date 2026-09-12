@@ -4,6 +4,7 @@ import {chryslerColliders} from './city/chrysler.js';
 import {trafficRoutes,routePose} from './traffic.js';
 import {seeded} from './math.js';
 import {propBounds} from './prop-bounds.js';
+import {sidewalkSlabs} from './streets.js';
 export const ROOF_ASSETS=[['city-kit-industrial/water-tower',2.8],['space-kit/satelliteDish_detailed',2.4],['city-kit-industrial/detail-tank',1.1],['city-kit-industrial/solar-panel-flat',.25]];
 // One placement list drives both the downloaded car instances and their physics.
 export function carPlacements(env){
@@ -25,7 +26,7 @@ export function roofColliders(c){
  return [...spire,...crown,[0,base+h/2,0,(swap?d:w)/2,h/2,(swap?w:d)/2]];
 }
 export function staticProps(env){
- const props=[];if(env.id==='midtown')return props.concat(midtownProps(env));if(env.id!=='harbor-district')return props;
+ const props=[];if(env.id==='midtown')return props.concat(midtownProps(env));if(env.id==='city-block')return sidewalkSlabs(env);if(env.id!=='harbor-district')return props;
  const add=(id,kind,position,half)=>props.push({id,kind,position,yaw:0,boxes:[[0,0,0,...half]]});
  for(const x of [-44,-7,7,44])for(let z=-68;z<=68;z+=20){add(`lamp-${x}-${z}`,'lamp',[x,2.6,z],[.09,2.5,.09]);add(`lamp-arm-${x}-${z}`,'lamp',[x+.6,5.1,z],[.7,.045,.045]);add(`lamp-bulb-${x}-${z}`,'lamp',[x+1,5.03,z],[.375,.02,.14]);}
  env.buildings.forEach((b,i)=>{const w=b.nx*b.bay,d=b.nz*b.bay;add('walk-'+i,'pavement',[b.x,.08,b.z],[(w+3)/2,.08,(d+3)/2]);});
@@ -49,7 +50,8 @@ function midtownProps(env){
   if(streets.some(s=>Math.abs(z-s)<streetWidth/2+2))continue;
   const lx=x+side*(avenueWidth/2+.8),id=`lamp-${lx}-${z}`;add(id,'lamp',[lx,3,z],[.1,3,.1]);add(id+'-arm','lamp',[lx-side*.7,6.1,z],[.8,.05,.05]);add(id+'-bulb','lamp',[lx-side*1.2,6.03,z],[.4,.025,.15]);
  }
- for(const [i,b] of env.buildings.entries()){
+ if(env.infinite)out.push(...sidewalkSlabs(env));
+ else for(const [i,b] of env.buildings.entries()){
   const w=b.tiers[0].nx*b.bay,d=b.tiers[0].nz*b.bay;add('walk-'+i,'pavement',[b.x,.09,b.z],[(w+4)/2,.09,(d+4)/2]);
  }
  if(!env.infinite)for(const side of [-1,1]){

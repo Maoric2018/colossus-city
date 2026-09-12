@@ -2,6 +2,7 @@
 // separate members and holes remain separate, and every cap keeps source UV/color.
 import {ShapeUtils,Vector2} from 'three';
 const EPS=1e-6;
+const sectionCache=new WeakMap();
 const key=v=>v.slice(0,3).map(n=>Math.round(n/EPS)).join(',');
 const mix=(a,b,t)=>a.map((n,k)=>n+(b[k]-n)*t);
 const area=p=>p.reduce((sum,a,i)=>{const b=p[(i+1)%p.length];return sum+a.x*b.y-b.x*a.y;},0)/2;
@@ -43,12 +44,13 @@ export function crossSection(polygons,axis,value){
  return triangles;
 }
 export function capFaces(record,cuts,keep,clip){
- const output=[],sections=new Map(),selected=new Set(cuts.map(b=>b.piece.id));
+ let sections=sectionCache.get(record);if(!sections){sections=new Map();sectionCache.set(record,sections);}
+ const output=[],selected=new Set(cuts.map(b=>b.piece.id));
  for(const b of cuts)for(let axis=0;axis<3;axis++)for(const sign of [-1,1]){
   const value=(sign<0?b.lo:b.hi)[axis];if(!Number.isFinite(value))continue;
   const stride=axis===0?1:axis===1?b.group.n[0]:b.group.n[0]*b.group.n[1];
   if(selected.has(b.piece.id+sign*stride))continue;
-  const id=axis+':'+value.toFixed(7);if(!sections.has(id))sections.set(id,crossSection(record.polygons,axis,value));
+  const id=axis+':'+value.toFixed(7);if(!sections.has(id)){if(sections.size>=512)sections.delete(sections.keys().next().value);sections.set(id,crossSection(record.polygons,axis,value));}
   for(const triangle of sections.get(id)){
    const polygon=clip(triangle,b);if(polygon.length<3)continue;
    const normal=[0,0,0];normal[axis]=keep?-sign:sign;

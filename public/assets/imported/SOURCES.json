@@ -439,6 +439,49 @@
       "file": "public/assets/imported/car-kit/debris-plate-a.glb",
       "bytes": 5048,
       "sha256": "3ecb3242d9e984dadd149fcdd0ded5f43e803b6370b6ddf2b7ab24876aa361ae"
+    },
+    {
+      "file": "public/assets/imported/flight-vfx/hyperspeed.png",
+      "bytes": 486741,
+      "sha256": "70df65315452cbe7683b30e44140b2818a8b8940621d0cbdfbed312de4711a5b"
+    },
+    {
+      "file": "public/assets/imported/flight-vfx/sonic-smoke.png",
+      "bytes": 767360,
+      "sha256": "c9d00d208c3e4ddfb9fda207918b875366880635205046cd16a3edbf7f449964"
+    }
+  ],
+  "effects": [
+    {
+      "id": "soar-hyperspeed",
+      "creator": "CodeManu",
+      "page": "https://codemanu.itch.io/vfx-free-pack",
+      "archive": "https://opengameart.org/sites/default/files/vfx_free_pack.zip",
+      "license": "CC0",
+      "sourceFile": "Effect_Hyperspeed/30fps/Spritesheets/Effect_Hyperspeed_1_517x515.png",
+      "file": "public/assets/imported/flight-vfx/hyperspeed.png",
+      "layout": {
+        "columns": 6,
+        "rows": 5,
+        "frames": 30
+      },
+      "modifications": "None. Original sheet animated and mapped into peripheral radial streaks at runtime."
+    },
+    {
+      "id": "soar-sonic-smoke",
+      "creator": "morningkingdom",
+      "page": "https://morningkingdom.itch.io/shock-wave-smoke",
+      "archiveName": "smoke_shok_wave.rar",
+      "license": "CC0; author also requests no AI training",
+      "sourceFile": "smoke_shok_wave/284x284/middle/_284x284_middle.png",
+      "file": "public/assets/imported/flight-vfx/sonic-smoke.png",
+      "layout": {
+        "columns": 9,
+        "rows": 9,
+        "firstFrame": 8,
+        "frames": 68
+      },
+      "modifications": "None. Original sheet played as a brief pressure-wave burst."
     }
   ]
 }

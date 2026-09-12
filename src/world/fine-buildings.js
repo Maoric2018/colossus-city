@@ -2,6 +2,7 @@ import * as T from 'three';
 import {shardBallistic} from '../../shared/city/fracture.js';
 import {appearanceSources,cutAppearance} from '../render/fracture-geometry.js';
 const matrix=new T.Matrix4(),offset=new T.Matrix4(),one=new T.Vector3(1,1,1),eye=new T.Vector3();
+const makeBatch=(material,capacity,vertices,castShadow)=>{const mesh=new T.BatchedMesh(capacity,vertices,0,material);mesh.frustumCulled=false;mesh.perObjectFrustumCulled=true;mesh.sortObjects=material.transparent;mesh.castShadow=castShadow;mesh.receiveShadow=true;return mesh;};
 // Material batches contain actual clipped building triangles, for both the
 // standing remainder and loose pieces. No replacement palette or proxy meshes.
 export class FineBuildings{
@@ -13,11 +14,18 @@ export class FineBuildings{
    // Exposed reverse faces retain the base texture/color rather than reflecting
    // the bright sky like the polished outer skin of a metal/glass facade.
    mat.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nif (!gl_FrontFacing) { metalnessFactor = 0.0; roughnessFactor = max(roughnessFactor, 0.8); }');};mat.customProgramCacheKey=()=> 'fracture-interior-v1';
-   const mesh=new T.BatchedMesh(64,Math.max(4096,2**Math.ceil(Math.log2(n))),0,mat);mesh.frustumCulled=false;mesh.perObjectFrustumCulled=true;mesh.sortObjects=mat.transparent;mesh.castShadow=!!draw.castShadow;mesh.receiveShadow=true;this.root.add(mesh);pool={mesh,capacity:64,vertices:mesh.geometry.attributes.position?.count||Math.max(4096,2**Math.ceil(Math.log2(n))),allocated:0,live:0,count:0};this.pools.set(draw.key,pool);this.batches.set(draw.key,mesh);}
-  if(pool.allocated+n>pool.vertices){pool.mesh.optimize();pool.allocated=pool.live;if(pool.allocated+n>pool.vertices){pool.vertices=2**Math.ceil(Math.log2(pool.allocated+n));pool.mesh.setGeometrySize(pool.vertices,0);}}
-  if(pool.count>=pool.capacity){pool.capacity*=2;pool.mesh.setInstanceCount(pool.capacity);}draw.geometryId=pool.mesh.addGeometry(draw.geometry);draw.index=pool.mesh.addInstance(draw.geometryId);draw.pool=pool;draw.vertices=n;pool.live+=n;pool.allocated+=n;pool.count++;draw.geometry.dispose();delete draw.geometry;return draw;
+   const vertices=Math.max(4096,2**Math.ceil(Math.log2(n))),mesh=makeBatch(mat,64,vertices,!!draw.castShadow);this.root.add(mesh);pool={mesh,capacity:64,vertices,allocated:0,live:0,count:0,geometries:new Map()};this.pools.set(draw.key,pool);this.batches.set(draw.key,mesh);}
+  let shared=pool.geometries.get(draw.geometry);
+  if(!shared){if(pool.allocated+n>pool.vertices){
+    // Three's optimize() leaves its allocation cursor unchanged when every
+    // geometry was deleted. Recycle that empty batch through the public API.
+    if(pool.live===0){const old=pool.mesh;pool.vertices=Math.max(pool.vertices,2**Math.ceil(Math.log2(n)));pool.mesh=makeBatch(old.material,pool.capacity,pool.vertices,old.castShadow);old.removeFromParent();old.dispose();this.root.add(pool.mesh);this.batches.set(draw.key,pool.mesh);}
+    else pool.mesh.optimize();
+    pool.allocated=pool.vertices-pool.mesh.unusedVertexCount;if(pool.allocated+n>pool.vertices){pool.vertices=2**Math.ceil(Math.log2(pool.allocated+n));pool.mesh.setGeometrySize(pool.vertices,0);}}
+   shared={id:pool.mesh.addGeometry(draw.geometry),refs:0,vertices:n,source:draw.geometry};pool.geometries.set(draw.geometry,shared);pool.live+=n;pool.allocated+=n;}
+  if(pool.count>=pool.capacity){pool.capacity*=2;pool.mesh.setInstanceCount(pool.capacity);}draw.geometryId=shared.id;draw.index=pool.mesh.addInstance(shared.id);draw.pool=pool;draw.shared=shared;shared.refs++;pool.count++;draw.geometry.dispose();delete draw.geometry;return draw;
  }
- remove(draw){const p=draw.pool;if(!p)return;p.mesh.deleteInstance(draw.index);p.mesh.deleteGeometry(draw.geometryId);p.live-=draw.vertices;p.count--;draw.pool=null;}
+ remove(draw){const p=draw.pool;if(!p)return;p.mesh.deleteInstance(draw.index);if(--draw.shared.refs===0){p.mesh.deleteGeometry(draw.geometryId);p.live-=draw.shared.vertices;p.geometries.delete(draw.shared.source);}p.count--;draw.pool=null;}
  set(c,skin,pose,resources){
   let e=this.cells.get(c.id);if(!e){e={c,pose,parts:[],skin};this.cells.set(c.id,e);}for(const d of e.parts)this.remove(d);e.skin={...skin};
   pose.fine={};e.parts=cutAppearance(this.source(c,resources),skin.parts||[],skin,true).map(d=>this.add(d));this.write(e);this.nextSelect=0;

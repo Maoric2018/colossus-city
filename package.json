@@ -37,7 +37,11 @@
     "test:flight-animation": "node scripts/flight-animation-smoke.mjs",
     "test:fine-destruction": "node scripts/fine-destruction-smoke.mjs",
     "test:soar-breach": "node scripts/soar-breach-smoke.mjs",
-    "test:fracture-render": "node scripts/fracture-render-smoke.mjs"
+    "test:fracture-render": "node scripts/fracture-render-smoke.mjs",
+    "test:traffic": "node scripts/traffic-smoke.mjs",
+    "test:streets": "node scripts/street-smoke.mjs",
+    "profile:destruction": "node scripts/destruction-profile.mjs",
+    "profile:destruction-render": "node scripts/destruction-render-profile.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.17.3",

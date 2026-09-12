@@ -23,9 +23,9 @@ const skyFragment = `varying vec3 vDir;uniform vec3 topColor;uniform vec3 horizo
 }`;
 const tp = new T.Vector3(), tq = new T.Quaternion(), tinv = new T.Quaternion(), to = new T.Vector3(), td = new T.Vector3(), tc = new T.Vector3(), th = new T.Vector3(), tPos = new T.Vector3(), tRot = new T.Quaternion();
 export class CityView {
- constructor(scene, env, {tier = TIERS.low, quest = false, parent = null} = {}){
+ constructor(scene, env, {tier = TIERS.low, quest = false, parent = null, preparedCells = null} = {}){
   this.parent=parent;this.scene = scene; this.env = env; this.tier = tier; this.quest = quest; this.root = new T.Group(); scene.add(this.root);
-  this.cells = generateCells(env); this.byId = new Map(this.cells.map(c => [c.id, c])); this.moving = new Map(); this.detached = new Set(); this.attachments = new Map(); this.assetCells = new Map(); this.batches = [];
+  this.cells = preparedCells||generateCells(env); this.byId = new Map(this.cells.map(c => [c.id, c])); this.moving = new Map(); this.detached = new Set(); this.attachments = new Map(); this.assetCells = new Map(); this.batches = [];
   this.handWorld = new HandWorld(env,this.cells); this.props = staticProps(env);
   this.skins = new Map(this.cells.map(c => [c.id, initialSkin(c)])); this.colliderCache = new Map(this.cells.map(c => [c.id, cellColliders(c)]));
   for(const c of this.cells){c.queryHalf=c.size.map(v=>v/2);for(const a of this.colliderCache.get(c.id))for(let k=0;k<3;k++)c.queryHalf[k]=Math.max(c.queryHalf[k],Math.abs(a[k])+a[k+3]);}
@@ -36,6 +36,7 @@ export class CityView {
   this.textures = parent?.textures || {concrete:tex(t.concrete, 30), concreteNormal:tex(tier.normalMaps&&t.concreteNormal, 30, false), concreteRoughness:tex(!tier.lambert&&t.concreteRoughness, 30, false), asphalt:tex(t.asphalt, 38), asphaltNormal:tex(tier.normalMaps&&t.asphaltNormal, 38, false), asphaltRoughness:tex(!tier.lambert&&t.asphaltRoughness, 38, false)};
   if(!parent)this.makeSkyAndLights(); this.ground = parent ? {update(){}} : buildGround(this.root, env, tier, this.textures);
   this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || this.texture(t.concrete, 1),resources:parent?.buildings,components:parent?.buildings.components});
+  if(!parent&&env.infinite)this.buildings.components.radius=Math.max(this.buildings.components.radius,this.scene.fog.far+12);
   this.buildings.attachments=this.attachments;this.transforms = this.buildings.entries;
   this.fine=parent?.fine||new FineBuildings(this.root,tier);
   if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{if(scene.userData.reuseCityVisibility)return;this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.fine.select(camera);this.commit();};
@@ -46,11 +47,11 @@ export class CityView {
  texture(url, repeat = 1, srgb = true){ const t = this.loader.load(url); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = this.quest ? 2 : 4; if(srgb) t.colorSpace = T.SRGBColorSpace; return t; }
  makeSkyAndLights(){
   const env = this.env;
-  // A full neighboring block is detailed in every direction. Fade completely
+  // Two neighboring blocks are detailed in every direction. Fade completely
   // inside that footprint, before unloaded buildings or simpler facades appear.
   if(env.infinite)installDistanceFog();
   const headset=this.quest||this.tier.name==='QUEST';
-  this.scene.fog = env.infinite ? new T.Fog(env.sky.fog,headset?32:40,headset?60:65) : new T.FogExp2(env.sky.fog, env.sky.fogDensity);
+  this.scene.fog = env.infinite ? new T.Fog(env.sky.fog,headset?64:80,headset?120:130) : new T.FogExp2(env.sky.fog, env.sky.fogDensity);
   const sky = new T.Mesh(new T.SphereGeometry(800, 24, 12), new T.ShaderMaterial({vertexShader:skyVertex, fragmentShader:skyFragment, toneMapped:false, uniforms:{topColor:{value:new T.Color(env.infinite?0x6e8eaa:env.sky.top)}, horizon:{value:new T.Color(env.infinite?env.sky.fog:env.sky.horizon)}}, side:T.BackSide, depthWrite:false})); this.sky = sky; sky.renderOrder = -100; this.root.add(sky);
   // Neutral ground bounce: a green ground colour tints Lambert facades olive.
   this.root.add(new T.HemisphereLight(0xdcecf5, 0x8f887c, this.tier.lambert ? 1.7 : 1.4));
@@ -105,7 +106,7 @@ export class CityView {
  reset(){ this.stream?.reset();if(!this.parent)this.fine.reset();else this.fine.unregister(this.cells);this.cars.reset(); this.fragments.reset(); this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.pose(c.id).skinDirty=true;this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
  commit(){ this.buildings.commit();this.fine.commit();for(const v of this.stream?.views.values()||[])v.buildings.commit(); }
  getCell(id){return this.byId.get(id)||this.stream?.getCell(id);}
- dispose(){this.disposed=true;this.fine.unregister(this.cells);this.buildings.components.unregister(this.cells);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();});for(const mesh of this.fragments.batches.values()){mesh.geometry.dispose();mesh.material.dispose();}this.root.removeFromParent();}
+ dispose(){this.disposed=true;this.stream?.preparation.dispose();this.stream?.reset();this.fine.unregister(this.cells);this.buildings.components.unregister(this.cells);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();});for(const mesh of this.fragments.batches.values()){mesh.geometry.dispose();mesh.material.dispose();}this.root.removeFromParent();}
  *solidProps(){yield* this.handWorld.fixed;yield* this.cars.boxes();}
  update(dt){ this.ground.update(dt);if(!this.parent){this.rubble.update(dt);this.fine.update(dt);}this.fragments.update(dt);for(const v of this.stream?.views.values()||[])v.fragments.update(dt); }
  // ---- spatial queries ----

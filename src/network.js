@@ -1,6 +1,7 @@
 import {decodeSnapshot} from '../shared/protocol.js';
+import {unpackEvents} from '../shared/event-codec.js';
 import {handQuaternion} from '../shared/giant-rig.js';
-import {C} from '../shared/config.js';
+import {SnapshotTiming} from '../shared/snapshot-timing.js';
 const mix = (a, b, t) => a + (b - a) * t;
 const angle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 function vectorInto(out, a, b, t){ out[0] = mix(a[0], b[0], t); out[1] = mix(a[1], b[1], t); out[2] = mix(a[2], b[2], t); return out; }
@@ -8,11 +9,12 @@ function quatInto(out, a, b, t){
  const sign = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -1 : 1;
  let n = 0; for(let i = 0; i < 4; i++){ out[i] = mix(a[i], b[i] * sign, t); n += out[i] * out[i]; } n = Math.sqrt(n) || 1; for(let i = 0; i < 4; i++) out[i] /= n; return out;
 }
-// Game socket: reliable JSON control/events plus binary snapshots, interpolated ~100 ms behind.
+// Game socket: reliable JSON control/events plus binary snapshots, with a jitter-aware cushion.
 // sample() reuses its output objects so a 60 Hz render loop does not churn the garbage collector.
 export class Connection {
  constructor(onMessage, onClose){
   this.onMessage = onMessage; this.onClose = onClose; this.snapshots = []; this.ping = 0; this.bytes = 0; this.kbps = 0; this.lastBytes = 0; this.receivedAt = 0; this.ws = null;
+  this.timing=new SnapshotTiming();
   this.scratch = {players:new Map(), bodies:new Map(), state:{head:[0, 0, 0], left:[0, 0, 0], right:[0, 0, 0], players:[], bodies:[]}};
   this.timer = setInterval(() => { if(this.ws?.readyState === 1){ this.send({type:'ping', t:performance.now()}); this.kbps = (this.bytes - this.lastBytes) * 8 / 2000; this.lastBytes = this.bytes; } }, 2000);
  }
@@ -21,17 +23,18 @@ export class Connection {
   return new Promise((resolve, reject) => {
    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`); this.ws = ws; ws.binaryType = 'arraybuffer'; let joined = false;
    const timeout = setTimeout(() => { if(!joined){ reject(Error('Connection timed out. Make sure the server is running.')); ws.close(); } }, 10000);
-   ws.onopen = () => this.send({type:'join', ...join});
+   ws.onopen = () => this.send({type:'join', ...join, eventFormat:1});
    ws.onmessage = e => {
     if(e.data instanceof ArrayBuffer){
      this.bytes += e.data.byteLength;
-     try{ const s = decodeSnapshot(e.data); this.receivedAt = performance.now(); this.snapshots.push(s); if(this.snapshots.length > 20) this.snapshots.shift(); }catch(err){ console.warn(err); } return;
+     try{ const s = decodeSnapshot(e.data); this.receivedAt = performance.now();this.timing.receive(s.time,this.receivedAt);this.snapshots.push(s); if(this.snapshots.length > 20) this.snapshots.shift(); }catch(err){ console.warn(err); } return;
     }
     this.bytes += e.data.length;
     try{ const m = JSON.parse(e.data);
      if(m.type === 'pong'){ this.ping = Math.round(performance.now() - m.t); return; }
-     if(m.type === 'welcome'){ joined = true; clearTimeout(timeout); this.snapshots = []; this.id = m.id; this.room = m.room; this.role = m.role; resolve(m); }
+     if(m.type === 'welcome'){ joined = true; clearTimeout(timeout); this.snapshots = [];this.timing=new SnapshotTiming();this.scratch.players.clear();this.scratch.bodies.clear(); this.id = m.id; this.room = m.room; this.role = m.role; resolve(m); }
      if(m.type === 'error' && !joined){ clearTimeout(timeout); reject(Error(m.message)); ws.close(); return; }
+     if(m.type==='events'&&m.eventFormat===1)m.events=unpackEvents(m.events);
      this.onMessage(m);
     }catch(err){ console.error(err); }
    };
@@ -45,7 +48,7 @@ export class Connection {
  get lead(){ return Math.min(.25, (performance.now() - this.receivedAt) / 1000 + this.ping / 2000); }
  sample(){
   const latest = this.latest; if(!latest) return null;
-  const target = latest.time + Math.min((performance.now() - this.receivedAt) / 1000, .15) - C.INTERPOLATION_MS / 1000;
+  const target = this.timing.renderTime(latest.time,(performance.now()-this.receivedAt)/1000);
   let a = this.snapshots[0], b = latest;
   for(let i = 1; i < this.snapshots.length; i++){ if(this.snapshots[i].time >= target){ a = this.snapshots[i - 1]; b = this.snapshots[i]; break; } a = this.snapshots[i]; }
   const t = Math.max(0, Math.min(1, (target - a.time) / (b.time - a.time || 1))), s = this.scratch.state;
@@ -78,6 +81,6 @@ export class Connection {
   if(this.scratch.bodies.size > 600) this.scratch.bodies.clear();
   return s;
  }
- close(notify = false){ const ws = this.ws; this.ws = null; if(ws){ if(!notify) ws.onclose = null; ws.close(); } this.snapshots = []; }
+ close(notify = false){ const ws = this.ws; this.ws = null; if(ws){ if(!notify) ws.onclose = null; ws.close(); } this.snapshots = [];this.timing=new SnapshotTiming(); }
  dispose(){ this.close(); clearInterval(this.timer); }
 }
