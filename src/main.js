@@ -76,7 +76,7 @@ function onMessage(m){
  if(m.type==='events')for(const e of m.events)event(e);
  if(m.type==='error')toast(m.message,4);
 }
-function addRag(r){for(const p of r.parts){if(rags.has(p.id))rags.get(p.id).dispose();rags.set(p.id,new RagView(scene,p,r.player));}}
+function addRag(r){const view=new RagView(scene,r);for(const p of r.parts){rags.get(p.id)?.dispose();rags.set(p.id,{update:(position,rotation)=>view.update(p.id,position,rotation),dispose:()=>view.remove(p.id)});}}
 function event(e){
  if(e.type==='missile'){missiles.add(e);fx.sound(180,.22,'sawtooth',.025);return;}
  if(e.type==='detonate'){missiles.remove(e.id);fx.impact(e.p,1.5);return;}
@@ -198,7 +198,7 @@ $('vr-button').onclick=async()=>{hideOverlay();fx.unlockAudio();try{await xr.ent
 $('copy-link').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',net.room);try{await navigator.clipboard.writeText(u.toString());toast('INVITE LINK COPIED');}catch{toast(`ROOM CODE / ${net.room}`,5);}};
 document.querySelectorAll('[data-role]').forEach(e=>e.onclick=()=>setRole(e.dataset.role));
 const params=new URLSearchParams(location.search);$('room-input').value=params.get('room')||'';$('name').value=localStorage.getItem('colossus-name')||'';if(params.get('role')==='boss'||quest)setRole('boss');
-const artReady=Promise.all([cityView.ready,giant.ready,missiles.ready,installDistrict(cityView,renderer),loadModel('/assets/imported/raider/armored-pilot.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(()=>{window.COLOSSUS_ART_READY=true;if(!playing)notice('CITY READY · CREATE A ROOM OR JOIN YOUR FRIENDS');});
+const artReady=Promise.all([cityView.ready,giant.ready,missiles.ready,installDistrict(cityView,renderer),loadModel('/assets/imported/raider/armored-pilot.glb'),loadModel('/assets/imported/raider/armored-ragdoll.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(()=>{window.COLOSSUS_ART_READY=true;if(!playing)notice('CITY READY · CREATE A ROOM OR JOIN YOUR FRIENDS');});
 if(params.get('spectator')==='1'&&params.get('room'))artReady.then(()=>start(false,false,true));
 window.COLOSSUS_READY=true;notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test.

@@ -1,4 +1,6 @@
 import * as T from 'three';
+import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
+import {raiderParts} from '../shared/raider-rig.js';
 import {armElbow} from './arm-rig.js';
 import {loadModel,bakedModel} from './assets.js';
 import {TEAM_COLORS} from '../shared/config.js';
@@ -101,6 +103,13 @@ function suitGeometry(color){
   ])
  ];return coloredGeometry(parts);
 }
+function flightPack(parent,offset=new T.Vector3()){
+ const pack=new T.Group();pack.position.set(0,.28,.27).sub(offset);parent.add(pack);mesh(rounded(.32,.4,.18,.04),dark,pack);
+ for(const sign of [-1,1]){mesh(new T.CylinderGeometry(.095,.13,.48,10),metal,pack,[sign*.25,-.07,.05]);mesh(new T.CylinderGeometry(.065,.065,.05,10),cyan,pack,[sign*.25,-.33,.05]);}return pack;
+}
+function equipRifle(parent,rifle,mount,offset=new T.Vector3()){
+ return rifle.parts.map(part=>{const material=part.material.clone();material.color.set(0x587486);material.metalness=.6;const gun=new T.Mesh(part.geometry,material);gun.scale.setScalar(1.2);gun.position.fromArray(mount).add(new T.Vector3(0,-1.25,-.13)).sub(offset);gun.castShadow=true;parent.add(gun);return material;});
+}
 export class RaiderView{
  constructor(scene,id){
   this.id=id;this.weaponMaterials=[];this.root=new T.Group();scene.add(this.root);const color=TEAM_COLORS[(id-1)%TEAM_COLORS.length];
@@ -108,8 +117,7 @@ export class RaiderView{
   this.disposed=false;this.ready=Promise.all([loadModel('/assets/imported/raider/armored-pilot.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([model,rifle])=>{
    if(this.disposed)return;this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.removeFromParent();
    this.mesh=new T.Group();model.traverse(part=>{if(!part.isMesh)return;const m=new T.Mesh(part.geometry,part.material);m.position.y=-1.15;m.castShadow=true;this.mesh.add(m);});
-   const pack=this.pack=new T.Group();pack.position.set(0,.28,.27);this.mesh.add(pack);mesh(rounded(.32,.4,.18,.04),dark,pack);for(const sign of [-1,1]){mesh(new T.CylinderGeometry(.095,.13,.48,10),metal,pack,[sign*.25,-.07,.05]);mesh(new T.CylinderGeometry(.065,.065,.05,10),cyan,pack,[sign*.25,-.33,.05]);}
-   const mount=model.getObjectByName('Raider_ArmoredPilot').userData.weaponMount;for(const part of rifle.parts){const material=part.material.clone();material.color.set(0x587486);material.metalness=.6;this.weaponMaterials.push(material);const gun=new T.Mesh(part.geometry,material);gun.scale.setScalar(1.2);gun.position.fromArray(mount).add(new T.Vector3(0,-1.25,-.13));gun.castShadow=true;this.mesh.add(gun);}
+   this.pack=flightPack(this.mesh);this.weaponMaterials=equipRifle(this.mesh,rifle,model.getObjectByName('Raider_ArmoredPilot').userData.weaponMount);
    this.root.add(this.mesh);this.imported=true;
   }).catch(error=>console.error('Raider model failed to load',error));
   this.jets=[-1,1].map(s=>glow(this.root,color,.9,[s*.27,-.21,.36]));this.color=color;
@@ -122,7 +130,17 @@ export class RaiderView{
  dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}this.pack?.traverse(o=>o.geometry?.dispose());for(const material of this.weaponMaterials)material.dispose();for(const j of this.jets)j.material.dispose();}
 }
 export class RagView{
- constructor(scene,part,player){this.id=part.id;this.mesh=new T.Mesh(rounded(...part.size,.05),new T.MeshStandardMaterial({color:part.size[0]>.5?TEAM_COLORS[(player-1)%TEAM_COLORS.length]:0x8b9fa7,roughness:.55,metalness:.4}));this.mesh.castShadow=true;scene.add(this.mesh);this.update(part.p,part.q);}
- update(p,q){this.mesh.position.set(...p);this.mesh.quaternion.set(...q);}
- dispose(){this.mesh.removeFromParent();this.mesh.geometry.dispose();this.mesh.material.dispose();}
+ constructor(scene,rag){
+  this.root=new T.Group();scene.add(this.root);this.parts=new Map(rag.parts.map(p=>[p.id,{...p}]));this.weaponMaterials=[];
+  this.ready=Promise.all([loadModel('/assets/imported/raider/armored-ragdoll.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([source,rifle])=>{
+   if(this.disposed)return;const model=cloneSkeleton(source);this.root.add(model);model.traverse(o=>{if(o.isSkinnedMesh){this.skin=o;o.castShadow=true;o.frustumCulled=false;}});
+   this.bones=new Map(this.skin.skeleton.bones.map(b=>[b.name.replace('rag_',''),b]));
+   this.pack=flightPack(this.bones.get('chest'),new T.Vector3(...raiderParts.find(p=>p.name==='chest').o));
+   this.weaponMaterials=equipRifle(this.bones.get('lowerR'),rifle,this.skin.userData.weaponMount,new T.Vector3(...raiderParts.find(p=>p.name==='lowerR').o));
+   for(const [id,p]of this.parts)this.update(id,p.p,p.q);
+  }).catch(error=>console.error('Raider ragdoll failed to load',error));
+ }
+ update(id,p,q){const part=this.parts.get(id);if(!part)return;part.p=p;part.q=q;const bone=this.bones?.get(part.name);if(bone){bone.position.fromArray(p);bone.quaternion.fromArray(q);}}
+ remove(id){this.parts.delete(id);if(!this.parts.size)this.dispose();}
+ dispose(){if(this.disposed)return;this.disposed=true;this.root.removeFromParent();this.pack?.traverse(o=>o.geometry?.dispose());for(const material of this.weaponMaterials)material.dispose();this.skin?.skeleton.dispose();}
 }

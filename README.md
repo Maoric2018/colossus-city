@@ -3,7 +3,7 @@
 
 Asymmetric multiplayer source prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders the city; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
-**Validation status (September 11, 2026):** dependencies installed and locked; **55 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
+**Validation status (September 11, 2026):** dependencies installed and locked; **58 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
 
 The latest update adds rigid, articulated giant arms; solid cars, rooftop equipment and street fixtures; a new armored raider facing forward; brighter laser pulses and impacts; and a wider camera over the right shoulder. Roof equipment stays solid as its building collapses.
 
@@ -80,7 +80,7 @@ The server supports local TLS when both `TLS_CERT` and `TLS_KEY` are set. A cert
 
 **Giant reach:** the default 14× world scale maps a physical 0.5 m controller movement to 7 m in the city. The server now preserves that full reach without a slow positional catch-up. Before entering VR, open **Quest Controls** to adjust turn speed (30–180°/s) or reach gain (0.5–1.5×). A calibration adjusts the giant scale for your standing height; the headset HUD shows the resulting reach. Smooth turning pivots around your head, and artificial rotation is excluded from hand-strike velocity.
 
-**Flight:** hold Space to take off, then hold either Shift key to soar. Release Shift to return to hover. The pilot flies prone, mouse aim steers the flight path, and S brakes. Normal flight stays at 11 m/s; holding Shift soars at up to 32 m/s. E dodges in your held WASD/Space/C direction, or forward when no direction is held. Dodges use 12% thrust and have a 1.2-second cooldown. Speed streaks, a wider field of view and banking communicate acceleration.
+**Flight:** hold Space to take off, then hold either Shift key to soar. Release Shift to return to hover. The pilot flies prone, mouse aim steers the flight path, and S brakes. Normal flight stays at 11 m/s; holding Shift soars at up to 32 m/s. The giant walks at 13 m/s (about 18% faster than normal raider flight), with the same speed on Quest and keyboard. E dodges in your held WASD/Space/C direction, or forward when no direction is held. Dodges use 12% thrust and have a 1.2-second cooldown. Speed streaks, a wider field of view and banking communicate acceleration.
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode against scenery/raiders, damage nearby raiders and destroy building bays. The server enforces a shared 0.8-second firing cooldown and an eight-projectile cap.
 
@@ -92,7 +92,7 @@ The raiders win by reducing the giant's core health to zero. Headshots do more d
 
 ### Contact and ragdolls
 
-Raider movement is server-owned dynamic-capsule physics. A hand's **swept path** is checked each physics tick to catch fast contact. Relative impact velocity determines knockback/damage. A struck player becomes **eleven actual rigid bodies joined at the pelvis, spine, neck, shoulders, elbows, hips and knees**; elbows/knees use limited hinges. Debris can also knock down raiders. Clients receive the same authoritative limb transforms rather than inventing different local collisions. Live avatars are lightweight rigid humanoid meshes, not high-end animated/skinned characters.
+Raider movement is server-owned dynamic-capsule physics. A hand's **swept path** is checked each physics tick to catch fast contact. Relative impact velocity determines knockback/damage. A struck player becomes **eleven actual rigid bodies joined at the pelvis, spine, neck, shoulders, elbows, hips and knees**; elbows/knees use limited hinges. Debris can also knock down raiders. Clients receive the same authoritative limb transforms rather than inventing different local collisions. Knockdowns retain the same armored raider model, helmet, boots, flight pack and rifle. The continuous mesh is skinned to those eleven physics bodies; it also preserves the initial prone pose when hit during soaring. Recovery and respawn restore the live pilot.
 
 ### Destruction
 
@@ -137,7 +137,8 @@ npm test               # 24 dependency-free checks
 npm run test:physics   # Actual Rapier stepping, joints, collapse, reset
 npm run test:network   # Actual multiplayer + spectator-channel integration
 npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three math)
-npm run test:all       # All 55 Node tests after installation
+npm run test:all       # All 58 Node tests after installation
+npm run test:ragdoll   # Model match, tumbling, late joining and Quest stereo
 npm run bench          # Real server-physics profile; outputs local results
 ```
 

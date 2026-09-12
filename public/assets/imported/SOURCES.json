@@ -59,6 +59,14 @@
       "download": "https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Spacesuit.gltf",
       "license": "CC0",
       "modifications": "Spacesuit baked at 0.3 seconds of Idle_Gun_Pointing; source skinning and transforms applied; rotated to -Z forward, centered and scaled to 2.2 m; merged vertex-colored mesh with wrist mount metadata. Runtime flight pack and Kenney rifle added by src/avatars.js. Rebuild with scripts/prepare-raider.mjs."
+    },
+    {
+      "id": "raider-armored-ragdoll",
+      "creator": "Quaternius",
+      "page": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "download": "https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Spacesuit.gltf",
+      "license": "CC0",
+      "modifications": "Same posed Spacesuit surface and vertex colors as armored-pilot.glb. Source bone weights merged into 11 physics-driven bones, keeping continuous skin at the joints. scripts/prepare-ragdoll.mjs generates this GLB plus shared/raider-rig.js collision dimensions and joint anchors. Shared runtime flight pack and rifle follow chest/forearm bones."
     }
   ],
   "textures": [
@@ -326,6 +334,11 @@
       "file": "public/assets/imported/raider/armored-pilot.glb",
       "bytes": 1141360,
       "sha256": "c63742cd9fbf32fa54b3b17370753d028772e5b95211b545f9d366df53ee5b8b"
+    },
+    {
+      "file": "public/assets/imported/raider/armored-ragdoll.glb",
+      "bytes": 1903848,
+      "sha256": "0dbeb9b9dc858f761b73429a354af34aad3b41d8369963a41851e3a9e13500ff"
     },
     {
       "file": "public/assets/imported/space-kit/License.txt",

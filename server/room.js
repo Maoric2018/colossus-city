@@ -4,6 +4,7 @@ import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {fly,launchMissile,updateMissiles} from './abilities.js';
 import {staticProps} from '../shared/props.js';
+import {raiderParts,raiderLinks,raiderGear} from '../shared/raider-rig.js';
 import {C,group} from '../shared/config.js';
 import {activeEnvironment as city,generateCells,unsupportedCells,cellColliders} from '../shared/environment.js';
 import {v,add,sub,mul,len,norm,dist,arr,vec,clamp,quatYaw,quatEuler,rotateYaw,segmentDistance,segmentAABB,raySphere,lookDir,finiteVector,sanitizeInput} from '../shared/math.js';
@@ -112,7 +113,7 @@ export class Room {
   clearedCells:this.cells.filter(c=>this.detached.has(c.id)&&!this.debris.has(c.entity)).map(c=>c.id),entities:[...this.debris.values()].map(e=>this.debrisMeta(e)),rags:[...this.rags.values()].map(r=>this.ragMeta(r)),roster:this.roster()};}
  roster(){return [...this.clients.values()].map(c=>({id:c.id,name:c.name,role:c.role})).concat([...this.players.values()].filter(p=>p.bot).map(p=>({id:p.id,name:p.name,role:'bot'})));}
  debrisMeta(e){return {type:'debris',id:e.id,cells:e.cells,origin:e.origin,...bodyPose(e.body)};}
- ragMeta(r){return {type:'rag',id:r.id,player:r.player,parts:r.parts.map(p=>({id:p.id,size:p.size,...bodyPose(p.body)}))};}
+ ragMeta(r){return {type:'rag',id:r.id,player:r.player,parts:r.parts.map(p=>({id:p.id,name:p.name,size:p.size,...bodyPose(p.body)}))};}
 
  step(){
   this.tick++;this.time+=C.TICK;
@@ -185,7 +186,7 @@ export class Room {
    for(const key of ['head','left','right'])b[key]={...b.target[key]};
   }else if(this.bossClient&&b.desktop){
    const i=this.time-b.lastInput<.45?b.input:noInput();b.yaw=i.yaw;
-   const dir=rotateYaw(v(i.x,0,i.z),b.yaw);b.x=clamp(b.x+dir.x*C.GIANT_SPEED*C.TICK,-48,48);b.z=clamp(b.z+dir.z*C.GIANT_SPEED*C.TICK,-48,48);
+   let dir=rotateYaw(v(i.x,0,i.z),b.yaw);if(len(dir)>1)dir=norm(dir);b.x=clamp(b.x+dir.x*C.GIANT_SPEED*C.TICK,-48,48);b.z=clamp(b.z+dir.z*C.GIANT_SPEED*C.TICK,-48,48);
    b.head=v(b.x,23.8,b.z);let l=v(-5.6,15.5,-4),r=v(5.6,15.5,-4);
    if(i.fire){const phase=this.time*7;const sweep=Math.sin(phase);r=v(6*sweep,10+Math.cos(phase)*5,-9-Math.max(0,-Math.cos(phase))*5);}
    if(i.up>0){const t=Math.sin(this.time*6);l=v(-5,9+t*8,-9);r=v(5,9+t*8,-9);}
@@ -274,31 +275,28 @@ export class Room {
  }
  knockdown(p,kick,damage){
   if(!p.body||this.time<p.invulnerable)return;
-  p.hp=Math.max(0,p.hp-damage);const at=p.body.translation(),velocity=add(p.body.linvel(),kick);
-  this.removeBody(p.body);p.body=null;const rag=this.makeRag(p,at,velocity);p.rag=rag.id;p.recoverAt=this.time+2.1;
+  p.hp=Math.max(0,p.hp-damage);const at=p.body.translation(),flightVelocity=p.body.linvel(),velocity=add(flightVelocity,kick);
+  this.removeBody(p.body);p.body=null;const rag=this.makeRag(p,at,velocity,flightVelocity);p.rag=rag.id;p.recoverAt=this.time+2.1;
   if(p.hp<=0){p.deadUntil=this.time+C.RESPAWN_SECONDS;this.kills++;this.event({type:'kill',player:p.id});}
   this.event({type:'impact',p:arr(at),power:.45});
  }
- makeRag(p,at,velocity){
+ makeRag(p,at,velocity,flightVelocity=v()){
   if(this.rags.size>=C.MAX_RAGDOLLS){const candidate=[...this.rags.values()].find(r=>![...this.players.values()].some(p=>p.rag===r.id));if(candidate)this.removeRag(candidate.id);}
-  const defs=[
-   {name:'hips',o:[0,0,0],s:[.52,.36,.32]}, {name:'chest',o:[0,.38,0],s:[.62,.42,.34]}, {name:'head',o:[0,.82,0],s:[.36,.38,.36]},
-   {name:'upperL',o:[-.48,.35,0],s:[.24,.44,.24]},{name:'lowerL',o:[-.57,-.05,0],s:[.22,.4,.22]},
-   {name:'upperR',o:[.48,.35,0],s:[.24,.44,.24]},{name:'lowerR',o:[.57,-.05,0],s:[.22,.4,.22]},
-   {name:'thighL',o:[-.18,-.42,0],s:[.27,.5,.29]},{name:'shinL',o:[-.18,-.91,0],s:[.24,.45,.26]},
-   {name:'thighR',o:[.18,-.42,0],s:[.27,.5,.29]},{name:'shinR',o:[.18,-.91,0],s:[.24,.45,.26]}
-  ];
-  const yaw=p.input.yaw||0,parts=defs.map((d,i)=>{
-   const pos=add(at,rotateYaw(vec(d.o),yaw));
-   const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x,pos.y,pos.z).setRotation(quatYaw(yaw)).setLinearDamping(.12).setAngularDamping(.6).setCcdEnabled(true));
+  const defs=raiderParts,yaw=p.input.yaw||0,speed=Math.hypot(flightVelocity.x,flightVelocity.z),tilt=p.soaring?-Math.PI/2+(p.input.pitch||0):-Math.min(.4,speed*.018),bank=clamp((flightVelocity.x*Math.cos(yaw)-flightVelocity.z*Math.sin(yaw))*.025,-.4,.4);
+  // Match the live pilot's yaw * flight lean * bank, including prone knockdowns.
+  const local=quatEuler(tilt,0,bank),sy=Math.sin(yaw/2),cy=Math.cos(yaw/2),q={x:cy*local.x+sy*local.z,y:cy*local.y+sy*local.w,z:cy*local.z-sy*local.x,w:cy*local.w-sy*local.y};
+  const rotate=p=>{const t=v(2*(q.y*p.z-q.z*p.y),2*(q.z*p.x-q.x*p.z),2*(q.x*p.y-q.y*p.x));return v(p.x+q.w*t.x+q.y*t.z-q.z*t.y,p.y+q.w*t.y+q.z*t.x-q.x*t.z,p.z+q.w*t.z+q.x*t.y-q.y*t.x);};
+  const parts=defs.map((d,i)=>{
+   const pos=add(at,rotate(vec(d.o)));
+   const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x,pos.y,pos.z).setRotation(q).setLinearDamping(.12).setAngularDamping(.6).setCcdEnabled(true));
    this.world.createCollider(RAPIER.ColliderDesc.cuboid(d.s[0]/2,d.s[1]/2,d.s[2]/2).setMass(i===1?22:i===0?14:5).setFriction(.65).setRestitution(.04).setCollisionGroups(group(G.RAGDOLL,G.WORLD|G.DEBRIS|G.GIANT)),body);
+   for(const gear of raiderGear.filter(g=>g.part===d.name)){const o=sub(vec(gear.o),vec(d.o));this.world.createCollider(RAPIER.ColliderDesc.cuboid(...gear.s.map(v=>v/2)).setTranslation(o.x,o.y,o.z).setDensity(0).setFriction(.65).setCollisionGroups(group(G.RAGDOLL,G.WORLD|G.DEBRIS|G.GIANT)),body);}
    body.setLinvel(velocity,true);body.setAngvel(v(velocity.z*.14,0,-velocity.x*.14),true);
-   return {id:this.nextRag++,body,size:d.s,offset:d.o};
+   return {id:this.nextRag++,name:d.name,body,size:d.s,offset:d.o};
   });
-  const links=[[0,1,[0,.17,0]],[1,2,[0,.62,0]],[1,3,[-.35,.53,0]],[3,4,[-.55,.13,0],true],[1,5,[.35,.53,0]],[5,6,[.55,.13,0],true],[0,7,[-.18,-.2,0]],[7,8,[-.18,-.67,0],true],[0,9,[.18,-.2,0]],[9,10,[.18,-.67,0],true]];
-  for(const [a,b,anchor,hinge] of links){
+  for(const {a,b,anchor,hinge,axis} of raiderLinks){
    const aa=sub(vec(anchor),vec(defs[a].o)),ab=sub(vec(anchor),vec(defs[b].o));
-   const params=hinge?RAPIER.JointData.revolute(aa,ab,v(1,0,0)):RAPIER.JointData.spherical(aa,ab);
+   const params=hinge?RAPIER.JointData.revolute(aa,ab,vec(axis)):RAPIER.JointData.spherical(aa,ab);
    const joint=this.world.createImpulseJoint(params,parts[a].body,parts[b].body,true);if(hinge)joint.setLimits(-.15,2.2);
   }
   const rag={id:parts[0].id,player:p.id,parts,born:this.time};this.rags.set(rag.id,rag);this.event(this.ragMeta(rag));return rag;
