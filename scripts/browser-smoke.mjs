@@ -14,7 +14,7 @@ let serverLog='',browser;server.stdout.on('data',d=>serverLog+=d);server.stderr.
 const errors=[],checks=[],poses=[];
 try{
  for(let i=0;i<100;i++){if(await fetch(`${url}/healthz`).then(r=>r.ok).catch(()=>false))break;if(i===99)throw Error(serverLog);await delay(100);}
- browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader']});
+ browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
  async function pageFor(context){
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));
@@ -27,9 +27,9 @@ try{
   assert.deepEqual(await page.evaluate(()=>window.__COLOSSUS.assetStatus.failed),[],'Downloaded art must load without failures');
   return page;
  }
- const desktop=await browser.newContext({viewport:{width:1440,height:900}});
+ const desktop=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:2});
  const raider=await pageFor(desktop);
- await raider.locator('#create').click();await raider.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ await raider.locator('#name').fill('SCOUT');await raider.locator('#create').click();await raider.waitForFunction(()=>window.__COLOSSUS.state!==null);
  const room=await raider.evaluate(()=>window.__COLOSSUS.net.room);
  const before=await raider.evaluate(()=>window.__COLOSSUS.state.players[0].p);
  await raider.bringToFront();await raider.locator('#resume').click();
@@ -39,13 +39,20 @@ try{
  await raider.keyboard.up('Space');await raider.keyboard.up('KeyW');
  assert.ok(await raider.evaluate(()=>window.__COLOSSUS.renderer.info.render.calls)>0);
  await raider.screenshot({path:'artifacts/desktop-smoke.png'});
+ // Clear the 16 m Union Works roof before testing full soaring speed.
+ await raider.keyboard.down('Space');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].p[1]>22);await raider.keyboard.up('Space');
+ await raider.keyboard.press('KeyF');await raider.waitForFunction(()=>{const p=window.__COLOSSUS.state.players[0];return (p.flags&16)&&Math.hypot(...p.v)>23;});
+ assert.equal(await raider.locator('#flight-mode').textContent(),'SOARING');
+ await raider.keyboard.down('KeyD');await raider.keyboard.press('KeyE');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].dodgeCooldown>.5);await raider.keyboard.up('KeyD');
+ await raider.screenshot({path:'artifacts/raider-soaring.png'});await raider.keyboard.press('KeyF');await raider.waitForFunction(()=>!(window.__COLOSSUS.state.players[0].flags&16));
+ checks.push('Raider hover/soar toggle, fast flight, directional dodge and cooldown HUD');
  checks.push('Desktop WebGL rendering, room creation and keyboard jetpack ascent');console.log(checks.at(-1));
  const headset=await browser.newContext({viewport:{width:1200,height:800}});
  const iwer=await readFile('node_modules/iwer/build/iwer.js','utf8');
  await headset.addInitScript({content:iwer+`\nwindow.questDevice=new IWER.XRDevice(IWER.metaQuest2,{stereoEnabled:true});questDevice.installRuntime({forceInstall:true});questDevice.position.set(0,1.7,0);questDevice.controllers.left.position.set(-.4,1.2,-.3);questDevice.controllers.right.position.set(.4,1.2,-.3);`});
  const quest=await pageFor(headset);
  assert.equal(await quest.locator('[data-role="boss"]').getAttribute('class'),'role active');
- await quest.locator('#room-input').fill(room);await quest.locator('#join').click();
+ await quest.locator('#name').fill('COLOSSUS');await quest.locator('#room-input').fill(room);await quest.locator('#join').click();
  await quest.waitForFunction(()=>window.__COLOSSUS.state!==null);
  await quest.locator('#resume').click();await quest.locator('#vr-button').click();
  await quest.waitForFunction(()=>window.__COLOSSUS.renderer.xr.isPresenting);
@@ -57,14 +64,33 @@ try{
  assert.equal(render.shadows,false);assert.equal(render.frameRate,72);
  await quest.screenshot({path:'artifacts/quest2-emulated-stereo.png'});
  checks.push('Quest 2 profile: auto-selected giant, two stereo views, tracked poses and 72 Hz request');
+ const handBefore=await quest.evaluate(()=>window.__COLOSSUS.net.latest.right);
+ await quest.evaluate(()=>questDevice.controllers.right.position.x+=.5);
+ await quest.waitForFunction(before=>Math.abs(window.__COLOSSUS.net.latest.right[0]-before[0]-7)<.05,handBefore);
+ await quest.evaluate(()=>questDevice.controllers.right.position.x-=.5);
+ checks.push('Half-metre controller extension reaches seven city metres on the real server');
+ await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('trigger',1));
+ await quest.waitForFunction(()=>window.__COLOSSUS.missiles.active.size>0);await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('trigger',0));
+ await quest.screenshot({path:'artifacts/quest-missile.png'});checks.push('Touch trigger launches a replicated, rendered missile');
+ const second=await pageFor(desktop);await second.locator('#name').fill('STRIKER');await second.locator('#room-input').fill(room);await second.locator('#join').click();await second.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ const observerPromise=desktop.waitForEvent('page');await raider.bringToFront();await raider.keyboard.press('Escape');await raider.locator('#menu-spectator').click();const observer=await observerPromise;observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
+ await observer.waitForFunction(()=>window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.frames>=2&&c.image.naturalWidth===640));
+ assert.ok(await observer.evaluate(()=>[...window.__COLOSSUS.views.cards.values()].some(c=>c.mode==='Headset left eye')));
+ await observer.screenshot({path:'artifacts/spectator-panel.png'});
+ await quest.screenshot({path:'artifacts/quest2-while-watched.png'});
+ const mirrorStats=await quest.evaluate(()=>({active:window.__COLOSSUS.views.active,eyes:window.__COLOSSUS.renderer.xr.getCamera().cameras.length,enabled:window.__COLOSSUS.renderer.xr.enabled}));assert.equal(mirrorStats.active,true);assert.equal(mirrorStats.eyes,2);assert.equal(mirrorStats.enabled,true);
+ checks.push('Spectator receives actual frames from both raiders and the headset left eye; stereo rendering survives capture');
+ await observer.locator('#spectator-free').click();await quest.waitForFunction(()=>!window.__COLOSSUS.views.active);checks.push('Closing live views stops capture on players');await observer.locator('#menu-spectator').click();await quest.waitForFunction(()=>window.__COLOSSUS.views.active);checks.push('Live Views opens from a player pause menu and reopens from spectator free camera');
+ await observer.close();await second.close();
+
  const z=await quest.evaluate(()=>window.__COLOSSUS.net.latest.bossZ);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,-1));
  await quest.waitForFunction(z=>window.__COLOSSUS.net.latest.bossZ<z-.4,z);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,0));
  await quest.evaluate(()=>questDevice.controllers.right.updateAxes('thumbstick',1,0));
- await quest.waitForFunction(()=>Math.abs(window.__COLOSSUS.net.latest.bossYaw+Math.PI/6)<.02);
+ await quest.waitForFunction(()=>window.__COLOSSUS.net.latest.bossYaw<-.25);
  await quest.evaluate(()=>questDevice.controllers.right.updateAxes('thumbstick',0,0));
- checks.push('Left Touch stick locomotion and right Touch 30-degree snap turn');
+ checks.push('Left Touch stick locomotion and right Touch continuous smooth turn');
  await quest.evaluate(()=>{questDevice.position.y=1.4;questDevice.controllers.right.updateButtonValue('a-button',1);});
  await quest.waitForFunction(()=>Math.abs(window.__COLOSSUS.rig.scale.y-17)<.01&&Math.abs(window.__COLOSSUS.net.latest.head[1]-23.8)<.3);
  await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('a-button',0));
@@ -97,6 +123,10 @@ try{
  assert.equal(await quest.evaluate(()=>window.__COLOSSUS.camera.fov),65);
  assert.equal(await quest.evaluate(()=>window.__COLOSSUS.rig.scale.y),1);
  checks.push('Exit and re-enter immersive VR in the same room');
+ const practice=await pageFor(desktop);await practice.locator('[data-role="boss"]').click();await practice.locator('#practice').click();await practice.waitForFunction(()=>window.__COLOSSUS.state?.players.length===3);
+ const practiceRoom=await practice.evaluate(()=>window.__COLOSSUS.net.room),botObserver=await pageFor(desktop);await botObserver.locator('#room-input').fill(practiceRoom);await botObserver.locator('#spectate').click();
+ await botObserver.waitForFunction(()=>{const cards=[...window.__COLOSSUS.views.cards.values()];return cards.length===4&&cards.every(c=>c.image.naturalWidth===640)&&cards.filter(c=>c.role==='bot').length===3;});
+ await botObserver.screenshot({path:'artifacts/spectator-practice.png'});checks.push('Practice panel shows all three simulated drone cameras and the live desktop giant');
  assert.deepEqual(errors,[]);
  const report={created:new Date().toISOString(),result:'PASS',checks,render,posePackets:poses.length,browserErrors:errors,notValidated:'Physical Quest 2 hardware, tracking accuracy, haptics, comfort, headset FPS or thermal behavior'};
  await writeFile('artifacts/browser-smoke.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));

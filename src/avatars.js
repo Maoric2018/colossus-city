@@ -60,7 +60,7 @@ export class GiantView{
   [-1,1].forEach((sign,i)=>{
    const shoulder=new T.Vector3(sign*4.2,3.1,0).applyQuaternion(q).add(chest),hand=new T.Vector3(...(i?s.right:s.left));
    const center=shoulder.clone().lerp(hand,.47),bend=new T.Vector3(sign*1.5,-1,2).applyQuaternion(q);center.add(bend);
-   this.arms[i].upper.set(shoulder,center);this.arms[i].lower.set(center,hand);this.arms[i].fist.position.copy(hand);this.arms[i].fist.quaternion.copy(q);
+   this.arms[i].upper.set(shoulder,center);this.arms[i].lower.set(center,hand);this.arms[i].fist.position.copy(hand);this.arms[i].fist.quaternion.copy(q);if(s[i?'rightQuaternion':'leftQuaternion'])this.arms[i].fist.quaternion.fromArray(s[i?'rightQuaternion':'leftQuaternion']);
    const hip=new T.Vector3(sign*1.6,-4.3,0).applyQuaternion(q).add(chest),foot=new T.Vector3(sign*2.1,1,1.1).applyQuaternion(q);foot.x+=head.x;foot.z+=head.z;
    const knee=hip.clone().lerp(foot,.52).add(new T.Vector3(0,0,-1.3).applyQuaternion(q));this.legs[i].thigh.set(hip,knee);this.legs[i].shin.set(knee,foot);this.legs[i].foot.position.copy(foot);this.legs[i].foot.quaternion.copy(q);
   });
@@ -91,14 +91,14 @@ export class RaiderView{
   this.mesh=new T.Mesh(suitGeometry(color),new T.MeshStandardMaterial({vertexColors:true,metalness:.4,roughness:.56}));this.mesh.castShadow=true;this.root.add(this.mesh);
   this.disposed=false;this.ready=bakedModel('/assets/imported/space-kit/astronautA.glb').then(model=>{
    if(this.disposed)return;this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.removeFromParent();
-   this.mesh=new T.Group();const scale=2.2/model.size.y;for(const part of model.parts){const m=new T.Mesh(part.geometry,part.material);m.scale.setScalar(scale);m.position.y=-1.15;m.rotation.y=Math.PI;m.castShadow=true;this.mesh.add(m);}this.root.add(this.mesh);this.imported=true;
+   this.mesh=new T.Group();const scale=2.2/model.size.y;for(const part of model.parts){const m=new T.Mesh(part.geometry,part.material);m.scale.setScalar(scale);m.position.y=-1.15;m.castShadow=true;this.mesh.add(m);}this.root.add(this.mesh);this.imported=true;
   }).catch(error=>console.error('Raider model failed to load',error));
   this.jets=[-1,1].map(s=>glow(this.root,color,.9,[s*.27,-.21,.36]));this.color=color;
  }
  update(p,local=false,firstPerson=false){
   this.root.visible=!(p.flags&3)&&!(local&&firstPerson);this.root.position.set(...p.p);this.root.rotation.set(0,p.yaw,0);
-  const speed=Math.hypot(p.v[0],p.v[2]);this.mesh.rotation.x=-Math.min(.4,speed*.018);
-  for(const j of this.jets){const on=(p.v[1]>1||speed>4)&&p.fuel>.01;j.visible=on;j.scale.setScalar(.8+Math.sin(performance.now()*.06)*.2);}
+  const speed=Math.hypot(p.v[0],p.v[2]);const target=p.flags&16?-Math.PI/2+(p.pitch||0):-Math.min(.4,speed*.018);this.mesh.rotation.x+=(target-this.mesh.rotation.x)*.2;this.mesh.rotation.z+=(Math.max(-.4,Math.min(.4,(p.v[0]*Math.cos(p.yaw)-p.v[2]*Math.sin(p.yaw))*.025))-this.mesh.rotation.z)*.15;
+  for(const [index,j]of this.jets.entries()){j.position.set(index? .27:-.27,-.21,.36).applyAxisAngle(new T.Vector3(1,0,0),this.mesh.rotation.x);const on=(p.v[1]>1||speed>4)&&p.fuel>.01;j.visible=on;j.scale.setScalar((p.flags&32?2:p.flags&16?1.4:.8)+Math.sin(performance.now()*.06)*.2);}
  }
  dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}for(const j of this.jets)j.material.dispose();}
 }

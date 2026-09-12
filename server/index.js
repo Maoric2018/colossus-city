@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {installViews} from './views.js';
 import https from 'node:https';
 import {readFile,stat} from 'node:fs/promises';
 import {readFileSync,createReadStream} from 'node:fs';
@@ -34,7 +35,9 @@ const handler=async(req,res)=>{
 };
 const server=process.env.TLS_CERT&&process.env.TLS_KEY?https.createServer({cert:readFileSync(process.env.TLS_CERT),key:readFileSync(process.env.TLS_KEY)},handler):http.createServer(handler);
 const wss=new WebSocketServer({noServer:true,maxPayload:8192,perMessageDeflate:false});
+const viewServer=installViews(server,rooms);
 server.on('upgrade',(req,socket,head)=>{
+ if(req.url==='/views')return;
  try{
   const origin=req.headers.origin,host=req.headers.host;
   const permitted=!origin||new URL(origin).host===host||(process.env.ALLOWED_ORIGIN&&origin===process.env.ALLOWED_ORIGIN);
@@ -96,5 +99,5 @@ const interval=setInterval(()=>{
 },4);
 const heartbeat=setInterval(()=>{for(const ws of wss.clients){if(!ws.alive){ws.terminate();continue;}ws.alive=false;ws.ping();}},15000);
 server.listen(PORT,'0.0.0.0',()=>console.log(`COLOSSUS CITY | ${process.env.TLS_CERT?'https':'http'}://localhost:${PORT}\nQuest immersive VR needs HTTPS. See README.md.`));
-function shutdown(){clearInterval(interval);clearInterval(heartbeat);for(const ws of wss.clients)ws.close(1001,'Server shutting down');for(const r of rooms.values())r.dispose();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),1500).unref();}
+function shutdown(){clearInterval(interval);clearInterval(heartbeat);for(const ws of [...wss.clients,...viewServer.clients])ws.close(1001,'Server shutting down');for(const r of rooms.values())r.dispose();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),1500).unref();}
 process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);

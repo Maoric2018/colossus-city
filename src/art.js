@@ -10,7 +10,13 @@ export function mergeParts(parts){return mergeGeometries(parts.map(([g,p=[0,0,0]
 }),false);}
 export function glowTexture(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.12,'rgba(255,255,255,.65)');g.addColorStop(.4,'rgba(255,255,255,.12)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return new T.CanvasTexture(c);}
 export const glowMap=glowTexture();
-export function glow(parent,color,size,p=[0,0,0]){const s=new T.Sprite(new T.SpriteMaterial({map:glowMap,color,transparent:true,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}));s.position.set(...p);s.scale.setScalar(size);parent.add(s);return s;}
+export function glow(parent,color,size,p=[0,0,0]){
+ const material=new T.SpriteMaterial({map:glowMap,color,transparent:true,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false});
+ // Sprite corners are expanded in view space. Account for the giant's scaled
+ // camera so a six-metre glow stays six world metres in either eye and its mirror.
+ material.onBeforeCompile=shader=>{shader.vertexShader=shader.vertexShader.replace('vec2 alignedPosition =','scale *= length( viewMatrix[0].xyz );\n\tvec2 alignedPosition =');};
+ const s=new T.Sprite(material);s.position.set(...p);s.scale.setScalar(size);parent.add(s);return s;
+}
 export function labelTexture(text,{bg='#09202b',fg='#c9efdc',w=512,h=128}={}){
  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle=bg;x.fillRect(0,0,w,h);x.fillStyle=fg;x.font=`bold ${Math.floor(h*.34)}px Arial`;x.textAlign='center';x.textBaseline='middle';x.fillText(text,w/2,h/2,w*.92);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex;
 }

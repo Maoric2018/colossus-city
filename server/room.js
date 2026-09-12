@@ -1,12 +1,14 @@
 // Rapier 0.17.3's package main points at CommonJS inside a type:module package.
 // Node needs the explicit ESM entry; browser bundlers previously hid this issue.
+import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
+import {fly,launchMissile,updateMissiles} from './abilities.js';
 import {C,group} from '../shared/config.js';
 import {activeEnvironment as city,generateCells,unsupportedCells,cellColliders} from '../shared/environment.js';
 import {v,add,sub,mul,len,norm,dist,arr,vec,clamp,quatYaw,quatEuler,rotateYaw,segmentDistance,segmentAABB,raySphere,lookDir,finiteVector,sanitizeInput} from '../shared/math.js';
 export const physicsReady=RAPIER.init();
 const G=C.COLLISION;
-const noInput=()=>({x:0,z:0,up:0,boost:false,fire:false,yaw:0,pitch:0,seq:0});
+const noInput=()=>({x:0,z:0,up:0,boost:false,fire:false,soar:false,missile:false,dodge:0,yaw:0,pitch:0,seq:0});
 // Explicit quaternion ordering: never depend on WASM property enumeration.
 const bodyPose=b=>{const p=b.translation(),q=b.rotation();return {p:[p.x,p.y,p.z],q:[q.x,q.y,q.z,q.w]};};
 
@@ -23,9 +25,9 @@ export class Room {
   this.world=new RAPIER.World(v(0,C.GRAVITY,0));this.world.timestep=C.TICK;
   this.world.integrationParameters.numSolverIterations=6;
   this.queue=new RAPIER.EventQueue(true);this.colliderTags=new Map();this.cells=generateCells(this.env);
-  this.cellMap=new Map();this.detached=new Set();this.debris=new Map();this.nextDebris=1000;this.rags=new Map();this.events=[];
+  this.cellMap=new Map();this.detached=new Set();this.debris=new Map();this.nextDebris=1000;this.missiles=new Map();this.nextMissile=20000;this.rags=new Map();this.events=[];
   this.phase=0;this.remaining=C.MATCH_SECONDS;this.bossHP=C.BOSS_HP;this.kills=0;this.startTime=this.time;
-  this.boss={x:0,z:0,yaw:0,head:v(0,23.8,0),left:v(-5.6,16,-4),right:v(5.6,16,-4),lastPose:-100,input:noInput(),lastInput:-100};
+  this.boss={x:0,z:0,yaw:0,head:v(0,23.8,0),left:v(-5.6,16,-4),right:v(5.6,16,-4),lastPose:-100,input:noInput(),lastInput:-100,missileReady:0};
   this.ground=this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0,-.3,0));
   this.world.createCollider(RAPIER.ColliderDesc.cuboid(220,.3,220).setFriction(.82).setCollisionGroups(group(G.WORLD)),this.ground);
   for(const c of this.cells){
@@ -57,7 +59,7 @@ export class Room {
  attach(ws,role,name){
   if(role==='boss'&&this.bossClient)throw Error('This room already has a giant. Join as a raider.');
   if(role==='raider'&&[...this.players.values()].filter(p=>!p.bot).length>=C.MAX_RAIDERS)throw Error('The eight raider slots are full.');
-  const id=this.nextPlayer++,client={id,ws,role,name};this.clients.set(id,client);
+  const id=this.nextPlayer++,client={id,ws,role,name,viewKey:randomBytes(24).toString('hex')};this.clients.set(id,client);
   if(role==='boss'){this.bossClient=id;this.boss.lastPose=-100;this.boss.input=noInput();}
   if(role==='raider'){
    // Human players replace practice bots before consuming extra physics budget.
@@ -71,13 +73,13 @@ export class Room {
   const id=this.nextPlayer++,p={id,name:`DRONE ${i+1}`,bot:true,input:noInput(),lastInput:this.time,kills:0,damage:0};this.players.set(id,p);this.spawn(p);
  }}
  removePlayer(id){const p=this.players.get(id);if(p?.body)this.removeBody(p.body);if(p?.rag)this.removeRag(p.rag);this.players.delete(id);}
- detach(id){const c=this.clients.get(id);if(!c)return;this.clients.delete(id);if(this.bossClient===id){this.bossClient=null;this.boss.input=noInput();}this.removePlayer(id);if(!this.clients.size)this.emptySince=Date.now();}
+ detach(id){const c=this.clients.get(id);if(!c)return;c.viewSocket?.close(1000,'Player left');this.clients.delete(id);if(this.bossClient===id){this.bossClient=null;this.boss.input=noInput();}this.removePlayer(id);if(!this.clients.size)this.emptySince=Date.now();}
  spawn(p,at){
   if(p.body)this.removeBody(p.body);
   const spawn=at||vec(this.env.spawns[(p.id-1)%this.env.spawns.length]);
   p.body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(spawn.x,Math.max(1.2,spawn.y),spawn.z).lockRotations().setLinearDamping(.12).setCcdEnabled(true));
   const co=this.world.createCollider(RAPIER.ColliderDesc.capsule(.8,.34).setMass(70).setFriction(.05).setRestitution(0).setCollisionGroups(group(G.PLAYER,G.WORLD|G.DEBRIS)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),p.body);
-  this.colliderTags.set(co.handle,{player:p.id});p.hp=C.PLAYER_HP;p.fuel=1;p.rag=null;p.deadUntil=0;p.recoverAt=0;p.invulnerable=this.time+C.INVULNERABLE_SECONDS;p.lastShot=-1;
+  this.colliderTags.set(co.handle,{player:p.id});p.hp=C.PLAYER_HP;p.fuel=1;p.rag=null;p.deadUntil=0;p.recoverAt=0;p.invulnerable=this.time+C.INVULNERABLE_SECONDS;p.lastShot=-1;p.soaring=false;p.dodgeUntil=0;p.dodgeReady=0;p.lastDodgeSeq=p.input.dodge||0;
  }
  removeBody(body){if(!body||!body.isValid())return;for(let i=0;i<body.numColliders();i++)this.colliderTags.delete(body.collider(i).handle);this.world.removeRigidBody(body);}
  input(client,m){
@@ -90,17 +92,20 @@ export class Room {
    if(m.tracking===false){this.boss.desktop=false;this.boss.lastPose=-100;this.boss.moveX=0;this.boss.moveZ=0;return;}
    if(!finiteVector(m.head)||!finiteVector(m.left)||!finiteVector(m.right)||!Number.isFinite(m.yaw))return;
    const b=this.boss,head=vec(m.head),l=vec(m.left),r=vec(m.right);
-   if(head.y<5||head.y>38||Math.hypot(head.x-b.x,head.z-b.z)>18||dist(head,l)>23||dist(head,r)>23)return;
-   // Session entry, snap turns, recentering and recovered tracking are teleports,
+   if(head.y<5||head.y>38||Math.hypot(head.x-b.x,head.z-b.z)>18||dist(head,l)>64||dist(head,r)>64)return;
+   // Session entry, recentering and recovered tracking are teleports,
    // not swings. Rebase collision bodies and suppress contact briefly.
    if(m.reset===true||b.desktop||this.time-b.lastPose>=.4){b.resetPose=true;b.noContactUntil=this.time+.2;}
+   b.turnDelta=clamp((b.turnDelta||0)+clamp(Number(m.turnDelta)||0,-.8,.8),-Math.PI,Math.PI);
+   b.triggers={left:!!m.fireLeft,right:!!m.fireRight};
+   b.aims={};for(const side of ['left','right'])if(finiteVector(m[side+'Aim'],3,1.1)&&len(vec(m[side+'Aim']))>.8)b.aims[side]=norm(vec(m[side+'Aim']));
    b.target={head,left:l,right:r};b.yaw=clamp(m.yaw,-1e5,1e5);b.lastPose=this.time;b.desktop=false;
    b.moveX=clamp(Number(m.moveX)||0,-1,1);b.moveZ=clamp(Number(m.moveZ)||0,-1,1);
   }
   if(m.type==='restart'&&client.id===this.hostId()&&this.phase!==0){this.round++;this.initWorld();this.event({type:'reset'});}
  }
  hostId(){return this.clients.keys().next().value;}
- welcome(client){return {type:'welcome',id:client.id,role:client.role,room:this.code,practice:this.practice,environment:this.env.id,round:this.round,host:this.hostId(),
+ welcome(client){return {type:'welcome',id:client.id,viewKey:client.viewKey,role:client.role,room:this.code,practice:this.practice,environment:this.env.id,round:this.round,host:this.hostId(),missiles:[...this.missiles.values()].map(m=>({...m,p:arr(m.p)})),
   clearedCells:this.cells.filter(c=>this.detached.has(c.id)&&!this.debris.has(c.entity)).map(c=>c.id),entities:[...this.debris.values()].map(e=>this.debrisMeta(e)),rags:[...this.rags.values()].map(r=>this.ragMeta(r)),roster:this.roster()};}
  roster(){return [...this.clients.values()].map(c=>({id:c.id,name:c.name,role:c.role})).concat([...this.players.values()].filter(p=>p.bot).map(p=>({id:p.id,name:p.name,role:'bot'})));}
  debrisMeta(e){return {type:'debris',id:e.id,cells:e.cells,origin:e.origin,...bodyPose(e.body)};}
@@ -114,6 +119,7 @@ export class Room {
   this.updateBoss();
   for(const p of this.players.values())this.updatePlayer(p);
   for(const e of this.debris.values())e.preImpactSpeed=len(e.body.linvel());
+  updateMissiles(this);
   this.world.step(this.queue);
   const hits=[],fractures=new Set();
   this.queue.drainCollisionEvents((a,b,started)=>{
@@ -133,7 +139,7 @@ export class Room {
    }
   }
   for(const [id,r] of this.rags)if(this.time-r.born>9)this.removeRag(id);
-  if(this.bossHP<=0||this.remaining<=0){this.phase=this.bossHP<=0?1:2;this.endedAt=this.time;this.event({type:'end',winner:this.phase===1?'raiders':'giant'});}
+  if(this.bossHP<=0||this.remaining<=0){this.missiles.clear();this.phase=this.bossHP<=0?1:2;this.endedAt=this.time;this.event({type:'end',winner:this.phase===1?'raiders':'giant'});}
  }
  updatePlayer(p){
   if(p.rag){
@@ -150,19 +156,9 @@ export class Room {
     yaw:Math.atan2(-aim.x,-aim.z),pitch:Math.atan2(aim.y,Math.hypot(aim.x,aim.z)),seq:0};p.lastInput=this.time;
   }
   const i=this.time-p.lastInput>.45?noInput():p.input;
-  const at=p.body.translation(),lv=p.body.linvel();
+  const at=p.body.translation();
   if(at.y<-8||Math.hypot(at.x,at.z)>108){this.knockdown(p,v(0,4,0),200);return;}
-  let movement=i.world?v(i.x,0,i.z):rotateYaw(v(i.x,0,i.z),i.yaw);
-  if(len(movement)>1)movement=norm(movement);
-  const boosted=i.boost&&p.fuel>.02,sp=boosted?C.BOOST_SPEED:C.PLAYER_SPEED;
-  const air=i.up>0&&p.fuel>0;
-  const desiredY=air?C.ASCEND_SPEED*i.up:(i.up<0?-10:at.y>2?-2.3:lv.y);
-  p.fuel=clamp(p.fuel+((air||boosted)?-.14:(at.y<2?.48:.16))*C.TICK,0,1);
-  const a=Math.min(1,C.TICK*6),av=air||at.y>2?.12:0;
-  let vx=lv.x+(movement.x*sp-lv.x)*a,vz=lv.z+(movement.z*sp-lv.z)*a;
-  if(Math.hypot(at.x,at.z)>C.ARENA_RADIUS){vx-=at.x*.04;vz-=at.z*.04;}
-  let vy=lv.y+(desiredY-lv.y)*av;if(at.y>C.MAX_ALTITUDE)vy=Math.min(vy,-4);
-  p.body.setLinvel(v(vx,vy,vz),true);
+  fly(this,p,i);
   if(i.fire&&this.time-p.lastShot>C.FIRE_INTERVAL)this.shoot(p);
  }
  shoot(p){
@@ -183,7 +179,7 @@ export class Room {
   if(this.bossClient&&this.time-b.lastPose<.4&&!b.desktop){
    const d=rotateYaw(v(b.moveX||0,0,b.moveZ||0),b.yaw),step=mul(len(d)>1?norm(d):d,C.GIANT_SPEED*C.TICK);
    b.x=clamp(b.x+step.x,-48,48);b.z=clamp(b.z+step.z,-48,48);
-   for(const key of ['head','left','right']){const delta=sub(b.target[key],b[key]);b[key]=b.resetPose?{...b.target[key]}:add(b[key],mul(delta,Math.min(1,(key==='head'?30:C.MAX_HAND_SPEED)*C.TICK/(len(delta)||1))));}
+   for(const key of ['head','left','right'])b[key]={...b.target[key]};
   }else if(this.bossClient&&b.desktop){
    const i=this.time-b.lastInput<.45?b.input:noInput();b.yaw=i.yaw;
    const dir=rotateYaw(v(i.x,0,i.z),b.yaw);b.x=clamp(b.x+dir.x*C.GIANT_SPEED*C.TICK,-48,48);b.z=clamp(b.z+dir.z*C.GIANT_SPEED*C.TICK,-48,48);
@@ -200,6 +196,8 @@ export class Room {
    b.left=add(v(b.x,0,b.z),rotateYaw(v(-5+Math.sin(this.time*.7)*7,13+Math.sin(this.time*1.1)*7,-7),b.yaw));
    b.right=add(v(b.x,0,b.z),rotateYaw(v(5+Math.sin(this.time*1.25)*9,12+Math.cos(this.time*1.6)*9,-8),b.yaw));
   }
+  if(this.bossClient&&!b.desktop&&this.time-b.lastPose<.4&&!b.resetPose){for(const side of ['left','right'])if(b.triggers?.[side]&&b.aims?.[side])launchMissile(this,side,b.aims[side]);}
+  if(this.bossClient&&b.desktop&&this.time-b.lastInput<.45&&b.input.missile)launchMissile(this,'right',lookDir(b.yaw,b.input.pitch));
   const canAttack=(!this.bossClient||(b.desktop?this.time-b.lastInput<.45:this.time-b.lastPose<.4))&&!(this.time<b.noContactUntil);
   // Raiders cannot fly through the giant's torso/head as if they were non-solid visuals.
   for(const p of this.players.values())if(canAttack&&p.body){
@@ -212,22 +210,23 @@ export class Room {
    const hand=this.handBodies[idx];
    for(let i=0;i<hand.numColliders();i++)hand.collider(i).setEnabled(canAttack);
    if(b.resetPose){hand.setTranslation(b[key],true);hand.setNextKinematicTranslation(b[key]);continue;}
-   let displacement=sub(b[key],prev);const speed=Math.min(C.MAX_HAND_SPEED,len(displacement)/C.TICK);
-   if(len(displacement)>C.MAX_HAND_SPEED*C.TICK)b[key]=add(prev,mul(norm(displacement),C.MAX_HAND_SPEED*C.TICK));
-   displacement=sub(b[key],prev);hand.setNextKinematicTranslation(b[key]);
+   const collisionPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(prev,b.head),b.turnDelta)):prev;
+   const displacement=sub(b[key],collisionPrev),speed=Math.min(C.MAX_HAND_SPEED,len(displacement)/C.TICK);
+   if(!b.desktop&&Math.abs(b.turnDelta||0)>.001)hand.setTranslation(collisionPrev,true);
+   hand.setNextKinematicTranslation(b[key]);
    if(!canAttack)continue;
-   for(const p of this.players.values())if(p.body&&len(sub(mul(displacement,1/C.TICK),p.body.linvel()))>4&&segmentDistance(p.body.translation(),prev,b[key])<C.HAND_RADIUS+.65){
+   for(const p of this.players.values())if(p.body&&len(sub(mul(displacement,1/C.TICK),p.body.linvel()))>4&&segmentDistance(p.body.translation(),collisionPrev,b[key])<C.HAND_RADIUS+.65){
     const direction=speed>3?norm(displacement):norm(sub(p.body.translation(),b[key]));const kick=add(mul(direction,clamp(speed*.65,8,35)),v(0,6,0));this.knockdown(p,kick,25+speed*1.15);
    }
    // Swept volume avoids tunnelling through storeys between network pose samples.
    if(speed>=3){const hit=[];
-    for(const c of this.cells)if(!this.detached.has(c.id)&&this.time-c.lastHit>.28&&segmentAABB(prev,b[key],vec(c.p),mul(vec(c.size),.5),C.HAND_RADIUS*.8)){
+    for(const c of this.cells)if(!this.detached.has(c.id)&&this.time-c.lastHit>.28&&segmentAABB(collisionPrev,b[key],vec(c.p),mul(vec(c.size),.5),C.HAND_RADIUS*.8)){
      c.lastHit=this.time;c.hp-=speed*1.6+18;if(c.hp<=0)hit.push(c.id);if(hit.length>=5)break;
     }
     if(hit.length)this.breakCells(hit,mul(norm(displacement),Math.min(16,speed*.28)));
    }
   }
-  b.resetPose=false;
+  b.resetPose=false;b.turnDelta=0;
  }
  breakCells(requested,kick=v(0,0,0)){
   const hits=[...new Set(requested)].filter(id=>this.cellMap.has(id)&&!this.detached.has(id));if(!hits.length)return;
@@ -306,7 +305,7 @@ export class Room {
   const b=this.boss;
   return {tick:this.tick,time:this.time,bossHP:this.bossHP,remaining:this.remaining,kills:this.kills,head:arr(b.head),left:arr(b.left),right:arr(b.right),bossYaw:b.yaw,bossX:b.x,bossZ:b.z,
    damage:this.detached.size/this.cells.length*100,phase:this.phase,round:this.round,
-   players:[...this.players.values()].map(p=>{const rb=p.body||this.rags.get(p.rag)?.parts[0].body;return {id:p.id,flags:(p.rag?2:0)|(p.hp<=0?1:0)|(this.time<p.invulnerable?4:0)|(p.bot?8:0),p:rb?arr(rb.translation()):[0,-20,0],v:rb?arr(rb.linvel()):[0,0,0],yaw:p.input.yaw,hp:p.hp,fuel:p.fuel,seq:p.input.seq};}),
+   players:[...this.players.values()].map(p=>{const rb=p.body||this.rags.get(p.rag)?.parts[0].body;return {id:p.id,flags:(p.rag?2:0)|(p.hp<=0?1:0)|(this.time<p.invulnerable?4:0)|(p.bot?8:0)|(p.soaring?16:0)|(this.time<p.dodgeUntil?32:0),p:rb?arr(rb.translation()):[0,-20,0],v:rb?arr(rb.linvel()):[0,0,0],yaw:p.input.yaw,hp:p.hp,fuel:p.fuel,seq:p.input.seq,pitch:p.input.pitch,dodgeCooldown:Math.max(0,p.dodgeReady-this.time)};}),
    bodies:[...[...this.debris.values()].map(e=>({id:e.id,...bodyPose(e.body)})),...[...this.rags.values()].flatMap(r=>r.parts.map(p=>({id:p.id,...bodyPose(p.body)})))]
   };
  }

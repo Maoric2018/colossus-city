@@ -37,12 +37,24 @@ test('duplicate entry is ignored; exit restores projection and allows a fresh se
 test('unsupported frame-rate requests do not prevent immersive entry',async()=>{
  const f=fixture();f.session.updateTargetFrameRate=async()=>{throw Error('Unsupported');};await f.xr.enter();assert.equal(f.enters,1);await f.session.end();
 });
-test('Touch axes, snap latch and A calibration send correctly scaled reset poses',async()=>{
+test('Touch smooth turning is continuous, proportional and stops inside the deadzone',async()=>{
  const f=fixture(),left=f.controller('left'),right=f.controller('right');await f.xr.enter();left.gamepad.axes[3]=-1;f.xr.update(f.frame,{},1000);
- const first=f.messages.at(-1);assert.equal(first.reset,true);assert.equal(first.moveZ,-1);assert.ok(first.left[0]<first.right[0]);assert.ok(Math.abs(first.head[1]-23.8)<.001);
- right.gamepad.axes[2]=1;f.xr.update(f.frame,{},1100);assert.equal(f.messages.at(-1).reset,true);assert.ok(Math.abs(f.messages.at(-1).yaw+Math.PI/6)<.001);
- f.xr.update(f.frame,{},1200);assert.equal(f.messages.at(-1).reset,false);assert.ok(Math.abs(f.messages.at(-1).yaw+Math.PI/6)<.001);
- f.setHeight(1.4);right.gamepad.buttons[4].pressed=true;f.xr.update(f.frame,{},1300);assert.equal(f.messages.at(-1).reset,true);assert.ok(Math.abs(f.messages.at(-1).head[1]-23.8)<.001);await f.session.end();
+ const first=f.messages.at(-1);assert.equal(first.reset,true);assert.equal(first.moveZ,-1);assert.ok(Math.abs(first.head[1]-23.8)<.001);
+ right.gamepad.axes[2]=1;f.xr.update(f.frame,{},1050);const a=f.xr.turn;assert.ok(Math.abs(a+Math.PI/40)<1e-6);assert.equal(f.messages.at(-1).reset,false);
+ f.xr.update(f.frame,{},1100);assert.ok(Math.abs(f.xr.turn-2*a)<1e-6);
+ right.gamepad.axes[2]=.59;f.xr.update(f.frame,{},1150);assert.ok(Math.abs(f.xr.turn-2.5*a)<1e-6);
+ right.gamepad.axes[2]=.1;f.xr.update(f.frame,{},1200);assert.ok(Math.abs(f.xr.turn-2.5*a)<1e-6);
+ f.setHeight(1.4);right.gamepad.buttons[4].pressed=true;f.xr.update(f.frame,{},1250);assert.equal(f.messages.at(-1).reset,true);assert.ok(Math.abs(f.messages.at(-1).head[1]-23.8)<.001);await f.session.end();
+});
+test('half a metre of tracked hand travel produces seven city metres without input lag',async()=>{
+ const f=fixture(),left=f.controller('left');f.controller('right');await f.xr.enter();const a=f.xr.update(f.frame,{},1000).left;left.gripSpace.x-=.5;const b=f.xr.update(f.frame,{},1050).left;assert.ok(Math.abs(b[0]-a[0]+7)<1e-6);assert.deepEqual(f.messages.at(-1).left,b);
+ f.xr.setSettings({reachGain:1.5});const c=f.xr.update(f.frame,{},1100).left;left.gripSpace.x-=.5;const d=f.xr.update(f.frame,{},1150).left;assert.ok(Math.abs(d[0]-c[0]+10.5)<1e-6);await f.session.end();
+});
+test('turning pivots around the tracked head and controller triggers carry aim',async()=>{
+ const f=fixture();f.controller('left');const right=f.controller('right');await f.xr.enter();f.frame.getViewerPose=()=>({transform:{position:{x:.3,y:1.7,z:.2},orientation:{x:0,y:0,z:0,w:1}}});
+ const before=f.xr.update(f.frame,{},1000).head;right.gamepad.axes[2]=1;right.gamepad.buttons[0].pressed=true;
+ for(let i=1;i<=20;i++)f.xr.update(f.frame,{},1000+i*50);
+ f.xr.local.head.forEach((n,i)=>assert.ok(Math.abs(n-before[i])<1e-5));assert.equal(f.messages.at(-1).fireRight,true);assert.ok(Math.abs(Math.hypot(...f.messages.at(-1).rightAim)-1)<1e-6);await f.session.end();
 });
 test('tracking loss and suspended sessions stop input; recovery and recenter rebase the pose',async()=>{
  const f=fixture();f.controller('left');const right=f.controller('right');await f.xr.enter();f.xr.update(f.frame,{},1000);

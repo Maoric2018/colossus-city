@@ -40,7 +40,7 @@ export class Connection{
   for(let i=1;i<this.snapshots.length;i++){if(this.snapshots[i].time>=target){a=this.snapshots[i-1];b=this.snapshots[i];break;}a=this.snapshots[i];}
   const t=Math.max(0,Math.min(1,(target-a.time)/(b.time-a.time||1))),pm=new Map(a.players.map(p=>[p.id,p])),bm=new Map(a.bodies.map(p=>[p.id,p]));
   const s={...b,head:vector(a.head,b.head,t),left:vector(a.left,b.left,t),right:vector(a.right,b.right,t),bossYaw:angle(a.bossYaw,b.bossYaw,t),bossX:mix(a.bossX,b.bossX,t),bossZ:mix(a.bossZ,b.bossZ,t)};
-  s.players=b.players.map(p=>{const q=pm.get(p.id);return q?{...p,p:vector(q.p,p.p,t),v:vector(q.v,p.v,t),yaw:angle(q.yaw,p.yaw,t)}:p;});
+  s.players=b.players.map(p=>{const q=pm.get(p.id);return q?{...p,p:vector(q.p,p.p,t),v:vector(q.v,p.v,t),yaw:angle(q.yaw,p.yaw,t),pitch:mix(q.pitch||0,p.pitch||0,t)}:p;});
   s.bodies=b.bodies.map(p=>{const q=bm.get(p.id);return q?{...p,p:vector(q.p,p.p,t),q:qmix(q.q,p.q,t)}:p;});return s;
  }
  close(notify=false){const ws=this.ws;this.ws=null;if(ws){if(!notify)ws.onclose=null;ws.close();}this.snapshots=[];}

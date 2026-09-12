@@ -19,7 +19,7 @@ Only the server decides movement, collision, shooting, damage, deaths, support l
 
 The tracked controller's grip-space position defines its simplified spherical hand. The head position and yaw define the simplified giant silhouette. Arms are visual articulated segments, not physical elbow joints. Core/head player collision uses server overlap tests; hands also have kinematic Rapier bodies for pushing debris/ragdolls. Giant locomotion/feet are not a physics character controller. Raiders are dynamic capsules whose desired speed is approached smoothly, rather than setting client-supplied positions.
 
-Head/controllers are finite bounded triples, head height/reach is checked, hand speed is clamped, stale input expires, stale tracking stops attack extrapolation. This limits accident/exploit severity but does not prove anti-cheat security: an untrusted client can fabricate plausible tracked poses. No raw camera frames, microphone recordings or user accounts are transmitted.
+Head/controllers are finite bounded triples, head height/reach is checked, damage velocity is clamped (the tracked hand position is preserved), stale input expires, stale tracking stops attack extrapolation. This limits accident/exploit severity but does not prove anti-cheat security: an untrusted client can fabricate plausible tracked poses. The optional debug channel transmits rendered game images while a spectator watches. No passthrough camera images, microphone recordings or user accounts are transmitted.
 
 ## Fixed step and timestamps
 
@@ -34,14 +34,24 @@ Control messages are JSON: join, input, pose, restart and ping. Entity creation/
 | Component | Bytes |
 | --- | ---: |
 | Frame and boss state | 92 |
-| One raider | 48 |
+| One raider | 56 |
 | One chunk or ragdoll body | 32 |
 
-At 144 chunks + 8 × 11 ragdoll parts + 8 raiders, a snapshot is 7,900 bytes. At 20 snapshots/s, one receiving client uses approximately 158,000 bytes/s for snapshots. Nine receiving players imply roughly 1.42 MB/s aggregate server snapshot egress at that configured maximum, excluding all JSON, protocol, TLS and spectator overhead. Sleeping bodies are still included until removed: this is deliberately simple full-snapshot replication, not aggressive delta compression. Empty/sparse scenes are smaller.
+At 144 chunks + 8 × 11 ragdoll parts + 8 raiders, a snapshot is 7,964 bytes. At 20 snapshots/s, one receiving client uses approximately 159,280 bytes/s for snapshots. Nine receiving players imply roughly 1.43 MB/s aggregate server snapshot egress at that configured maximum, excluding all JSON, protocol, TLS and spectator overhead. Sleeping bodies are still included until removed: this is deliberately simple full-snapshot replication, not aggressive delta compression. Empty/sparse scenes are smaller.
+
+The current snapshot magic is COL2 (0x434f4c32), including raider pitch, soar/dodge flags and cooldown. Every client must reload after updating from COL1. Missile creation/detonation uses reliable JSON events; welcome packets include active projectiles so late joiners see them. Server ray sweeps decide impact and splash damage. Client projectile motion is cosmetic extrapolation from the authoritative origin, direction and timestamp.
+
+Live views use a separate `/views` WebSocket, authenticated with a random per-connection token delivered in the game welcome. Only room spectators can subscribe. Human players publish JPEGs at up to six frames/s, 640 × 400, below 96 KiB each. Publishers capture only while subscribed; buffers beyond 192 KiB drop debug frames without blocking the game socket. The server caps channel messages and rejects non-JPEG binary input. This is room access control, not an account system. Budget additional image bandwidth and one extra XR eye render per captured frame. The laptop dashboard renders bot cameras locally and labels them simulated. Human views originate at that player: desktop canvas plus a compact gameplay HUD, or a render using the actual headset left-eye matrices including its in-world HUD. Menus, browser chrome, operating-system overlays and audio are not streamed.
 
 When a socket's outgoing buffer exceeds 128 KiB, fresh snapshots are skipped; reliable destruction events are not silently dropped. Beyond 1 MiB, a slow client is disconnected. This prevents application-level unbounded queues, but TCP's ordering can still stall newer data behind a lost packet. WebRTC unreliable data channels could improve snapshot delivery under loss, but require signaling plus a suitable trusted server-side data-channel endpoint. Neither WebRTC nor TURN is silently substituted into this build.
 
 Client input is limited to ~30 messages/s, with a server ceiling of 100 messages/s per connection and an 8 KiB inbound message limit. Handshake timeout and ping/pong heartbeat remove idle connections. There is a room/client cap and same-origin WebSocket policy. The room code is a convenience invitation, **not authentication**. This is suitable for a controlled demo, not an untrusted large public launch.
+
+## Flight and tracked hands
+
+The XR rig defaults to scale 14; hand reach is head + (tracked grip − head) × reach gain. Height calibration changes the rig scale, while the optional reach slider changes only the hands. Smooth yaw uses elapsed frame time and an analog deadzone. Turning preserves the head’s world position. Pose packets include accumulated artificial yaw so the server can rotate the previous collision point before measuring a physical swing. Tracking entry/recovery/recenter still rebase with a short contact grace period.
+
+Hover and soaring approach server-owned target velocities; soaring follows camera pitch/yaw and rotates the raider’s capsule to match the prone body. Directional dodges use a monotonically increasing input sequence, fuel debit and cooldown, so holding or resending one input cannot retrigger them. Soar, dodge and pitch are replicated to all clients. No client position command bypasses the physics world.
 
 ## Structural destruction
 

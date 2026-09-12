@@ -30,7 +30,7 @@ export function seeded(seed=12345){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;le
 export function finiteVector(x,n=3,limit=1000){return Array.isArray(x)&&x.length===n&&x.every(a=>typeof a==='number'&&Number.isFinite(a)&&Math.abs(a)<=limit);}
 export function sanitizeInput(m){
  if(!m||!Number.isFinite(m.yaw)||!Number.isFinite(m.pitch))return null;
- return {x:clamp(Number(m.x)||0,-1,1),z:clamp(Number(m.z)||0,-1,1),up:clamp(Number(m.up)||0,-1,1),boost:!!m.boost,fire:!!m.fire,
+ return {x:clamp(Number(m.x)||0,-1,1),z:clamp(Number(m.z)||0,-1,1),up:clamp(Number(m.up)||0,-1,1),boost:!!m.boost,fire:!!m.fire,soar:!!m.soar,missile:!!m.missile,dodge:clamp(Math.floor(Number(m.dodge)||0),0,1e9),
  aimYaw:clamp(Number.isFinite(m.aimYaw)?m.aimYaw:m.yaw,-1e5,1e5),aimPitch:clamp(Number.isFinite(m.aimPitch)?m.aimPitch:m.pitch,-1.55,1.55),
  yaw:clamp(m.yaw,-1e5,1e5),pitch:clamp(m.pitch,-1.45,1.45),seq:clamp(Number(m.seq)||0,0,1e9)};
 }

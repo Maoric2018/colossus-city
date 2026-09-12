@@ -3,7 +3,7 @@
 
 Asymmetric multiplayer source prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders the city; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
-**Validation status (September 11, 2026):** dependencies installed and locked; **44 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
+**Validation status (September 11, 2026):** dependencies installed and locked; **52 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
 
 ## 1. Start on a laptop
 
@@ -45,7 +45,7 @@ After deploying:
 2. Open the **same deployed address** on every laptop, choose **Raider**, and join using the same room code. Do not mix the local server and deployed server: they have different room state.
 3. Keep a clear physical play area and the headset's boundary system enabled. Start stationary, using the sticks. Large arm swings in the game do not make real furniture safe.
 
-This game does not require its own native Android app, Unity export, camera passthrough access, mixed-reality depth API, or Quest 3 features. The normal headset/browser setup still applies. It uses tracked head and controller poses from an `immersive-vr` session with `local-floor`. Both controllers must be tracked to send a fresh attack pose. Tracking loss suspends movement/contact; entry, recentering, snap turns, calibration and recovered tracking rebase the hands with a short contact grace period. It requests 72 Hz only when that capability is reported, and uses feature-detected haptics/foveation. That is **not** an achieved-frame-rate measurement.
+This game does not require its own native Android app, Unity export, camera passthrough access, mixed-reality depth API, or Quest 3 features. The normal headset/browser setup still applies. It uses tracked head and controller poses from an `immersive-vr` session with `local-floor`. Both controllers must be tracked to send a fresh attack pose. Tracking loss suspends movement/contact; entry, recentering, calibration and recovered tracking rebase the hands with a short contact grace period. It requests 72 Hz only when that capability is reported, and uses feature-detected haptics/foveation. That is **not** an achieved-frame-rate measurement.
 
 ### Fly.io deployment
 
@@ -71,10 +71,18 @@ The server supports local TLS when both `TLS_CERT` and `TLS_KEY` are set. A cert
 
 | Player | Controls |
 | --- | --- |
-| Laptop raider | WASD move relative to view; mouse aim; hold Space for jetpack ascent; Shift boost; C descend; hold left mouse to fire; V first/third-person view; Q quality; Escape release pointer. |
-| Quest giant | Move your head and both controllers to embody the giant. Swing into raiders/buildings; no trigger is required for contact damage. Left stick moves the giant; right stick snaps 30°; right-controller A recalibrates standing height. |
-| Desktop giant | WASD locomotion; mouse view; hold left click for a sweeping hand; Space for repeated downward strikes. |
-| Spectator | Mouse + WASD free flight; Space up; C down. |
+| Laptop raider | WASD move relative to view; mouse aim; hold Space for jetpack ascent; F toggles hover/soar; E + direction dodges; Shift boost; C descend; hold left mouse to fire; V first/third-person view; Q quality; Escape release pointer. |
+| Quest giant | Move your head and both controllers to embody the giant. Swing into raiders/buildings; no trigger is required for contact damage. Left stick moves the giant; right stick turns smoothly (90°/s default); either trigger launches a missile; right-controller A recalibrates standing height. |
+| Desktop giant | WASD locomotion; mouse view; hold left click for a sweeping hand; Space for repeated downward strikes; right click or R fires missiles. |
+| Spectator | Live views opens a panel with every player’s game camera. Select a feed to enlarge it. Free Camera enables mouse + WASD flight; Space up; C down. |
+
+**Giant reach:** the default 14× world scale maps a physical 0.5 m controller movement to 7 m in the city. The server now preserves that full reach without a slow positional catch-up. Before entering VR, open **Quest Controls** to adjust turn speed (30–180°/s) or reach gain (0.5–1.5×). A calibration adjusts the giant scale for your standing height; the headset HUD shows the resulting reach. Smooth turning pivots around your head, and artificial rotation is excluded from hand-strike velocity.
+
+**Flight:** hold Space to take off, then press F to soar. The pilot flies prone, mouse aim steers the flight path, and S brakes. Hover stays at 11 m/s (20 boosted); soaring reaches 32 m/s (42 boosted). E dodges in your held WASD/Space/C direction, or forward when no direction is held. Dodges use 12% thrust and have a 1.2-second cooldown. Speed streaks, a wider field of view and banking communicate acceleration.
+
+**Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode against scenery/raiders, damage nearby raiders and destroy building bays. The server enforces a shared 0.8-second firing cooldown and an eight-projectile cap.
+
+**Debugging:** on a laptop in the same room, press **Escape → Live Views** to open a spectator tab, or enter the room code and select **Spectate**. It receives live game images from every human player, including the colossus’s actual left-eye pose and in-world HUD. Feeds are 640 × 400 at up to six updates per second, with aspect ratio preserved; they are delayed debug previews, not a headset system-screen recording. AI drone cameras are explicitly labeled simulated. Capture runs only while the panel is open; headset rendering incurs an extra low-resolution eye render when watched. Free Camera stops capture. A small indicator on the playing client shows when viewers are watching.
 
 The raiders win by reducing the giant's core health to zero. Headshots do more damage. The giant wins by surviving the four-minute round; kills and city destruction are tracked as its score. Dead raiders respawn after five seconds. Nonfatal impacts temporarily knock players into ragdolls before recovery. A fresh round begins twenty seconds after the result; the host can also select New Round. **Escape does not pause the server.**
 
@@ -117,7 +125,7 @@ The refresh checks source hashes before replacing files. Models, textures and so
 
 Physics is targeted at **60 fixed steps/s**, snapshots at **20/s**, inputs/poses at **30/s**. Remote objects are interpolated over ~100 ms. The local raider camera uses bounded extrapolation, not a second authoritative solver. WebSockets are reliable and ordered; poor Wi-Fi can introduce head-of-line delay. This is a hackathon networking choice, not a rollback/lag-compensated competitive netcode stack.
 
-Caps: 144 debris bodies, eight ragdolls, eight raiders. Under pressure, new collapses are coarsened; at full capacity additional damage waits rather than deleting a falling tower. Rigid-body caps do not imply only 144 colliders: hollow bays have multiple collision shapes. The maximum configured binary snapshot example is 7,900 bytes, or ~158 KB/s per receiving client at 20 Hz, **before** event/WS/TLS overhead. This is a calculated budget, not a network measurement.
+Caps: 144 debris bodies, eight ragdolls, eight raiders. Under pressure, new collapses are coarsened; at full capacity additional damage waits rather than deleting a falling tower. Rigid-body caps do not imply only 144 colliders: hollow bays have multiple collision shapes. The maximum configured binary snapshot example is 7,964 bytes, or ~159 KB/s per receiving client at 20 Hz, **before** event/WS/TLS overhead. This is a calculated budget, not a network measurement.
 
 Rendering uses instanced building pieces, merged detail geometry, shared materials, bounded particles, and no bloom/shadow pass by default on Quest. XR uses a 0.85 framebuffer scale request and foveation where supported. None of these settings proves that your Quest achieves 72 FPS. Profile the full eight-player collapse, not just the lobby.
 
@@ -125,9 +133,9 @@ Rendering uses instanced building pieces, merged detail geometry, shared materia
 npm run check          # Syntax and local import existence, no packages needed
 npm test               # 24 dependency-free checks
 npm run test:physics   # Actual Rapier stepping, joints, collapse, reset
-npm run test:network   # Actual server + two WebSocket clients
+npm run test:network   # Actual multiplayer + spectator-channel integration
 npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three math)
-npm run test:all       # All 44 Node tests after installation
+npm run test:all       # All 52 Node tests after installation
 npm run bench          # Real server-physics profile; outputs local results
 ```
 
@@ -148,9 +156,12 @@ Inspect `docs/VALIDATION.md` for headset testing and known limitations. Do not t
 
 - `server/room.js`: authoritative movement, tracked contacts, ragdolls, support graph, fractures, match lifecycle.
 - `server/index.js`: HTTP/WSS hosting, room routing, input limits, tick loop and snapshots.
+- `server/abilities.js`: server-owned flight, directional dodges and missile collisions.
+- `server/views.js`, `src/spectator.js`: bounded room-authenticated live debug feeds.
+- `src/missiles.js`, `src/flight-fx.js`: imported rockets and flight presentation.
 - `shared/`: environment definition, physics/network budgets, analytic helpers, binary codec.
 - `src/city.js`, `avatars.js`, `effects.js`: render-side art, imports and cosmetic effects.
-- `src/xr.js`: standard WebXR session, Quest controller input, scale, snap-turn and HUD.
+- `src/xr.js`: standard WebXR session, Quest controller input, scale, smooth turning and HUD.
 - `src/main.js`, `network.js`: lobby, desktop controls/camera, input and interpolation.
 - `docs/ARCHITECTURE.md`: authority, bandwidth, failure modes and scaling boundary.
 - `docs/ASSET_PIPELINE.md`: precise GLB conventions and environment replacement.
