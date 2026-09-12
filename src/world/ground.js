@@ -18,15 +18,10 @@ export function buildGround(root, env, tier, textures){
  for(const z of streets){ yellows.push([new T.BoxGeometry(span, .012, .12), [0, .045, z - .3]], [new T.BoxGeometry(span, .012, .12), [0, .045, z + .3]]); for(let x = -half; x < half; x += 8) for(const lane of [-streetWidth / 4, streetWidth / 4]) marks.push([new T.BoxGeometry(3, .012, .12), [x, .045, z + lane]]); }
  for(const x of avenues) for(const z of streets) for(let i = -3; i <= 3; i++) for(const side of [-1, 1]){ walks.push([new T.BoxGeometry(.7, .014, 2.6), [x + i * 1.3, .05, z + side * (streetWidth / 2 + 1.6)]]); walks.push([new T.BoxGeometry(2.6, .014, .7), [x + side * (avenueWidth / 2 + 1.6), .05, z + i * 1.3]]); }
  mesh(mergeParts(marks), marking, root).castShadow = false; mesh(mergeParts(yellows), yellow, root).castShadow = false; mesh(mergeParts(walks), marking, root).castShadow = false;
- // Raised sidewalk slab and name sign per tower.
- const labels=document.createElement('canvas');labels.width=2048;labels.height=1024;const ctx=labels.getContext('2d'),cols=13,rows=Math.ceil(env.buildings.length/cols),cw=labels.width/cols,ch=labels.height/rows,signs=[];
- ctx.fillStyle='#18292d';ctx.fillRect(0,0,labels.width,labels.height);ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#d6ded5';
+ // Raised sidewalk slab per tower.
  const dark = surface(tier, {color:0x293d42, metalness:.65, roughness:.61}), pads = [];
- for(const [bi,b] of env.buildings.entries()){ const [x0, z0, x1, z1] = buildingFootprint(b); pads.push([new T.BoxGeometry(x1 - x0 + 4, .18, z1 - z0 + 4), [b.x, .09, b.z]]);
-  const col=bi%cols,row=Math.floor(bi/cols);ctx.fillText(b.name,col*cw+cw/2,row*ch+ch/2,cw-8);
-  for(const zs of [-1,1]){const geo=new T.PlaneGeometry(Math.min(14,x1-x0)*.84,.9),uv=geo.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,(col+uv.getX(i))/cols,1-(row+1-uv.getY(i))/rows);signs.push([geo,[b.x,1.4,zs>0?z1+.3:z0-.3],[0,zs<0?Math.PI:0,0]]);}
+ for(const b of env.buildings){ const [x0, z0, x1, z1] = buildingFootprint(b); pads.push([new T.BoxGeometry(x1 - x0 + 4, .18, z1 - z0 + 4), [b.x, .09, b.z]]);
  }
- const signMap=new T.CanvasTexture(labels);signMap.colorSpace=T.SRGBColorSpace;mesh(mergeParts(signs),new T.MeshBasicMaterial({map:signMap,toneMapped:false}),root).castShadow=false;
  mesh(mergeParts(pads), concrete, root).castShadow = false;
  const plaza = new T.Mesh(new T.CircleGeometry(env.plaza, 48), surface(tier, {map:textures.concrete, color:0xa4b3af, roughness:.65})); plaza.rotation.x = -Math.PI / 2; plaza.position.y = .1; root.add(plaza);
  const ring = new T.Mesh(new T.RingGeometry(env.plaza - 1.6, env.plaza - 1.4, 64), new T.MeshBasicMaterial({color:0x7addcd})); ring.rotation.x = -Math.PI / 2; ring.position.y = .11; root.add(ring);
