@@ -1,8 +1,8 @@
 # Dense city architectural kit
 
-Midtown contains 169 buildings and 5,589 hollow structural bays. Outside its original five-by-five block grid, deterministic 70 m blocks generate in every horizontal direction. Each new block has eight buildings around a courtyard (occasionally a ninth Chrysler landmark), with footprints that preserve roads and alley clearance. Sixteen architecture families vary material, height, footprint, roofline and details. Existing downloaded Kenney/Quaternius props and photographic textures are reused; custom code supplies the destructible architectural kit and landmark-specific geometry.
+Midtown contains 169 buildings and 5,827 hollow structural bays. Outside its original five-by-five block grid, deterministic 70 m blocks generate in every horizontal direction. Each new block has eight buildings around a courtyard (occasionally a ninth Chrysler landmark), with footprints that preserve roads and alley clearance. Sixteen architecture families vary material, height, footprint, roofline and details. Existing downloaded Kenney/Quaternius props and photographic textures are reused; custom code supplies the destructible architectural kit and landmark-specific geometry.
 
-`shared/city/components.js` defines **136 real geometry types**. Every building uses at least **75 distinct types**, including the landmarks and the reduced headset kit (the starting district currently has a minimum of 78). `src/world/components.js` shares one batch set across loaded blocks and attaches each part to its parent bay and skin. Physics operates on structural bays and simplified equipment proxies; ornaments do not each create a separate rigid body.
+`shared/city/components.js` defines **214 real geometry types**. Every building uses at least **75 distinct types**, including the landmarks and the reduced headset kit (the starting district currently has a minimum of 78). `src/world/components.js` shares one batch set across loaded blocks and attaches each part to its parent bay and skin. Physics operates on structural bays and simplified equipment proxies; ornaments do not each create a separate rigid body.
 
 | Family | Parts |
 | --- | --- |
@@ -15,6 +15,9 @@ Midtown contains 169 buildings and 5,589 hollow structural bays. Outside its ori
 | Expanded roof / ornament | downspouts, gutters, soffits, corbels, friezes, fixings, roof hatches, fans, walkways, solar frames, tanks, lightning rods, chimney caps, planters, screens and balustrade posts |
 | Architecture families | Gothic arches, copper mansards, sawtooth roofs, Deco chevrons and cast-iron capitals, alongside family-specific placement of the shared kit |
 | Twin towers | perimeter ribs, three-prong lobby tridents, spandrels, mechanical-floor louvers, rooftop hat trusses, flat crown rims |
+| Modern curtain-wall details | 20 assemblies: pressure caps, gaskets, shadow boxes, glazing stops, slab fire barriers, ceiling tracks, blinds, anchors, glass fins, revolving doors, vestibules, lighting, sensors, terrace pavers and maintenance cradles |
+| 30 Hudson Yards | 31 custom assemblies: horizontal ribbons, corner blades, lobby piers, canopy, mechanical grilles, shoulder screens, sliced angled crown, City Climb stairs and rails, Edge deck, faceted underside, glass balustrades, glass floor inset, bleachers and nose flashing |
+| One Vanderbilt | 27 custom assemblies: terra-cotta spandrels and flutes, glazed lips, volume fins, bronze lobby details, angled reveals, transit portal, setback screens, SUMMIT skyboxes, tapered lantern and needle spire |
 | Chrysler | 35 custom types: curved crown shells, triangular windows, rolled arch rims, standing seams, crown decks, spire collar/needle/ribs, marble piers, brick spandrels/basketweave/zigzags, steel sashes, black bands, grille/hubcaps/enamel/fenders/hood ornaments, eagle plinth/neck/head/eyes/feathers, finials, coping/rails, mechanical louvers and seven entrance assemblies |
 | Empire State style | fluted limestone pilasters, Art Deco entrance sunburst, setback cornices, stepped crown, observation balustrade, mast buttresses |
 
@@ -37,3 +40,12 @@ The factory builds 313 hollow bays with 115 distinct component types including t
 Custom geometry supports extruded polygons with real triangular openings, bent crown profiles, cones and cylinders. Large crown faces subdivide before bending to prevent folds across windows. All detailed copies share the existing global instance batches. Distant copies use a simpler crown in one extra shared draw. Roof proxies extend hand-query, missile-blast and building broad-phase bounds; a moving or settled crown retains these shapes. Its 35 visual assemblies share supporting structural bays rather than creating 35 independent physics bodies.
 
 `npm run test:chrysler` exercises the actual spawn button and WebSocket flow, an already loaded client block, a late spectator, crown attachment transforms, unload/return, reset and emulated Quest stereo. `tests/chrysler.test.js` checks component coverage, courtyard clearance, stable original IDs, host authorization/cooldown, preserved live damage, pristine late-join metadata, crown debris colliders and high-spire hits.
+
+
+## Modern New York landmarks
+
+`shared/city/modern-landmarks.js` defines 30 Hudson Yards (228 bays) and One Vanderbilt (424 bays), their 78 new assemblies, per-floor taper and shared extension colliders. Vanderbilt’s four volumes finish at different heights; its L-shaped shoulders use two merged slab rectangles, without solid geometry over the missing corner. Continuous tapered columns merge by grid identity into inclined runs instead of creating a collider per storey. Destruction restores local per-bay shapes as before.
+
+Modern curtain-wall skins use opaque reflective glazing to avoid exposing every interior through an intact building, and their glass masks still open the wall when broken. Fine flutes and panel seams render within 36 m on headset/performance tiers and 65 m on higher tiers; silhouette parts remain available out to 230 m. No world labels or name signs are added.
+
+`npm run test:landmarks` exercises both towers in emulated Quest 2 stereo and verifies moving crown/deck transforms. `tests/modern-landmarks.test.js` checks support, notch openings, all custom geometry, extension contacts and debris colliders. Reference photographs, proportions and game-scale compromises are documented in `NYC_LANDMARKS.md`.

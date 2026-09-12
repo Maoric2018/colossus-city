@@ -24,6 +24,7 @@ function windows(x, s, list, rand, lit, color, dark){
  }
 }
 export function facadeMaps(material, size = 512, seed = 7){
+ const curtain=['glass','hudson30','vanderbilt'].includes(material),modern=material==='hudson30'||material==='vanderbilt';
  const rand = seeded(seed + material.length);
  const map = canvasTexture(size, (x, s) => {
   if(material === 'brick'){
@@ -54,6 +55,12 @@ export function facadeMaps(material, size = 512, seed = 7){
    x.fillStyle = rgb(120, 118, 112); for(let i = 0; i < 4; i++) x.fillRect(i * s / 4, 0, 3, s); x.fillRect(0, s * .22, s, 3); x.fillRect(0, s * .72, s, 3);
    windows(x, s, WINDOWS.concrete, rand, 0, '', rgb(24, 30, 38));
    x.fillStyle = rgb(90, 96, 100); for(let i = 1; i < 6; i++) x.fillRect((.06 + i * .88 / 6) * s, s * .3, 3, s * .36);
+  }else if(modern){
+   // Two office levels per structural bay; restrained blue glass and thin joints.
+   x.fillStyle=material==='hudson30'?'#7098ad':'#819da6';x.fillRect(0,0,s,s);
+   for(let row=0;row<2;row++)for(let col=0;col<8;col++){const v=rand();x.fillStyle=v>.8?'rgba(190,216,221,.26)':v>.45?'rgba(216,228,230,.12)':'rgba(22,59,78,.11)';x.fillRect(col*s/8,row*s/2,s/8-1,s/2-2);}
+   x.fillStyle='#a8bec5';for(let i=0;i<=8;i++)x.fillRect(i*s/8,0,Math.max(1,s/512),s);
+   x.fillStyle=material==='hudson30'?'#365263':'#c2b9a6';for(let row=0;row<2;row++)x.fillRect(0,(row*.5+.44)*s,s,s*(material==='hudson30'?.045:.05));
   }else{
    // Glass: pane alpha only inside the grid; mullions are opaque dark metal.
    x.clearRect(0, 0, s, s); x.fillStyle = 'rgba(150,200,225,.62)'; x.fillRect(0, 0, s, s);
@@ -63,12 +70,12 @@ export function facadeMaps(material, size = 512, seed = 7){
  });
  const emissive = canvasTexture(size, (x, s) => {
   x.fillStyle = 'rgb(0,0,0)'; x.fillRect(0, 0, s, s);
-  if(material === 'glass'){ for(let i = 0; i < 3; i++) if(rand() < .35) x.fillStyle = `rgba(255,${190 + rand() * 40 | 0},${120 + rand() * 60 | 0},${.5 + rand() * .3})`, x.fillRect(i * s / 3 + 8, 12, s / 3 - 16, s * .78); }
+  if(curtain){ for(let i = 0; i < 3; i++) if(rand() < .35) x.fillStyle = `rgba(255,${190 + rand() * 40 | 0},${120 + rand() * 60 | 0},${.5 + rand() * .3})`, x.fillRect(i * s / 3 + 8, 12, s / 3 - 16, s * .78); }
   else windows(x, s, WINDOWS[material], rand, .45, rgb(255, 205, 140), 'rgb(0,0,0)');
  });
- if(material === 'glass') map.premultiplyAlpha = false;
+ if(curtain) map.premultiplyAlpha = false;
  // Window panes for masonry: transparent except inside the openings, drawn just outside the facade.
- const panes = material === 'glass' ? map : canvasTexture(size, (x, s) => {
+ const panes = curtain ? map : canvasTexture(size, (x, s) => {
   x.clearRect(0, 0, s, s);
   for(const [wx, wy, ww, wh] of WINDOWS[material]){ x.fillStyle = 'rgba(150,200,225,.6)'; x.fillRect(wx * s, wy * s, ww * s, wh * s); x.fillStyle = 'rgba(40,48,56,.95)'; x.fillRect((wx + ww / 2 - .008) * s, wy * s, .016 * s, wh * s); x.fillRect(wx * s, (wy + wh / 2 - .008) * s, ww * s, .016 * s); }
  });

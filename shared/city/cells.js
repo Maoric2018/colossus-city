@@ -1,3 +1,4 @@
+import {shapeModernCell,finishModernCells} from './modern-landmarks.js';
 // A structural cell is one hollow storey bay: slab + four corner columns + exterior skins.
 // Cells form a support graph anchored at foundations. No triangle-mesh physics anywhere.
 import {C} from '../config.js';
@@ -15,10 +16,12 @@ export function generateCells(env){
    for(let f = 0; f < t.floors; f++, floor++)
     for(let z = 0; z < t.nz; z++) for(let x = 0; x < t.nx; x++){
      const ix = t.ix + x, iz = t.iz + z;
+     if(t.voids?.some(v=>ix>=v.ix&&ix<v.ix+v.nx&&iz>=v.iz&&iz<v.iz+v.nz))continue;
      const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, architecture:b.architecture || 'urban', variant:b.variant || 0, roofYaw:env.cellBase?b.variant%4:undefined, buildingFloors:totalFloors, ground:floor === 0,
       p:[originX + ix * b.bay, .15 + floor * b.story + b.story / 2, originZ + iz * b.bay],
       size:[b.bay, b.story, b.bay], walls:[false, false, false, false], neighbors:[], below:0, above:0, lateral:[],
       roof:false, stackAbove:0, frameScale:C.BUILDING_STRENGTH * (b.strength || 1) * (1 + .7 * (1 - floor / Math.max(1, totalFloors - 1)))};
+     shapeModernCell(cell,b);
      ids.set(`${ix}:${floor}:${iz}`, cell.id); cells.push(cell);
     }
   });
@@ -36,6 +39,7 @@ export function generateCells(env){
   for(const c of mine) if(c.roof){const type=(c.ix+c.iz*2+(env.cellBase?localIndex:c.building)+c.tier)%5;if(b.waterTower && c.ix===0 && c.iz===0)c.roofAsset=assets[0];else if(!b.spire && type>=1 && type<=3)c.roofAsset=assets[type];}
   if(b.spire){const top=mine.filter(c=>c.roof).sort((a,b)=>b.p[1]-a.p[1])[0];if(top)top.spire=b.spire;}
   if(b.architecture==='chrysler'){const top=mine.find(c=>c.floor===totalFloors-1&&c.ix===2&&c.iz===2);if(top)top.chryslerCrown=true;for(const c of mine)delete c.roofAsset;}
+  finishModernCells(mine,b);
   for(const c of mine){ let n = 0, up = c.above; while(up){ n++; up = byId.get(up).above; } c.stackAbove = n; }
  });
  return cells;

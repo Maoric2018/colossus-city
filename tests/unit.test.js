@@ -11,7 +11,7 @@ const near = (a, b, eps = 1e-5) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b
 const base = () => ({tick:19, time:1.25, bossHP:2200, bossMaxHP:5200, remaining:123, kills:2, head:[0, 23.8, 0], left:[-5, 15, 0], right:[5, 15, 0], bossYaw:.5, bossX:0, bossZ:0, damage:12, phase:0, round:1, players:[], bodies:[]});
 const building = i => cells.filter(c => c.building === i);
 test('map generation is deterministic, unique and every tower is inside the district', () => {
- assert.deepEqual(generateCells(city), cells); assert.equal(byId.size, cells.length); assert.equal(cells.length, city.buildings.reduce((n,b)=>n+b.tiers.reduce((m,t)=>m+t.nx*t.nz*t.floors,0),0)); assert.equal(city.buildings.length, 169);
+ assert.deepEqual(generateCells(city), cells); assert.equal(byId.size, cells.length); assert.equal(cells.length, city.buildings.reduce((n,b)=>n+b.tiers.reduce((m,t)=>m+(t.nx*t.nz-(t.voids||[]).reduce((n,v)=>n+v.nx*v.nz,0))*t.floors,0),0)); assert.equal(city.buildings.length, 169);
  for(const b of city.buildings){ const [x0, z0, x1, z1] = buildingFootprint(b); assert.ok(x0 > -city.half && x1 < city.half && z0 > -city.half && z1 < city.half, b.name); assert.ok(Math.hypot(b.x, b.z) > city.plaza + 12, b.name + ' overlaps the plaza'); }
 });
 test('every support edge is reciprocal and inside one building', () => { for(const c of cells) for(const n of c.neighbors){ assert.ok(byId.get(n).neighbors.includes(c.id)); assert.equal(c.building, byId.get(n).building); } });

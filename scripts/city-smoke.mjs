@@ -15,7 +15,7 @@ try{
  const page=await browser.newPage({viewport:{width:1600,height:1000}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url+'/?quality=low');await page.waitForFunction(()=>window.COLOSSUS_ART_READY);await page.waitForLoadState('networkidle');
  await page.evaluate(()=>{const {renderer,rig}=window.__COLOSSUS;renderer.setAnimationLoop(null);rig.position.set(0,0,0);document.body.replaceChildren(renderer.domElement);});
- const views=[['dense-city',[230,195,220],[0,25,0]],['twin-towers',[100,100,-145],[0,55,-70]],['empire-state',[-130,95,-135],[-70,58,-70]],['chrysler-building',[-114,70,65],[-70,61,0]],['chrysler-crown',[-95,106,28],[-70,108,0]],['building-components',[-54,15,95],[-70,11,70]]];
+ const views=[['dense-city',[230,195,220],[0,25,0]],['twin-towers',[100,100,-145],[0,55,-70]],['empire-state',[-130,95,-135],[-70,58,-70]],['chrysler-building',[-114,70,65],[-70,61,0]],['chrysler-crown',[-95,106,28],[-70,108,0]],['building-components',[-54,15,95],[-70,11,70]],['hudson-yards',[132,86,5],[70,60,-70]],['hudson-edge',[102,103,-42],[78,99,-68]],['one-vanderbilt',[136,82,77],[70,64,0]],['vanderbilt-crown',[93,120,23],[69,116,0]],['vanderbilt-facade',[89,18,18],[74,15,6]]];
  const stats={};
  for(const [name,p,target] of views){
   stats[name]=await page.evaluate(({p,target})=>{const {renderer,camera,scene}=window.__COLOSSUS;camera.position.set(...p);camera.lookAt(...target);renderer.info.reset();renderer.render(scene,camera);return {...renderer.info.render};},{p,target});
@@ -23,6 +23,7 @@ try{
  }
  const checks=await page.evaluate(async()=>{
   const T=await import('three'),{city,renderer,camera,scene}=window.__COLOSSUS;
+  camera.position.set(-54,15,95);camera.lookAt(-70,11,70);renderer.render(scene,camera);
   city.buildings.components.lastPosition=null;city.buildings.components.radius=1000;city.buildings.components.select(camera);
   const c=city.cells.find(c=>c.building===5&&c.roof&&c.walls[2]),e=city.buildings.pose(c.id),kit=city.buildings.components,part=kit.entries.get(c.id).find(p=>p.type==='cornice'&&p.side===2),mesh=kit.batches.get(part.type),before=new T.Matrix4();mesh.getMatrixAt(part.index,before);
   const rotation=[0,0,Math.sin(.4),Math.cos(.4)];city.addDebris({id:9900,cells:[c.id],origin:c.p,p:[-58,4,72],q:rotation,material:c.material});city.commit();const after=new T.Matrix4();mesh.getMatrixAt(part.index,after);const expected=new T.Matrix4().compose(e.p,e.q,new T.Vector3(...c.size)).multiply(new T.Matrix4().makeRotationY(-Math.PI));

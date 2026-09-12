@@ -96,3 +96,6 @@ scripts/           check (syntax/imports), benchmark (server CPU), profile (real
 ## Integrated main features
 
 `shared/giant-rig.js` and `shared/hand-world.js` share palm dimensions, wrist orientation and current solid geometry. Layered skin changes and all detach/crumble paths update the hand cache. `shared/props.js` provides deterministic car/roof placements and collision bounds for every quality tier. `shared/raider-rig.js` supplies the matching armored ragdoll. `src/view-stream.js` and `server/views.js` retain authenticated WebRTC spectator video and the bounded fallback. `src/city.js` re-exports the modular `src/world/city.js` entry point for existing tools.
+
+- `shared/city/modern-landmarks.js`: reference-based 30 Hudson Yards / One Vanderbilt factories, taper profiles, declarative components and extension proxies.
+- `scripts/landmark-smoke.mjs`: Quest stereo and moving attachment checks for the modern landmarks.

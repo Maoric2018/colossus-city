@@ -41,10 +41,18 @@ export function addBuildings(room,cells,indices){
   const floors=room.floors[bi];
   const runs=new Map();
   for(const f of floors)for(const a of floorColumns(f)){
-   const key=`${a[0].toFixed(3)}:${a[2].toFixed(3)}`,lo=a[1]-a[4],hi=a[1]+a[4];
-   const run=runs.get(key);if(run){run.lo=Math.min(run.lo,lo);run.hi=Math.max(run.hi,hi);}else runs.set(key,{x:a[0],z:a[2],lo,hi});
+   const key=a.grid,lo=a[1]-a[4],hi=a[1]+a[4];
+   const run=runs.get(key);if(run){run.end=[a[0],hi,a[2]];}else runs.set(key,{start:[a[0],lo,a[2]],end:[a[0],hi,a[2]]});
   }
-  for(const a of runs.values())room.buildingColumns[bi].handles.push(staticCollider(room,room.buildingBodies[bi],[a.x,(a.lo+a.hi)/2,a.z,.15,(a.hi-a.lo)/2,.15],{building:bi,column:true}));
+  // Tapered floors move the same column line a little each storey. Merge by its
+  // logical grid corner, then rotate the continuous run instead of adding hundreds
+  // of separate colliders. A structural failure still splits it into local bays.
+  for(const {start,end} of runs.values()){
+   const delta=end.map((n,k)=>n-start[k]),length=Math.hypot(...delta),q=[delta[2],0,-delta[0],length+delta[1]],ql=Math.hypot(...q),shape=RAPIER.ColliderDesc.cuboid(.15,length/2,.15)
+    .setTranslation(...start.map((n,k)=>(n+end[k])/2)).setRotation({x:q[0]/ql,y:0,z:q[2]/ql,w:q[3]/ql}).setDensity(22).setFriction(1.05).setRestitution(.015)
+    .setCollisionGroups(group(G.WORLD)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+   const co=room.world.createCollider(shape,room.buildingBodies[bi]);room.colliderTags.set(co.handle,{building:bi,column:true});room.buildingColumns[bi].handles.push(co.handle);
+  }
  });
 }
 function staticCollider(room, body, a, tag){
@@ -58,6 +66,27 @@ function mergeFloor(room, f){
  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
  for(const c of cells){ minX = Math.min(minX, c.p[0] - w / 2); maxX = Math.max(maxX, c.p[0] + w / 2); minZ = Math.min(minZ, c.p[2] - d / 2); maxZ = Math.max(maxZ, c.p[2] + d / 2); }
  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2, y = any.p[1], tag = {building:f.building, floor:f.floor};
+ // Notched landmark shoulders have real empty corners. A bounding rectangle would
+ // create invisible floors and walls across the cut; only these rare floors use bays.
+ const rectangular=new Set(cells.map(c=>c.ix)).size*new Set(cells.map(c=>c.iz)).size===cells.length;
+ f.notched=!rectangular;
+ if(f.notched){
+  // Greedily merge occupied runs into rectangles without spanning the empty notch.
+  const rows=new Map(),rects=[],last=new Map();for(const c of cells){if(!rows.has(c.iz))rows.set(c.iz,[]);rows.get(c.iz).push(c.ix);}
+  for(const [z,xs] of [...rows].sort((a,b)=>a[0]-b[0])){
+   xs.sort((a,b)=>a-b);for(let i=0;i<xs.length;){const x0=xs[i++];let x1=x0;while(xs[i]===x1+1)x1=xs[i++];const key=`${x0}:${x1}`,r=last.get(key);if(r&&r.z1===z-1)r.z1=z;else{const next={x0,x1,z0:z,z1:z};rects.push(next);last.set(key,next);}}
+  }
+  const ox=any.p[0]-any.ix*w,oz=any.p[2]-any.iz*d;
+  for(const r of rects)f.structure.push(staticCollider(room,body,[ox+(r.x0+r.x1)*w/2,y+h/2-slab,oz+(r.z0+r.z1)*d/2,(r.x1-r.x0+1)*w/2,slab,(r.z1-r.z0+1)*d/2],tag));
+  for(const c of cells){
+   for(let side=0;side<4;side++)if(c.walls[side]){
+    const a=side===0?[c.p[0],y,c.p[2]-d/2+.06,w/2-.3,h/2-.22,.06]:side===1?[c.p[0]+w/2-.06,y,c.p[2],.06,h/2-.22,d/2-.3]:side===2?[c.p[0],y,c.p[2]+d/2-.06,w/2-.3,h/2-.22,.06]:[c.p[0]-w/2+.06,y,c.p[2],.06,h/2-.22,d/2-.3];
+    f.walls[side].push(staticCollider(room,body,a,{...tag,side}));
+   }
+  }
+  f.structureMerged=true;f.wallsMerged.fill(true);return;
+ }
+
  f.structure.push(staticCollider(room, body, [cx, y + h / 2 - slab, cz, (maxX - minX) / 2, slab, (maxZ - minZ) / 2], tag));
 
  f.structureMerged = true;
@@ -66,7 +95,10 @@ function mergeFloor(room, f){
 }
 function floorColumns(f){
  const [w,h,d]=f.cells[0].size, y=f.cells[0].p[1],minX=Math.min(...f.cells.map(c=>c.p[0]-w/2)),maxX=Math.max(...f.cells.map(c=>c.p[0]+w/2)),minZ=Math.min(...f.cells.map(c=>c.p[2]-d/2)),maxZ=Math.max(...f.cells.map(c=>c.p[2]+d/2)),out=[];
- for(let x=minX;x<=maxX+.01;x+=w)for(let z=minZ;z<=maxZ+.01;z+=d)out.push([x,y,z,.15,h/2-.26,.15]);return out;
+ const put=(x,z,ix,iz)=>{const a=[x,y,z,.15,h/2-.26,.15];a.grid=`${ix}:${iz}`;out.push(a);};
+ if(f.notched){const points=new Set();for(const c of f.cells)for(const dx of [-1,1])for(const dz of [-1,1]){const ix=c.ix+(dx+1)/2,iz=c.iz+(dz+1)/2,key=`${ix}:${iz}`;if(!points.has(key)){points.add(key);put(c.p[0]+dx*w/2,c.p[2]+dz*d/2,ix,iz);}}return out;}
+ const ix=Math.min(...f.cells.map(c=>c.ix)),iz=Math.min(...f.cells.map(c=>c.iz));
+ for(let x=minX,i=0;x<=maxX+.01;x+=w,i++)for(let z=minZ,j=0;z<=maxZ+.01;z+=d,j++)put(x,z,ix+i,iz+j);return out;
 }
 function unmergeColumns(room,bi){
  const columns=room.buildingColumns[bi];if(!columns.merged)return;removeHandles(room,columns.handles);columns.merged=false;
@@ -157,7 +189,7 @@ export function damageSphere(room, center, radius, energy, by = 0, limit = 12){
  const hit = [];
  for(const c of cellsNear(room, center, radius + 4)){
   let d=dist(vec(c.p),center);
-  if(c.chryslerCrown)for(const a of roofColliders(c))d=Math.min(d,Math.hypot(Math.max(0,Math.abs(center.x-c.p[0]-a[0])-a[3]),Math.max(0,Math.abs(center.y-c.p[1]-a[1])-a[4]),Math.max(0,Math.abs(center.z-c.p[2]-a[2])-a[5])));
+  if(c.chryslerCrown||c.landmarkAttachment)for(const a of roofColliders(c))d=Math.min(d,Math.hypot(Math.max(0,Math.abs(center.x-c.p[0]-a[0])-a[3]),Math.max(0,Math.abs(center.y-c.p[1]-a[1])-a[4]),Math.max(0,Math.abs(center.z-c.p[2]-a[2])-a[5])));
   if(d > radius + 3) continue;
   const e = energy * clamp(1 - d / (radius + 3), .35, 1);
   if(damageCell(room, c, e, ALL_SIDES, by)) hit.push(c.id);
@@ -169,7 +201,7 @@ export function cellsNear(room, point, radius){
  const out = [];
  room.buildingBounds.forEach((b, i) => {
   if(point.x < b[0] - radius || point.x > b[3] + radius || point.y < b[1] - radius || point.y > b[4] + radius || point.z < b[2] - radius || point.z > b[5] + radius) return;
-  for(const c of room.cellsByBuilding[i]){const reach=c.chryslerCrown?c.queryHalf:c.size;if(!room.detached.has(c.id)&&Math.abs(c.p[0]-point.x)<radius+reach[0]&&Math.abs(c.p[1]-point.y)<radius+reach[1]&&Math.abs(c.p[2]-point.z)<radius+reach[2])out.push(c);}
+  for(const c of room.cellsByBuilding[i]){const reach=(c.chryslerCrown||c.landmarkAttachment)?c.queryHalf:c.size;if(!room.detached.has(c.id)&&Math.abs(c.p[0]-point.x)<radius+reach[0]&&Math.abs(c.p[1]-point.y)<radius+reach[1]&&Math.abs(c.p[2]-point.z)<radius+reach[2])out.push(c);}
  });
  return out;
 }

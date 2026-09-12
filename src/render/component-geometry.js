@@ -2,7 +2,12 @@ import * as T from 'three';
 // Keep the kit declarative and shared; only this adapter knows about Three.js.
 export function componentGeometry(part){
  let geometry;
- if(part.shape==='polygon'){
+ if(part.shape==='loft'){
+  const positions=[],uvs=[],faces=[[0,1,2,3],[4,7,6,5],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0]];
+  for(const f of faces)for(const i of [0,1,2,0,2,3]){positions.push(...part.corners[f[i]]);uvs.push(...[[0,0],[1,0],[1,1],[0,1]][i]);}
+  geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));geometry.computeVertexNormals();
+ }
+ else if(part.shape==='polygon'){
   const path=points=>{const p=new T.Shape();p.moveTo(...points[0]);for(const v of points.slice(1))p.lineTo(...v);p.closePath();return p;};
   const shape=path(part.points);for(const points of part.holes||[])shape.holes.push(path(points));
   geometry=new T.ExtrudeGeometry(shape,{depth:part.s[2],bevelEnabled:false,steps:1,curveSegments:12}).translate(0,0,-part.s[2]/2);

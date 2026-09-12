@@ -1,3 +1,4 @@
+import {hudsonBuilding,vanderbiltBuilding} from './modern-landmarks.js';
 import {chryslerBuilding} from './chrysler.js';
 // The only authoritative map definition. Visual assets never decide collisions.
 // MIDTOWN: a Manhattan-style grid of avenues (north-south) and streets (east-west) with
@@ -15,9 +16,9 @@ export const midtown = {
   // Inner ring around the plaza
   tower(-70,-70,'EMPIRE STATE','stone',[box(5,5,4), box(4,4,4,1,1), box(3,3,17,1,1), box(2,2,4,2,2), box(1,1,4,2,2)],{bay:4.8,story:3.4,spire:17,architecture:'empire',strength:1.2}),
   tower(-12,-78,'WORLD TRADE • NORTH','glass',[box(3,3,30)],{spire:15,architecture:'wtc',strength:1.15}),
-  tower(70,-70,'HUDSON YARDS','concrete',[box(3,3,18)]),
+  hudsonBuilding(70,-70),
   chryslerBuilding(-70,0),
-  tower(70,0,'ONE VANDERBILT','glass',[box(3,3,28)],{spire:10}),
+  vanderbiltBuilding(70,0),
   tower(-70,70,'TENEMENT ROW','brick',[box(4,2,7)],{waterTower:true}),
   tower(0,70,'GRAND CENTRAL','stone',[box(5,3,6)]),
   tower(70,70,'BROADWAY LOFTS','brick',[box(3,3,12)],{waterTower:true}),

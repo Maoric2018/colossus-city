@@ -1,3 +1,4 @@
+import {MODERN_LANDMARK_COMPONENTS,modernLandmark,modernPlacements} from './modern-landmarks.js';
 import {CHRYSLER_COMPONENTS,chryslerPlacements} from './chrysler.js';
 // Architectural kit in normalized bay coordinates. Parts have distinct geometry and jobs;
 // structural assemblies share a physics bay, while facade/glass pieces follow their own skin.
@@ -7,7 +8,7 @@ const rail=(y,z=-.51)=>[box([.9,.024,.022],[0,y,z]),...[-.42,-.21,0,.21,.42].map
 const beam=(x=0,z=0)=>[box([.1,.86,.025],[x,-.025,z]),...[-.075,.075].map(d=>box([.1,.86,.02],[x,-.025,z+d]))];
 const kit=(label,material,parts)=>({label,material,parts});
 export const COMPONENTS=Object.freeze({
- ...CHRYSLER_COMPONENTS,
+ ...CHRYSLER_COMPONENTS, ...MODERN_LANDMARK_COMPONENTS,
  slabEdge:kit('Precast slab edge','stone',[box([1,.075,.07],[0,.46,-.48])]),
  iBeam:kit('Steel I girder','steel',[box([.96,.09,.024],[0,.38,-.38]),...[-.05,.05].map(y=>box([.96,.018,.075],[0,.38+y,-.38]))]),
  hColumn:kit('Flanged steel column','steel',beam(-.46,-.46)),
@@ -115,6 +116,10 @@ export function componentPlacements(c,{interiors=true}={}){
  const core=c.ix%2===0&&c.iz%2===0;
  if(core && (interiors || c.ground))for(const type of ['iBeam','hColumn','joists','coreWall','elevator','stairFlight','stairLanding','stairRail','pipe'])put(type);
  if(core&&c.floor%3===1)put('crossBrace');
+ if(modernLandmark(c.architecture)){
+  if(core&&(interiors||c.ground))for(const t of ['ceilingLight','sprinkler','cableTray','partition','desk','serviceDoor','exitSign','stairStringer','conduit'])put(t);
+  modernPlacements(c,put,{interiors});return out;
+ }
  for(let side=0;side<4;side++)if(c.walls[side]){
   const facade=c.material==='glass'?'glass':'facade';
   const detailed=interiors||c.floor<3||c.roof;
