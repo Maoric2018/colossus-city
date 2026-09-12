@@ -1,0 +1,60 @@
+// A structural cell is one hollow storey bay: slab + four corner columns + exterior skins.
+// Cells form a support graph anchored at foundations. No triangle-mesh physics anywhere.
+import {MATERIALS, ALL_SIDES, sideBit, wallSolid} from './materials.js';
+export function generateCells(env){
+ const cells = [];
+ let id = 1;
+ env.buildings.forEach((b, bi) => {
+  const ids = new Map(), totalFloors = b.tiers.reduce((s, t) => s + t.floors, 0);
+  const base = b.tiers[0], originX = b.x - (base.nx - 1) / 2 * b.bay, originZ = b.z - (base.nz - 1) / 2 * b.bay;
+  let floor = 0;
+  b.tiers.forEach((t, ti) => {
+   for(let f = 0; f < t.floors; f++, floor++)
+    for(let z = 0; z < t.nz; z++) for(let x = 0; x < t.nx; x++){
+     const ix = t.ix + x, iz = t.iz + z;
+     const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, ground:floor === 0,
+      p:[originX + ix * b.bay, .15 + floor * b.story + b.story / 2, originZ + iz * b.bay],
+      size:[b.bay, b.story, b.bay], walls:[false, false, false, false], neighbors:[], below:0, above:0, lateral:[],
+      roof:false, stackAbove:0, frameScale:1 + .7 * (1 - floor / Math.max(1, totalFloors - 1))};
+     ids.set(`${ix}:${floor}:${iz}`, cell.id); cells.push(cell);
+    }
+  });
+  const mine = cells.filter(c => c.building === bi), byId = new Map(mine.map(c => [c.id, c]));
+  for(const c of mine){
+   const at = (dx, dy, dz) => ids.get(`${c.ix + dx}:${c.floor + dy}:${c.iz + dz}`) || 0;
+   c.below = at(0, -1, 0); c.above = at(0, 1, 0);
+   // walls: n(-z) e(+x) s(+z) w(-x). Exterior where no lateral neighbour exists on this floor.
+   const sides = [at(0, 0, -1), at(1, 0, 0), at(0, 0, 1), at(-1, 0, 0)];
+   sides.forEach((n, side) => { if(n) c.lateral.push(n); else c.walls[side] = true; });
+   c.neighbors = [c.below, c.above, ...c.lateral].filter(Boolean);
+   c.roof = !c.above;
+  }
+  for(const c of mine){ let n = 0, up = c.above; while(up){ n++; up = byId.get(up).above; } c.stackAbove = n; }
+ });
+ return cells;
+}
+// Per-cell mutable damage state, kept separately so the static cell table stays shareable.
+export function initialSkin(c){
+ const m = MATERIALS[c.material], mask = c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
+ return {glass:mask, facade:m.facadeHP > 0 ? mask : 0, hp:m.frameHP * c.frameScale, maxHp:m.frameHP * c.frameScale, facadeHp:c.walls.map(w => w ? m.facadeHP : 0)};
+}
+export const exteriorMask = c => c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
+// Cuboid components in LOCAL space: [center x,y,z, half x,y,z]. A wall is present only
+// while its solid skin layer stands, so broken windows/facades become openings.
+export function cellColliders(c, skin){
+ const [w, h, d] = c.size, slab = .13, col = .15, out = [];
+ out.push([0, h / 2 - slab, 0, w / 2, slab, d / 2]);
+ for(const x of [-1, 1]) for(const z of [-1, 1]) out.push([x * (w / 2 - col), 0, z * (d / 2 - col), col, h / 2 - .26, col]);
+ const solid = side => c.walls[side] && (!skin || wallSolid(c.material, skin.glass, skin.facade, side));
+ if(solid(0)) out.push([0, 0, -d / 2 + .06, w / 2 - .3, h / 2 - .22, .06]);
+ if(solid(1)) out.push([w / 2 - .06, 0, 0, .06, h / 2 - .22, d / 2 - .3]);
+ if(solid(2)) out.push([0, 0, d / 2 - .06, w / 2 - .3, h / 2 - .22, .06]);
+ if(solid(3)) out.push([-w / 2 + .06, 0, 0, .06, h / 2 - .22, d / 2 - .3]);
+ return out;
+}
+// Which exterior side of a bay faces a world point (dominant horizontal axis).
+export function facingSide(c, point){
+ const dx = point[0] - c.p[0], dz = point[2] - c.p[2];
+ return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 1 : 3) : (dz > 0 ? 2 : 0);
+}
+export {ALL_SIDES};

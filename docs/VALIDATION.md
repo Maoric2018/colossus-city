@@ -1,73 +1,44 @@
 # Validation record and acceptance gates
 
-## Current local validation — September 11, 2026
+## Current local validation — September 11, 2026 (branch `overhaul/smooth-city`, Windows 11, Intel Core i7-1355U / Iris Xe)
 
-- **52 Node tests: PASS:** 24 dependency-free unit tests, 11 real Rapier physics tests, six movement/projectile tests, one real multiplayer/debug-channel integration test, and ten XR lifecycle/input tests using fake XR frames with real Three.js math.
-- **32 JavaScript modules: syntax/import checks PASS.** All 55 bundled asset files pass SHA-256 verification.
-- **Actual browser renderer and multiplayer: PASS.** Chromium renders the imported art and uses real pointer capture/keyboard controls for ascent, hover/soar switching, fast flight and directional dodge. Two raider clients and a Quest client publish real images into a fourth spectator client. Closing the panel stops capture.
-- **Meta IWER Quest 2 emulation: PASS.** Stereo views, Touch mapping, proportional smooth yaw, 0.5 m physical controller extension reaching 7 m on the actual server, trigger-fired missiles, A calibration, controller tracking loss/recovery, visibility changes, recentering and repeated exit/re-entry. No browser JavaScript, resource or shader errors were reported. The sampled intact VR view submitted 156 draw calls / 442,548 triangles across both eyes with shadows disabled, before live-view capture. This is one view, not a worst-case GPU budget.
-- **Spectator visual inspection: PASS.** Headset left-eye scene, projection and in-world HUD match the emulated headset. Smoke/glow billboards now account for the giant camera scale; they no longer swamp the mirrored view. Actual player images are separated from explicitly simulated AI cameras.
-- **Real server benchmark: PASS on this Mac (Apple M5 Pro, Node 22.19.0).** Eight raiders, six staged collapses and repeated ragdolls: p95 4.37 ms, p99 7.08 ms, maximum 9.89 ms versus a 16.67 ms simulation budget. These are CPU measurements without network transport or headset rendering.
-- **Dependency installation audit: zero reported vulnerabilities.** Runtime packages, test tools and transitive versions are locked in `package-lock.json`. This audit was performed during dependency setup, not repeated for this controls-only dependency tree.
-- **USB tool installed, headset unavailable.** Android Platform Tools 37.0.1 was downloaded from Google; the earlier `npm run quest:check` found no connected device.
+- **62 Node tests: PASS.** 28 dependency-free unit tests (district generation, setback continuity, graph support, load model, skin openings, codec COL3, shared flight model), 16 real Rapier physics tests (layered skins, merged-floor colliders, delayed load cascades, islands and toppling, two-stage fracture, crumble, giant crushed by debris, torso shove, budgets, resets, XR recenter/tracking loss), 7 movement/projectile tests (incl. the breach shot), one real multiplayer/debug-channel integration test and 11 XR lifecycle tests.
+- **57 JavaScript modules: syntax/import checks PASS.**
+- **Server benchmark (`npm run bench`)**: eight raiders intact 1.7 ms mean / 3.4 ms p99 per tick; eight raiders with six staged tower collapses and repeated ragdolls 7.2 ms mean / 15.9 ms p99, worst single tick 29.8 ms (an island creation/split) against the 16.67 ms budget. Before the merged-floor and box-debris collider work the same scenarios measured 5.5 ms and 25 ms mean (max 122 ms) on this CPU.
+- **Real GPU profile (`npm run profile`, visible Chromium, 1600×900)**: tier `low` (auto-selected for Iris Xe) 55–58 fps vsync-locked with ~7.7 ms frame work in lobby, flight and combat; `quest` tier equivalent on this GPU; `medium` (shadows) 43–50 fps; `high` (shadows + bloom, the previous default look) 36–39 fps. Draw calls ~120 in play on `low`.
+- **Browser smoke test (`npm run test:browser`)**: real WebGL/WebSocket/Rapier with Meta IWER's Quest 2 profile — see `artifacts/browser-smoke.json` for the latest run and its check list.
 
-Current logs: `artifacts/test-results.txt`, `artifacts/syntax-results.txt`, `artifacts/browser-smoke.json`, `artifacts/visual-report.json`, `artifacts/physics-benchmark.json`. Screenshots include `artifacts/raider-soaring.png`, `artifacts/spectator-panel.png`, `artifacts/quest2-while-watched.png` and `artifacts/quest2-emulated-stereo.png`. Older validation files are historical records.
+Artifacts: `artifacts/render-profile.json`, `artifacts/physics-benchmark.json`, `artifacts/browser-smoke.json`, `artifacts/profile-*.png`.
 
 ## Still not validated
 
-- Physical Quest 2 stereo/optics, head and controller tracking accuracy, haptics, comfort, sustained frame rate or thermal throttling.
-- Extended interactive play, gameplay balance, eight real players, weak Wi-Fi or long-running sessions.
-- USB forwarding on a connected headset; the helper is ready but no device was available.
-- Docker build, Fly deployment, or trusted HTTPS/WSS end-to-end access on a headset.
-- Optional replacement GLBs beyond the bundled imported assets.
-
-See [Quest 2 testing](QUEST2_TESTING.md) for the local USB workflow. Emulation does not turn these remaining hardware checks into passes.
+- Physical Quest 2 stereo/optics, tracking accuracy, haptics, comfort, sustained frame rate and thermal throttling. The `quest` tier (Lambert shading, 0.8 framebuffer scale, low-poly skyline, small pools) is sized from Meta's published guidance, not measured on a headset.
+- Eight real humans, weak Wi-Fi, long sessions, and gameplay balance of the new breach shot / stagger / tower-drop loop.
+- USB forwarding on a connected headset; Docker/Fly deployment with trusted HTTPS on a headset.
 
 ## First connected-machine checks
-
-Run from project root:
 
 ```sh
 npm ci
 npm run check
 npm run test:all
 npm run bench
+npm run profile
 npm start
 ```
 
-The physics suite checks real stepping, support loss/gravity, ragdoll creation, death/respawn, nonlethal recovery, exclusive boss ownership, cleared-cell late-join state, secondary fragmentation, body budget and round-reset body validity. A failure needs investigation, not deletion of the assertion.
-
-In a second terminal run the optional Playwright smoke test after installing its browser. It opens four real clients, renders the actual scene, joins the same room and exercises flight, missiles, tracked reach and the live spectator panel. Its screenshot is diagnostic output, not proof of visual quality. Software-rendered headless FPS is not representative of a laptop GPU or Quest.
-
-`npm run bench` reports CPU/Node identity and mean/p50/p95/p99/max step times for an intact eight-player room and staged collapse/ragdoll stress. It includes some fracture/codec cost but not transport, full process contention, background rooms, GPU or headset cost. Compare the 16.67 ms simulation budget and leave substantial headroom; do not only compare the mean. Do not advertise 72 FPS based on this script.
-
 ## Two-laptop acceptance
 
-Create a giant room in one browser and join from a second laptop as a raider. Confirm matching room/round, takeoff/movement directions, mouse aim, core/head damage, occlusion behind buildings, boost/fuel, F hover/soar, E directional dodge, first/third-person cameras and spectator feeds/flight. Hold the desktop giant's click to strike a visible raider; verify both screens show matching ragdoll trajectory and recovery/death. Knock out a complete building support level and verify upper floor gravity. Shoot while another object crosses the ray; verify the server blocks the shot. Examine camera behavior in tight alleys.
-
-Join midway through a collapse, again after old rubble has been cleared, and after round reset. No building should return simply because someone joins. Repeatedly reset the round after players have died and rubble exists: freed WASM body handles must not survive the reset. Confirm a second boss cannot take the seat. Disconnect the giant and confirm the roster labels the stand-in AI. Disconnect a laptop mid-flight; the remaining match should continue without ghost input.
+Create a giant room in one browser and join from a second laptop as a raider. Confirm matching room/round, the raider's own movement is immediate (prediction) while remote players interpolate, mouse aim, core/head damage, occlusion behind buildings, boost/fuel, F hover/soar, E dodge, the breach shot (charge ring, cooldown, cracked bay), first/third-person cameras and spectator feeds. Shatter windows with rifle fire and confirm the opening lets you fly inside. Break a brick base bay and watch the creak → delayed failure → cascade. Knock out enough of a tower base for it to tip as one island, split on landing and crumble. Drop structure on the giant and confirm the stagger, the exposed-core bonus and the announcer feed on both screens. Reset rounds after collapses; no building should return on join.
 
 ## Quest 2 acceptance
 
-Use either the local USB workflow in `QUEST2_TESTING.md` (all clients must reach the same Mac server) or the HTTPS deployed origin on all devices. Use both Touch controllers and select Colossus. Select Enter VR only via a deliberate browser click.
-
-- Enter/exit immersive mode repeatedly. Confirm correct handedness, floor height, scale, stereo depth, head tracking and in-world HUD. Confirm the scene does not disappear when turning around.
-- Press A to calibrate while standing. Move each hand slowly, then swing moderately. Confirm remote hand positions and impact timing. Compare local hand rendering against server-visible contact under ordinary Wi-Fi latency.
-- Test left-stick direction while facing different ways, continuous analog right-stick turns, controller tracking loss, headset removal, browser suspension and room disconnection. Look especially for artificial turn/recalibration movement being interpreted as an unintended high-speed strike; artificial yaw is excluded from physical strike velocity, and explicit pose resets rebase kinematic hands with a 200 ms contact grace period; verify this still feels correct on hardware.
-- Fire both controller triggers. Check visible rocket direction, collision with thin walls and raiders, cooldown, splash damage and destruction. Open Live Views on a laptop and compare its left-eye preview to the headset while moving. Record headset FPS with capture both open and closed.
-- Test a single raider first, then four, then eight. Cause building failures while all raiders fly and several are ragdolls. Run long enough for thermal throttling to appear. Record actual XR frame timing; a requested 72 Hz is not necessarily a delivered 72 FPS.
-- Confirm no cockpit/head mesh obscures the view and no uncontrolled camera shake occurs in VR. Stop immediately if artificial locomotion is uncomfortable. Tune movement speed/comfort before public play.
-
-This code intentionally does not request passthrough camera, real-world hit testing, scene depth, articulated hand tracking or DOM-overlay support. Those are separate feature paths, not prerequisites of this fully virtual game.
+Follow `QUEST2_TESTING.md`. In addition to the previous checks: confirm the dust/haptic tick when a hand crosses a bay is immediate and the server-side strike follows shortly; confirm material haptics differ (glass tinkle vs stone thud); confirm the red vignette on being crushed is comfortable and the camera never shakes; confirm walking into a tower slows the giant and breaks bays; record delivered FPS with `?quality=quest` during a full tower collapse with eight raiders and rubble on screen, both with Live Views closed and open.
 
 ## Network/failure acceptance
 
-Use a network shaper or actual weak Wi-Fi to test roughly 100 ms RTT, a jittering connection, packet loss and temporary stalls. WebSockets are ordered: inspect delayed chunks/events and rubber-banding rather than assuming reliable delivery means low latency. Test reconnect through Leave/Join; prior player identity is not preserved. If the server disappears, the UI must say disconnected rather than imply a still-live match. Confirm stale inputs expire and no disconnected hand continues attacking.
+As before: shaped ~100 ms RTT, jitter, loss and stalls; watch prediction corrections (they should read as nudges, never teleports) and delayed chunk events; reconnect through Leave/Join; server disappearance must read as disconnected.
 
-Test one Fly Machine, HTTPS static files, WSS upgrade, health checks, origin policy and game asset paths. Do not provision a second machine to "fix" a missing room: first check that all clients use the same address and that only one process hosts the registry. Restarting the machine loses matches by design.
+## Known limits
 
-## Known limits / not completed features
-
-The environment combines downloaded Kenney/Poly Haven assets and Quaternius mech armor with authored destructible bays. It is a stylized harbor, not a photorealistic NYC environment. The giant/raiders use rigid posing rather than full animation rigs. Destruction is bay-level game fracture using graph connectivity, not engineering-grade structural analysis. Intact structures may retain unrealistic cantilevers. Decorations/far skyline do not break. Lower giant limbs are not a full collision rig. Imported props use optional fixed boxes. Avatar hits use simplified server shapes rather than skinned-mesh collision.
-
-Movement uses bounded camera extrapolation, not a reconciled prediction/rollback system. No rewind hit validation, WebRTC/TURN, authenticated accounts, reconnect tokens, persistence, horizontal scaling or public-service abuse protection is implemented. Graph/body/particle limits bound some costs but not every GPU/solver workload. Physical plausibility, balance, stability and sustained Quest frame rate still require real-device evaluation and iteration. Live feeds are low-resolution previews capped at six updates per second, with transport delay and extra capture cost; they do not record headset system overlays or passthrough.
+Game structural model, not engineering analysis; rigid compounds; decorative skyline; simplified giant collision; no rewind hit validation, WebRTC, accounts, persistence or horizontal scaling. Live feeds are low-resolution previews. All numbers above are from one laptop; the headset is the missing measurement.

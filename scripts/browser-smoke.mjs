@@ -39,8 +39,8 @@ try{
  await raider.keyboard.up('Space');await raider.keyboard.up('KeyW');
  assert.ok(await raider.evaluate(()=>window.__COLOSSUS.renderer.info.render.calls)>0);
  await raider.screenshot({path:'artifacts/desktop-smoke.png'});
- // Clear the 16 m Union Works roof before testing full soaring speed.
- await raider.keyboard.down('Space');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].p[1]>22);await raider.keyboard.up('Space');
+ // Clear the 43 m Union Square roof ahead of the spawn before testing full soaring speed.
+ await raider.keyboard.down('Space');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].p[1]>52,undefined,{timeout:30000});await raider.keyboard.up('Space');
  await raider.keyboard.press('KeyF');await raider.waitForFunction(()=>{const p=window.__COLOSSUS.state.players[0];return (p.flags&16)&&Math.hypot(...p.v)>23;});
  assert.equal(await raider.locator('#flight-mode').textContent(),'SOARING');
  await raider.keyboard.down('KeyD');await raider.keyboard.press('KeyE');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].dodgeCooldown>.5);await raider.keyboard.up('KeyD');

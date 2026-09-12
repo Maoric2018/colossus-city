@@ -1,44 +1,75 @@
 import * as T from 'three';
 import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
-import {bakedModel,instances,assetStatus} from './assets.js';
+import {bakedModel, instances, assetStatus} from './assets.js';
 import {seeded} from '../shared/math.js';
-const base='/assets/imported/';
-export async function installDistrict(view,renderer){
- const skyURL=base+'textures/sky-'+(view.quest?'1k':'2k')+'.hdr';
- const tasks=[],rand=seeded(78021),root=view.root;
- tasks.push(new RGBELoader().loadAsync(skyURL).then(hdr=>{
-  hdr.mapping=T.EquirectangularReflectionMapping;const pmrem=new T.PMREMGenerator(renderer),env=pmrem.fromEquirectangular(hdr);pmrem.dispose();
-  view.scene.environment=env.texture;view.scene.environmentIntensity=.6;view.scene.background=hdr;view.scene.backgroundIntensity=.8;view.scene.backgroundBlurriness=0;
-  view.scene.backgroundRotation.y=.4;view.scene.environmentRotation.y=.4;view.sky.visible=false;assetStatus.loaded.push(skyURL);
- }).catch(error=>{assetStatus.failed.push(skyURL);console.error('Sky panorama failed to load',error);}));
- // A continuous outer shore grounds the downloaded skyline across the harbor.
- const shore=new T.Mesh(new T.RingGeometry(126,470,96),new T.MeshStandardMaterial({color:0x607a70,roughness:1}));shore.rotation.x=-Math.PI/2;shore.position.y=-.19;root.add(shore);
- const skylineNames=['building-skyscraper-a','building-skyscraper-b','building-skyscraper-c','building-skyscraper-d','building-skyscraper-e','building-a','building-c','building-f','building-g','building-k','low-detail-building-a','low-detail-building-c'];
- skylineNames.forEach((name,type)=>{
-  const places=[];for(let j=0;j<(view.quest?3:7);j++){const angle=(type+j*skylineNames.length)*2.39996,r=152+rand()*148,h=(type<5?38:17)+rand()*(type<5?51:23);places.push({position:[Math.cos(angle)*r,-.15,Math.sin(angle)*r],yaw:Math.round(rand()*4)*Math.PI/2,height:h});}
-  tasks.push(bakedModel(base+`city-kit-commercial/${name}.glb`).then(model=>{for(const p of places)p.scale=p.height/model.size.y;for(const part of model.parts)part.material.color.setHex(0x9aafb9);instances(root,model,places,{castShadow:false});}));
+const base = '/assets/imported/';
+// Downloaded dressing around the destructible district: HDR sky, far skyline, street traffic,
+// rooftop equipment that rides its bay, harbour industry. Nothing here is gameplay collision.
+export async function installDistrict(view, renderer){
+ const tier = view.tier, env = view.env, half = env.half;
+ const skyURL = base + 'textures/sky-' + (view.quest ? '1k' : '2k') + '.hdr';
+ const tasks = [], rand = seeded(78021), root = view.root;
+ tasks.push(new RGBELoader().loadAsync(skyURL).then(hdr => {
+  hdr.mapping = T.EquirectangularReflectionMapping; const pmrem = new T.PMREMGenerator(renderer), envMap = pmrem.fromEquirectangular(hdr); pmrem.dispose();
+  view.scene.environment = envMap.texture; view.scene.environmentIntensity = tier.lambert ? .45 : .6; view.scene.background = hdr; view.scene.backgroundIntensity = .8; view.scene.backgroundBlurriness = 0;
+  view.scene.backgroundRotation.y = .4; view.scene.environmentRotation.y = .4; view.sky.visible = false; assetStatus.loaded.push(skyURL);
+ }).catch(error => { assetStatus.failed.push(skyURL); console.error('Sky panorama failed to load', error); }));
+ // Lower tiers lean on the two low-detail models for the ring (they are 10x cheaper) and keep
+ // only a few detailed skyscrapers for silhouette.
+ const detailed = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c', 'building-skyscraper-d', 'building-skyscraper-e', 'building-a', 'building-c', 'building-f', 'building-g', 'building-k'];
+ const skylineNames = tier.skyline >= 1 ? [...detailed, 'low-detail-building-a', 'low-detail-building-c'] : [...detailed.slice(0, 3), 'low-detail-building-a', 'low-detail-building-c', 'low-detail-building-a', 'low-detail-building-c'];
+ const perType = Math.max(2, Math.round(7 * Math.max(tier.skyline, .6)));
+ skylineNames.forEach((name, type) => {
+  const tall = name.includes('skyscraper') || name.startsWith('low-detail');
+  const places = []; for(let j = 0; j < perType; j++){ const angle = (type + j * skylineNames.length) * 2.39996, r = half + 60 + rand() * 160, h = (tall ? 48 : 20) + rand() * (tall ? 70 : 28); places.push({position:[Math.cos(angle) * r, -.15, Math.sin(angle) * r], yaw:Math.round(rand() * 4) * Math.PI / 2, height:h}); }
+  tasks.push(bakedModel(base + `city-kit-commercial/${name}.glb`).then(model => { for(const p of places) p.scale = p.height / model.size.y; for(const part of model.parts) part.material.color.setHex(0x9aafb9); instances(root, model, places, {castShadow:false}); }));
  });
- // Street cars sit in the existing traffic lanes, preserving walkable space.
- const cars=['taxi','sedan','police','van','firetruck','delivery'];
- cars.forEach((name,type)=>{const places=[];for(let i=type;i<42;i+=cars.length){const along=(i%14)*10-66,road=[-37,0,37][Math.floor(i/14)],swap=i%2;if([-37,0,37].some(n=>Math.abs(along-n)<8))continue;places.push({position:[swap?along:road+3.6,.13,swap?road-3.6:along],yaw:swap?Math.PI/2:Math.PI});}
-  tasks.push(bakedModel(base+`car-kit/${name}.glb`).then(model=>{for(const p of places)p.scale=(type>2?4.8:3.9)/model.size.z;instances(root,model,places);}));
+ // Street traffic sits in the avenue lanes, clear of intersections.
+ const cars = ['taxi', 'sedan', 'police', 'van', 'firetruck', 'delivery'], {avenues, streets, avenueWidth} = env.roads, perLane = Math.round(9 * tier.skyline) + 3;
+ cars.forEach((name, type) => {
+  const places = [];
+  avenues.forEach((x, ai) => { for(let i = 0; i < perLane; i++){ if((i + ai) % cars.length !== type) continue; const z = -half + 10 + (i / perLane) * (half * 2 - 20) + rand() * 6; if(streets.some(s => Math.abs(z - s) < 10)) continue; const swap = (i + ai) % 2; places.push({position:[x + (swap ? avenueWidth / 4 : -avenueWidth / 4), .13, z], yaw:swap ? 0 : Math.PI}); } });
+  tasks.push(bakedModel(base + `car-kit/${name}.glb`).then(model => { for(const p of places) p.scale = (type > 2 ? 4.8 : 3.9) / model.size.z; instances(root, model, places); }));
  });
- // Harbor equipment is outside the playable island. Roof props follow the bay
- // underneath them, including rotations, removal and full round resets.
- const roofAssets=[['city-kit-industrial/water-tower',2.8],['space-kit/satelliteDish_detailed',2.4],['city-kit-industrial/detail-tank',1.1],['city-kit-industrial/solar-panel-flat',.25]];
- roofAssets.forEach(([name,height],type)=>tasks.push(bakedModel(base+name+'.glb').then(model=>{
-  const cells=view.cells.filter(c=>c.roof&&(c.ix+c.iz*2+c.building)%4===type);
-  for(const part of model.parts){const batch=view.batch(part.geometry,part.material,cells.length);cells.forEach((c,index)=>{
-    const local=new T.Matrix4().compose(new T.Vector3(0,c.size[1]/2+.02,0),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),c.building*Math.PI/2),new T.Vector3().setScalar(height/model.size.y));
-    if(!view.attachments.has(c.id))view.attachments.set(c.id,[]);view.attachments.get(c.id).push({batch,index,local});
-   });}
-  for(const c of cells){const state=view.transforms.get(c.id);view.setCell(c.id,state.p,state.q,state.hidden);}view.commit();
+ // Roof props follow the bay underneath them, including rotations, removal and round resets.
+ const roofAssets = [['city-kit-industrial/water-tower', 3.2], ['space-kit/satelliteDish_detailed', 2.6], ['city-kit-industrial/detail-tank', 1.3], ['city-kit-industrial/solar-panel-flat', .3]];
+ roofAssets.forEach(([name, height], type) => tasks.push(bakedModel(base + name + '.glb').then(model => {
+  const cells = view.cells.filter(c => c.roof && (type === 0 ? env.buildings[c.building].waterTower && c.ix === 0 && c.iz === 0 : (c.ix + c.iz * 2 + c.building + c.tier) % 5 === type && !env.buildings[c.building].spire));
+  if(!cells.length) return;
+  for(const part of model.parts){ const batch = view.batch(part.geometry, part.material, cells.length); cells.forEach((c, index) => {
+   const local = new T.Matrix4().compose(new T.Vector3(0, c.size[1] / 2 + .04, 0), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), c.building * Math.PI / 2), new T.Vector3().setScalar(height / model.size.y));
+   if(!view.attachments.has(c.id)) view.attachments.set(c.id, []); view.attachments.get(c.id).push({batch, index, local});
+  }); }
+  attachRoofProps(view, cells);
  })));
- for(const [type,name]of ['shipping-container-a','shipping-container-b','building-a','building-g','chimney-large'].entries()){
-  tasks.push(bakedModel(base+`city-kit-industrial/${name}.glb`).then(model=>{
-   const places=[];for(let i=0;i<8;i++)places.push({position:[-107+i*28,-.15,-143-type*15],scale:(type<2?3.1:type===4?24:10)/model.size.y,yaw:Math.PI/2});instances(root,model,places,{castShadow:false});
+ // Spires on the signature towers.
+ const spires = env.buildings.map((b, i) => b.spire ? {b, i} : null).filter(Boolean);
+ if(spires.length){
+  const geometry = new T.CylinderGeometry(.08, .9, 1, 6), material = new T.MeshStandardMaterial({color:0x9aa8b0, metalness:.8, roughness:.35}), batch = view.batch(geometry, material, spires.length);
+  spires.forEach(({b, i}, index) => { const top = view.cells.filter(c => c.building === i && c.roof).sort((a, c) => c.p[1] - a.p[1])[0]; if(!top) return; const local = new T.Matrix4().compose(new T.Vector3(0, top.size[1] / 2 + b.spire / 2, 0), new T.Quaternion(), new T.Vector3(1, b.spire, 1)); if(!view.attachments.has(top.id)) view.attachments.set(top.id, []); view.attachments.get(top.id).push({batch, index, local}); });
+  attachRoofProps(view, view.cells.filter(c => view.attachments.has(c.id)));
+ }
+ for(const [type, name] of ['shipping-container-a', 'shipping-container-b', 'building-a', 'building-g', 'chimney-large'].entries()){
+  tasks.push(bakedModel(base + `city-kit-industrial/${name}.glb`).then(model => {
+   const places = []; for(let i = 0; i < 10; i++) places.push({position:[-half - 20 + i * 38, -.15, -half - 60 - type * 16], scale:(type < 2 ? 3.1 : type === 4 ? 24 : 10) / model.size.y, yaw:Math.PI / 2}); instances(root, model, places, {castShadow:false});
   }));
  }
- const results=await Promise.allSettled(tasks);for(const result of results)if(result.status==='rejected')console.error('District asset failed to load',result.reason);
+ const results = await Promise.allSettled(tasks); for(const result of results) if(result.status === 'rejected') console.error('District asset failed to load', result.reason);
  return results;
+}
+// Attached props are re-posed whenever their bay moves; register them with the buildings layer.
+function attachRoofProps(view, cells){
+ const {buildings} = view, matrix = new T.Matrix4(), offset = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0), temp = new T.Object3D();
+ if(!buildings.attachmentHook){
+  const original = buildings.setCell.bind(buildings);
+  buildings.setCell = (id, p, q, hidden) => {
+   original(id, p, q, hidden);
+   const attached = view.attachments.get(id); if(!attached) return;
+   const e = buildings.entries.get(id); temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.set(1, 1, 1); temp.updateMatrix(); offset.copy(temp.matrix);
+   for(const part of attached){ matrix.multiplyMatrices(offset, part.local); part.batch.setMatrixAt(part.index, hidden ? zero : matrix); part.batch.instanceMatrix.needsUpdate = true; }
+  };
+  buildings.attachmentHook = true;
+ }
+ for(const c of cells){ const e = buildings.entries.get(c.id); buildings.setCell(c.id, null, null, e.hidden); }
+ buildings.commit();
 }

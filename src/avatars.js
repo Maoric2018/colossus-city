@@ -23,7 +23,7 @@ export class GiantView{
   mesh(new T.CylinderGeometry(1.2,1.5,1.6,12),dark,this.body,[0,5,0]);
   mesh(new T.TorusGeometry(1.65,.23,8,32),dark,this.body,[0,.8,-1.95]);
   mesh(new T.TorusGeometry(1.38,.065,6,32),reactor,this.body,[0,.8,-2.19]);
-  mesh(new T.SphereGeometry(1.05,18,12),reactor,this.body,[0,.8,-2.05]);this.coreGlow=glow(this.body,0xbdff91,8,[0,.8,-2.5]);
+  mesh(new T.SphereGeometry(1.05,18,12),reactor,this.body,[0,.8,-2.05]);this.coreGlow=glow(this.body,0xbdff91,8,[0,.8,-2.5]);this.coreScale=8;
   mesh(rounded(3.7,3.9,3.15,.3),metal,this.head);
   mesh(rounded(3.12,1.6,.46,.1),dark,this.head,[0,-.15,-1.65]);
   mesh(rounded(2.88,.28,.18,.06),reactor,this.head,[0,.35,-1.95]);
@@ -41,7 +41,7 @@ export class GiantView{
    replace(this.body,'body',[8.8,9.5,4.7]);replace(this.head,'head',[4.5,4.3,3.8]);
    // Weak points retain their exact gameplay positions and stay visible at a distance.
    mesh(new T.TorusGeometry(1.42,.18,8,24),dark,this.body,[0,.05,-2.38]);
-   mesh(new T.SphereGeometry(1.08,16,10),reactor,this.body,[0,.05,-2.35]);this.coreGlow=glow(this.body,0xc3ff98,6,[0,.05,-2.95]);
+   mesh(new T.SphereGeometry(1.08,16,10),reactor,this.body,[0,.05,-2.35]);this.coreGlow=glow(this.body,0xc3ff98,6,[0,.05,-2.95]);this.coreScale=6;
    this.eyeGlow=glow(this.head,0xc3ff98,1.2,[-1.13,.66,-1.98]);glow(this.head,0xc3ff98,1.2,[1.13,.66,-1.98]);
    for(const [i,side]of ['R','L'].entries()){
     const arm=this.arms[i],leg=this.legs[i];
@@ -54,9 +54,12 @@ export class GiantView{
   }catch(error){console.error('Mech armor failed to load',error);}
  }
  fist(){const g=new T.Group();this.root.add(g);mesh(rounded(2.7,1.9,2.6,.25),metal,g);for(let i=0;i<4;i++)mesh(rounded(.53,.85,1.25,.12),trim,g,[(i-1.5)*.64,-.55,-.95]);mesh(rounded(.25,.3,2.2,.04),reactor,g,[1.38,.25,0]);return g;}
- update(s,{local=false}={}){
+ update(s,{local=false,stagger=0}={}){
   const head=new T.Vector3(...s.head),q=new T.Quaternion().setFromAxisAngle(up,s.bossYaw||0);this.head.position.copy(head);this.head.quaternion.copy(q);this.head.visible=!local;
   const chest=head.clone().add(new T.Vector3(0,-7.2,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
+  // A staggered giant shudders and its core flares: the raiders' damage window is readable from afar.
+  if(stagger>0){const t=performance.now()*.012;this.body.rotateX(Math.sin(t)*stagger*.06);this.body.rotateZ(Math.cos(t*1.3)*stagger*.05);}
+  const pulse=stagger>.35?1.6+Math.sin(performance.now()*.02)*.5:1;this.coreGlow.scale.setScalar((this.coreScale||6)*pulse);
   [-1,1].forEach((sign,i)=>{
    const shoulder=new T.Vector3(sign*4.2,3.1,0).applyQuaternion(q).add(chest),hand=new T.Vector3(...(i?s.right:s.left));
    const center=shoulder.clone().lerp(hand,.47),bend=new T.Vector3(sign*1.5,-1,2).applyQuaternion(q);center.add(bend);
