@@ -1,230 +1,154 @@
 # Colossus City — architecture diagrams
 
-Three views of the same system: what talks to what, how a building actually comes apart, and
+Three views of the same system: the stack it runs on, how a building actually comes apart, and
 what happens inside one authoritative tick. GitHub renders these natively.
 
-## 1. System architecture
+## 1. Tech stack
 
-Devices on the left, authority on the right, and `shared/` deliberately in the middle: it is the
-only code both sides import, which is why the client can predict flight exactly and why the
-server never has to trust a client for anything.
+One slide's worth: every technology the game runs on and how they connect. No individual files —
+for those see [MODULES.md](MODULES.md).
 
 ```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 48, "rankSpacing": 56, "htmlLabels": true, "curve": "basis"}} }%%
 flowchart LR
 
 classDef device fill:#0d212b,stroke:#7fd4c1,stroke-width:2px,color:#eaf6f2
-classDef client fill:#11232b,stroke:#9ec7d6,color:#eaf6f2
-classDef wire fill:#20262e,stroke:#ffd166,stroke-width:2px,color:#fff6e0
+classDef client fill:#11232b,stroke:#9ec7d6,stroke-width:2px,color:#eaf6f2
 classDef shared fill:#1b2a1d,stroke:#ceff83,stroke-width:2px,color:#f2ffe2
-classDef server fill:#241a2b,stroke:#c6a0ff,color:#f4ecff
-classDef phys fill:#2b1d1d,stroke:#ff9a7a,stroke-width:2px,color:#ffeee8
+classDef server fill:#241a2b,stroke:#c6a0ff,stroke-width:2px,color:#f4ecff
+classDef plat fill:#2b1d1d,stroke:#ff9a7a,stroke-width:2px,color:#ffeee8
 
-subgraph DEVICES["DEVICES"]
+subgraph D["CLIENTS"]
   direction TB
-  QUEST["Meta Quest 2<br/>the Colossus<br/>head + hand pose, sticks, triggers"]
-  LAPTOP["Laptop<br/>raider, desktop giant, spectator<br/>keyboard, mouse, pointer lock"]
-  PHONE["Phone / tablet<br/>two thumbs<br/>stick, drag-look, role pads"]
+  Q["<b>Meta Quest 2</b><br/>Quest Browser<br/>the colossus"]
+  L["<b>Laptop</b><br/>Chrome, Edge, Safari<br/>raider, giant, spectator"]
+  P["<b>Phone / tablet</b><br/>mobile browser<br/>touch raider"]
 end
 
-subgraph CLIENT["BROWSER CLIENT - src/"]
+subgraph C["BROWSER RUNTIME"]
   direction TB
-  MAIN["main.js<br/>bootstrap, 60 Hz frame loop"]
-
-  subgraph APP["src/app - session and input"]
-    direction TB
-    INPUT["input.js + touch.js<br/>one held() input shape<br/>ability sequence counters"]
-    PRED["prediction.js<br/>local sim, replays unacked inputs"]
-    CAMERA["camera.js + shake.js<br/>dead-reckoned giant, trauma shake"]
-    EVENTSM["events.js<br/>event to fx, audio, haptics, HUD"]
-  end
-
-  subgraph RENDER["src/render - budget"]
-    direction TB
-    QUALITY["quality.js<br/>mobile, quest, low, medium, high"]
-    RENDERER["renderer.js<br/>adaptive resolution, bloom, XR scale"]
-    LODM["catalog-lod, instances,<br/>fracture-geometry"]
-  end
-
-  subgraph WORLDC["src/world + presentation"]
-    direction TB
-    CITYV["city.js CityView<br/>spatial queries, skins, debris poses"]
-    STREAMC["streaming.js<br/>block streaming"]
-    BUILDC["buildings.js, fine-buildings,<br/>rubble, fragments, cars, textures"]
-    XRM["xr.js<br/>rig scale, smooth turn, in-world HUD"]
-    MEDIAC["avatars, effects, missiles,<br/>audio, spectator"]
-  end
-
-  MAIN --> APP
-  MAIN --> RENDER
-  MAIN --> WORLDC
-  INPUT --> PRED --> CAMERA
-  QUALITY --> RENDERER
-  QUALITY --> LODM
-  LODM --> BUILDC
-  CITYV --> STREAMC
-  CITYV --> BUILDC
-  CITYV --> XRM
-  EVENTSM --> CITYV
-  EVENTSM --> MEDIAC
+  THREE["<b>Three.js r180</b><br/>WebGL 2, instanced meshes,<br/>quality tiers, adaptive resolution"]
+  XR["<b>WebXR Device API</b><br/>immersive-vr, local-floor,<br/>Touch controllers, haptics"]
+  IN["<b>Pointer + touch input</b><br/>pointer lock, Pointer Events,<br/>client-side prediction"]
+  AUD["<b>Web Audio API</b><br/>procedural synthesis,<br/>no audio files"]
+  DOM["<b>Canvas 2D + DOM/CSS</b><br/>HUD, procedural facade textures"]
+  ESM["<b>ES modules + importmap</b><br/>no bundler, no build step"]
 end
 
-subgraph MID["CONTRACT"]
+subgraph S["SHARED CONTRACT"]
   direction TB
-
-  subgraph WIRE["transport"]
-    direction TB
-    WS["WebSocket /ws<br/>JSON control + reliable events"]
-    SNAP["COL3 binary snapshot<br/>20 Hz, float32"]
-    VIEWCH["/views channel<br/>spectator video"]
-  end
-
-  subgraph SHARED["shared/ - imported by BOTH sides"]
-    direction TB
-    FLIGHTS["flight.js<br/>the one flight model"]
-    PROTOS["protocol.js<br/>snapshot codec"]
-    CITYDEF["city/layout, cells, materials,<br/>structure, catalog, landmarks"]
-    CONFIG["config.js, math.js<br/>tunables, sweeps, sanitizeInput"]
-    RIGS["giant-rig, raider-rig,<br/>hand-world, props, traffic"]
-  end
-
-  PROTOS --> SNAP
+  SM["<b>Shared ES modules</b><br/>one flight model, one city<br/>definition, one config"]
+  PR["<b>COL3 binary protocol</b><br/>float32 transforms, 20 Hz"]
+  WSC["<b>WebSocket</b><br/>reliable JSON events<br/>+ binary snapshots, 30 Hz input"]
+  VID["<b>Live view channel</b><br/>encoded video, JPEG fallback"]
 end
 
-subgraph SERVER["AUTHORITATIVE SERVER - Node"]
+subgraph SV["AUTHORITATIVE SERVER"]
   direction TB
-  INDEXS["index.js<br/>HTTP, WS upgrade, rate limits,<br/>60 Hz accumulator"]
-  ROOM["room.js<br/>one match: membership,<br/>step order, snapshot"]
-
-  subgraph MECH["mechanics"]
-    direction TB
-    BOSSS["boss.js<br/>tracked hands, torso shove, combos"]
-    PLAYERSS["players.js, combat.js<br/>spawn, rifle, breach, ragdolls"]
-    ABILS["abilities.js, soar-breach.js<br/>flight, missiles"]
-    CARSS["cars.js<br/>traffic, wrecks"]
-  end
-
-  subgraph DESTR["destruction"]
-    direction TB
-    DESTS["destruction.js<br/>layered damage, collapse scheduling,<br/>islands, topple, crumble"]
-    FRACS["fracture.js + hand-destruction.js<br/>fine pieces"]
-    QUERYS["queries.js<br/>broadphase helpers"]
-  end
-
-  subgraph SRVIO["delivery"]
-    direction TB
-    STREAMS["streaming.js<br/>per-client blocks"]
-    VIEWSS["views.js<br/>authenticated relay"]
-    STATICS["static.js<br/>cached assets"]
-  end
-
-  INDEXS --> ROOM
-  ROOM --> MECH
-  ROOM --> DESTR
-  ROOM --> SRVIO
-  BOSSS --> DESTS
-  ABILS --> DESTS
-  PLAYERSS --> DESTS
-  DESTS --> FRACS
-  QUERYS --> DESTS
+  NODE["<b>Node.js 22</b><br/>single process, one room registry,<br/>60 Hz fixed-step accumulator"]
+  WSS["<b>ws</b><br/>WebSocket server, per-room fan-out,<br/>rate limits, origin policy"]
+  RAP["<b>Rapier3D 0.17 (WASM)</b><br/>rigid bodies, CCD, joints,<br/>merged static colliders"]
+  SIM["<b>Room simulation</b><br/>movement, tracked-hand contact,<br/>structural collapse, ragdolls"]
 end
 
-subgraph SIM["WORLD SIM AND HOSTING"]
+subgraph PL["PLATFORM"]
   direction TB
-  RAPIER["Rapier3D WASM<br/>fixed 1/60 s step, CCD,<br/>merged floor colliders"]
-  DOCKER["Dockerfile + fly.toml<br/>one machine, rooms live in process"]
-  ASSETS["public/assets<br/>Kenney, Quaternius, Poly Haven"]
-  TESTS["Node suite + Playwright<br/>real Rapier, IWER Quest 2"]
+  FLY["<b>Docker + Fly.io</b><br/>exactly one machine,<br/>rooms live in process"]
+  AST["<b>Static assets</b><br/>GLB from Kenney and Quaternius,<br/>HDR from Poly Haven, all CC0"]
+  TST["<b>node:test + Playwright</b><br/>real Rapier, Meta IWER<br/>Quest 2 emulation"]
 end
 
-QUEST --> MAIN
-LAPTOP --> MAIN
-PHONE --> MAIN
+Q --> XR
+L --> IN
+P --> IN
+XR --> THREE
+IN --> THREE
+ESM --> THREE
+AUD --> DOM
+THREE --> DOM
 
-INPUT -->|"input + pose, 30 Hz"| WS
-WS --> INDEXS
-SNAP -->|"interpolate ~100 ms behind"| PRED
-WS -->|"reliable events"| EVENTSM
-VIEWCH --> VIEWSS
-MEDIAC --> VIEWCH
+IN -->|"input + pose"| WSC
+SM -->|"one model, both sides"| IN
+PR --> WSC
+WSC -->|"snapshots + events"| THREE
+VID --- DOM
 
-FLIGHTS -->|"one model"| PRED
-FLIGHTS --> ABILS
-CITYDEF --> CITYV
-CITYDEF --> DESTS
-CONFIG --> QUALITY
-CONFIG --> ROOM
-RIGS --> XRM
-RIGS --> BOSSS
+WSC <--> WSS
+SM --> SIM
+VID <--> NODE
+WSS --> NODE
+NODE --> SIM
+SIM <--> RAP
 
-ROOM --> SNAP
-STREAMS --> STREAMC
-STATICS --> MAIN
-ROOM <--> RAPIER
-DOCKER --> INDEXS
-ASSETS --> STATICS
-TESTS -.-> ROOM
+FLY --> NODE
+AST --> THREE
+TST -.-> SIM
 
-class QUEST,LAPTOP,PHONE device
-class MAIN,INPUT,PRED,CAMERA,EVENTSM,QUALITY,RENDERER,LODM,CITYV,STREAMC,BUILDC,XRM,MEDIAC client
-class WS,SNAP,VIEWCH wire
-class FLIGHTS,PROTOS,CITYDEF,CONFIG,RIGS shared
-class INDEXS,ROOM,BOSSS,PLAYERSS,ABILS,CARSS,DESTS,FRACS,QUERYS,STREAMS,VIEWSS,STATICS server
-class RAPIER,DOCKER,ASSETS,TESTS phys
+class Q,L,P device
+class THREE,XR,IN,AUD,DOM,ESM client
+class SM,PR,WSC,VID shared
+class NODE,WSS,RAP,SIM server
+class FLY,AST,TST plat
 ```
 
 ## 2. How a tower comes down
 
-Every bay is a hollow storey: slab, four corner columns and exterior skins. Damage peels the
-skins before it ever reaches structure, and structure fails on a load model rather than on hit
-points alone.
+Four stages. Damage peels the skins before it ever reaches structure, and structure fails on a
+load model rather than on hit points alone — which is why collapses read as progressive.
 
 ```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 44, "rankSpacing": 62, "htmlLabels": true, "curve": "basis"}} }%%
 flowchart LR
 
-classDef hit fill:#2b1d1d,stroke:#ff9a7a,color:#ffeee8
-classDef skin fill:#11232b,stroke:#9ec7d6,color:#eaf6f2
-classDef load fill:#241a2b,stroke:#c6a0ff,color:#f4ecff
-classDef out fill:#1b2a1d,stroke:#ceff83,color:#f2ffe2
+classDef hit fill:#2b1d1d,stroke:#ff9a7a,stroke-width:2px,color:#ffeee8
+classDef skin fill:#11232b,stroke:#9ec7d6,stroke-width:2px,color:#eaf6f2
+classDef load fill:#241a2b,stroke:#c6a0ff,stroke-width:2px,color:#f4ecff
+classDef out fill:#1b2a1d,stroke:#ceff83,stroke-width:2px,color:#f2ffe2
 
-SRC["Damage source<br/>tracked hand sweep, torso shove,<br/>rifle round, breach bolt, missile,<br/>soaring raider, falling debris"]:::hit
-SIDE["facingSide()<br/>which wall took it"]:::hit
-GLASS{"glass intact<br/>on that side?"}:::skin
-POP["Windows shatter<br/>skin event, shards, tinkle"]:::skin
-FACADE{"facade standing?"}:::skin
-CRACK["Facade cracks<br/>absorbs most of the hit,<br/>shields the frame"]:::skin
-OPEN["Solid layer gone<br/>collider removed, the bay is now an opening<br/>raiders and rockets fly through"]:::skin
-FRAME["Structural frame HP<br/>lower storeys are stronger"]:::load
-GRAPH["unsupportedCells()<br/>graph path to a foundation"]:::load
-LOADM["structuralLoads()<br/>weight down each stack,<br/>hanging bays beam to neighbours,<br/>capacity = stack x safety x HP ratio"]:::load
-OVER{"carried > capacity?"}:::load
-CREAK["Creak<br/>scheduled failure + jitter"]:::load
-CRUSH["Column crushed to rubble at once<br/>never left propping the storeys above"]:::out
-ISLAND["Severed section becomes<br/>ONE rigid island"]:::out
-TOPPLE["topple(): angular velocity about<br/>the far edge of what still stands"]:::out
-LAND{"hard landing?"}:::out
-BANDS["Island splits into floor bands,<br/>bands into bays"]:::out
-CRUMBLE["Lone bay crumbles<br/>body freed, cosmetic rubble on clients"]:::out
-DOMINO["Chunk batters what it lands on<br/>and crushes the giant on its head or core"]:::hit
+subgraph A["1 · IMPACT"]
+  direction TB
+  SRC["<b>Damage source</b><br/>tracked hand, torso shove,<br/>rifle, breach bolt, missile,<br/>soaring raider, falling debris"]
+  SIDE["<b>Which wall took it</b><br/>dominant horizontal axis"]
+  SRC --> SIDE
+end
 
-SRC --> SIDE --> GLASS
-GLASS -- yes --> POP --> FACADE
-GLASS -- no --> FACADE
-FACADE -- yes --> CRACK --> FRAME
-FACADE -- no --> FRAME
-CRACK -.-> OPEN
-POP -.-> OPEN
-FRAME --> GRAPH
-FRAME --> LOADM
-LOADM --> OVER
-OVER -- yes --> CREAK --> CRUSH
-OVER -- no --> LOADM
+subgraph B["2 · SKINS"]
+  direction TB
+  GLASS["<b>Glass shatters first</b><br/>cheap, loud, cosmetic shards"]
+  FACADE["<b>Facade cracks</b><br/>brick, limestone, concrete<br/>absorbs the hit, shields the frame"]
+  OPEN["<b>Solid layer gone = an opening</b><br/>collider removed, raiders and<br/>rockets fly straight through"]
+  GLASS --> FACADE --> OPEN
+end
+
+subgraph C["3 · INTEGRITY"]
+  direction TB
+  FRAME["<b>Structural frame HP</b><br/>lower storeys are stronger"]
+  GRAPH["<b>Graph support</b><br/>is there still a path<br/>to a foundation?"]
+  LOADM["<b>Load model</b><br/>weight down each stack,<br/>hanging bays beam to neighbours,<br/>capacity = stack x safety x HP"]
+  CREAK["<b>Overloaded, so it creaks</b><br/>failure scheduled with jitter"]
+  FRAME --> GRAPH
+  FRAME --> LOADM --> CREAK
+end
+
+subgraph E["4 · COLLAPSE"]
+  direction TB
+  CRUSH["<b>Column crushed to rubble</b><br/>never left propping<br/>the storeys above"]
+  ISLAND["<b>Severed section becomes<br/>one rigid island</b><br/>and topples about whatever stands"]
+  BREAKUP["<b>Hard landing breaks it up</b><br/>island to floor bands to bays,<br/>lone bays crumble to rubble"]
+  DOMINO["<b>Debris keeps hitting things</b><br/>batters neighbours, crushes the<br/>giant on its head or core"]
+  CRUSH --> ISLAND --> BREAKUP --> DOMINO
+end
+
+SIDE --> GLASS
+OPEN --> FRAME
 GRAPH --> ISLAND
-CRUSH --> GRAPH
-ISLAND --> TOPPLE --> LAND
-LAND -- yes --> BANDS --> CRUMBLE
-LAND -- no --> DOMINO
-BANDS --> DOMINO
-DOMINO --> SRC
+CREAK --> CRUSH
+DOMINO -->|"cascades back in"| SRC
+
+class SRC,SIDE,DOMINO hit
+class GLASS,FACADE,OPEN skin
+class FRAME,GRAPH,LOADM,CREAK load
+class CRUSH,ISLAND,BREAKUP out
 ```
 
 ## 3. One authoritative tick
@@ -264,15 +188,20 @@ sequenceDiagram
   A->>A: events drive particles, rubble, audio, haptics, HUD
 ```
 
-## Reading the first diagram
+## Reading the stack
 
-- **Green** is `shared/` — pure logic with no Three.js, Rapier, DOM or Node in it. It is imported
-  unchanged by both sides, which is why the client can predict flight exactly and why an analog
-  thumbstick value survives to the server untouched.
-- **Amber** is the wire. Control and gameplay events are reliable JSON; transforms are a
-  versioned binary snapshot. Bump `MAGIC` in `shared/protocol.js` and every client must reload.
+- **Teal** is the three devices. One codebase serves all of them; the role and the input scheme
+  are decided at runtime, not at build time.
+- **Blue** is the browser runtime — platform APIs plus Three.js. There is no bundler and no build
+  step: the browser loads ES modules through an importmap, which is why a hackathon checkout runs
+  with `npm start` and nothing else.
+- **Green** is the contract, and it is the load-bearing idea. `shared/` is pure logic with no
+  Three.js, Rapier, DOM or Node in it, imported unchanged by both sides — that is why the client
+  can predict flight exactly and why the server never has to trust a client. Alongside it sits the
+  wire: reliable JSON for events, a versioned binary snapshot for transforms.
 - **Purple** is authority. Nothing in the client decides damage, position or structural failure.
-- **Red** is the physics world and anything that can hurt something.
+- **Orange** is everything around the game: hosting, CC0 art, and the test rigs that run real
+  physics and an emulated Quest 2.
 
 See [MODULES.md](MODULES.md) for the file-by-file map and the rules for changing each layer,
 and [ARCHITECTURE.md](ARCHITECTURE.md) for the budgets and failure modes.
