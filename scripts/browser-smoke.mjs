@@ -105,7 +105,7 @@ try{
  await second.waitForFunction(()=>window.__COLOSSUS.views.stream!==window.oldViewStream&&window.__COLOSSUS.views.active);
  await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].every(c=>c.received>performance.now()-500));
  checks.push('Publisher and spectator signaling reconnect automatically with the full current roster');
- await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].every(c=>!c.status.textContent.includes('Connecting')));await observer.screenshot({path:'artifacts/spectator-panel.png'});
+ await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].every(c=>c.fps>=20&&!c.status.textContent.includes('Connecting')));await observer.screenshot({path:'artifacts/spectator-panel.png'});
  await observer.close();await second.close();
 
  const z=await quest.evaluate(()=>window.__COLOSSUS.net.latest.bossZ);

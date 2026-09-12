@@ -44,7 +44,7 @@ export class ViewStream{
     const card=this.owner.cards.get(id);if(!card)return;
     // Browser support varies; a small jitter cushion prevents late-frame stutter while keeping delay low.
     try{if('jitterBufferTarget'in e.receiver)e.receiver.jitterBufferTarget=30;if('playoutDelayHint'in e.receiver)e.receiver.playoutDelayHint=.03;}catch{}
-    card.video.srcObject=new MediaStream([e.track]);card.transport='video';card.video.hidden=false;card.surface.hidden=true;card.video.play().catch(()=>this.fail(id));
+    card.rateStart=0;card.fps=undefined;card.latency=undefined;card.video.srcObject=new MediaStream([e.track]);card.transport='video';card.video.hidden=false;card.surface.hidden=true;card.video.play().catch(()=>this.fail(id));
     const presented=(now,meta)=>{
      if(this.peers.get(id)!==peer)return;clearTimeout(peer.timeout);peer.timeout=setTimeout(()=>{if(this.peers.get(id)===peer)this.fail(id);},8000);
      card.received=now;card.frames+=meta.presentedFrames-(peer.lastPresented??meta.presentedFrames-1);peer.lastPresented=meta.presentedFrames;if(Number.isFinite(meta.captureTime)){const latency=now-meta.captureTime;if(latency>=0&&latency<10000)card.latency=latency;}
