@@ -92,7 +92,9 @@ This is **pre-authored, support-based game destruction**, not finite-element eng
 
 ### Environment and presentation
 
-A stylized dusk waterfront district: glazed facades, emissive windows, concrete structural pieces, road markings, crosswalks, cars, lamp posts, bridges, water and a distant skyline. The giant is an authored armored colossus; raiders are small jetpack pilots. The UI remains at the edges during play; VR uses an in-scene HUD, not a DOM overlay. Desktop high quality adds restrained bloom and shadows. The bundled art is original procedural geometry/textures, **not a scan of NYC or production AAA art**. Visual polish has not been evaluated in a running 3D browser here.
+The harbor now uses downloaded Kenney skyscrapers, vehicles, industrial equipment and astronauts, plus Quaternius's textured Stan mech adapted to tracked armor parts. Poly Haven provides photographic asphalt/concrete maps and the cloud panorama used for lighting and reflections. New window framing, animated water and downloaded smoke, spark and muzzle sprites complete the scene. Rooftop equipment follows its supporting bay through collapse, removal and reset.
+
+Repeated models are merged by material and instanced. Quest uses a smaller skyline, capped particle pools, a 1K sky and no shadow/bloom passes; desktop uses a 2K sky and shadows/bloom. All assets are served locally and are bundled in the repository. The scene has been inspected in Chromium and in emulated Quest 2 stereo.
 
 ## 3. Swap the city or use imported assets
 
@@ -102,13 +104,14 @@ For repeated custom building art, put a **normalized, unskinned GLB structural b
 
 `props` accepts local GLBs and optional simple fixed-box collision descriptors. Prefer same-origin assets: the supplied content security policy intentionally does not permit arbitrary asset CDNs. There is no Draco/KTX2 decoder pipeline wired in yet; export ordinary GLB or add/test the required decoders.
 
-Optional photographic ground/concrete upgrade:
+Refresh the bundled photographic textures, or verify every imported asset without downloading:
 
 ```sh
 npm run assets
+npm run assets -- --verify
 ```
 
-This downloads two CC0 Poly Haven diffuse textures, saves provenance, and preserves an original backup. It is optional and network-dependent; it was not successfully exercised here. The five original bundled textures let the game start without any art download or runtime CDN request.
+The refresh checks source hashes before replacing files. Models, textures and source records are already bundled under `public/assets/imported/`; launching the game needs no art download. `npm run test:visual` verifies imported models against real physics collapse and saves screenshots.
 
 ## 4. Performance and verification
 

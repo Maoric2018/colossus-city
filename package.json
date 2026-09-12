@@ -20,7 +20,8 @@
     "test:all": "node --test tests/*.test.js",
     "assets": "node scripts/fetch-assets.mjs",
     "check": "node scripts/check.mjs",
-    "bench": "node scripts/benchmark.mjs"
+    "bench": "node scripts/benchmark.mjs",
+    "test:visual": "node scripts/visual-smoke.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.17.3",

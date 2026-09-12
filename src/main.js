@@ -6,6 +6,8 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {C} from '../shared/config.js';
 import {activeEnvironment as city} from '../shared/environment.js';
 import {clamp,raySphere,vec,lookDir} from '../shared/math.js';
+import {installDistrict} from './district.js';
+import {assetStatus,bakedModel} from './assets.js';
 import {CityView} from './city.js';
 import {GiantView,RaiderView,RagView} from './avatars.js';
 import {Effects} from './effects.js';
@@ -19,10 +21,9 @@ const players=new Map(),rags=new Map();
 const scene=new T.Scene();scene.background=new T.Color(city.sky.horizon);
 let renderer;
 try{renderer=new T.WebGLRenderer({canvas,antialias:!quest,alpha:false,powerPreference:'high-performance'});}catch(e){$('notice').textContent='WebGL 2 is unavailable. Enable hardware acceleration in your browser.';throw e;}
-renderer.setPixelRatio(Math.min(devicePixelRatio,quest?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.info.autoReset=false;renderer.shadowMap.enabled=!quest;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.outputColorSpace=T.SRGBColorSpace;
+renderer.setPixelRatio(Math.min(devicePixelRatio,quest?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.info.autoReset=false;renderer.shadowMap.enabled=!quest;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.96;renderer.outputColorSpace=T.SRGBColorSpace;
 const camera=new T.PerspectiveCamera(65,innerWidth/innerHeight,.05,650),rig=new T.Group();rig.add(camera);scene.add(rig);camera.position.set(63,39,70);
 const cityView=new CityView(scene,city,{quest});
-const pmrem=new T.PMREMGenerator(renderer);try{const env=pmrem.fromScene(cityView.envScene,.05,.1,700);scene.environment=env.texture;}catch(e){console.warn('Environment reflection generation skipped',e);}pmrem.dispose();
 const giant=new GiantView(scene),fx=new Effects(scene,{quest});
 let composer=null;function ensureComposer(){if(!composer){composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));composer.addPass(new UnrealBloomPass(new T.Vector2(innerWidth,innerHeight),.25,.35,1.1));composer.addPass(new OutputPass());}return composer;}if(!quest)ensureComposer();
 const net=new Connection(onMessage,onDisconnect);
@@ -149,7 +150,7 @@ function frame(now,xrFrame){
   const intro={head:[0,24,0],left:[-6,13+Math.sin(t*5),-3],right:[6,12+Math.cos(t*5),-4],bossYaw:-.35};giant.update(intro);
   camera.position.set(64+Math.sin(t)*6,35+Math.cos(t*.5)*3,63);camera.lookAt(-3,11,-5);
  }
- fx.update(dt);$('hit-marker').style.opacity=now<hitUntil?'1':'0';$('damage-flash').style.opacity=!renderer.xr.isPresenting&&now<flashUntil?'.65':'0';if(now>toastUntil)$('toast').textContent='';
+ cityView.update(dt);fx.update(dt);$('hit-marker').style.opacity=now<hitUntil?'1':'0';$('damage-flash').style.opacity=!renderer.xr.isPresenting&&now<flashUntil?'.65':'0';if(now>toastUntil)$('toast').textContent='';
  renderer.info.reset();if(renderer.xr.isPresenting||quality===0)renderer.render(scene,camera);else ensureComposer().render(dt);
 }
 renderer.setAnimationLoop(frame);
@@ -173,6 +174,7 @@ $('vr-button').onclick=async()=>{hideOverlay();fx.unlockAudio();try{await xr.ent
 $('copy-link').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',net.room);try{await navigator.clipboard.writeText(u.toString());toast('INVITE LINK COPIED');}catch{toast(`ROOM CODE / ${net.room}`,5);}};
 document.querySelectorAll('[data-role]').forEach(e=>e.onclick=()=>setRole(e.dataset.role));
 const params=new URLSearchParams(location.search);$('room-input').value=params.get('room')||'';$('name').value=localStorage.getItem('colossus-name')||'';if(params.get('role')==='boss'||quest)setRole('boss');
-window.COLOSSUS_READY=true;notice('SERVER-DRIVEN PHYSICS · NO ACCOUNT REQUIRED');
+const artReady=Promise.all([cityView.ready,giant.ready,installDistrict(cityView,renderer),bakedModel('/assets/imported/space-kit/astronautA.glb')]).then(()=>{window.COLOSSUS_ART_READY=true;if(!playing)notice('CITY READY · CREATE A ROOM OR JOIN YOUR FRIENDS');});
+window.COLOSSUS_READY=true;notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test.
-window.__COLOSSUS={renderer,scene,net,city:cityView,camera,rig,xr,get state(){return current;},get role(){return role;}};
+window.__COLOSSUS={renderer,scene,net,city:cityView,camera,rig,xr,giant,fx,artReady,assetStatus,get state(){return current;},get role(){return role;}};

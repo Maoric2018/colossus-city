@@ -23,7 +23,8 @@ try{
   page.on('requestfailed',r=>errors.push(`${r.failure()?.errorText} ${r.url()}`));
   page.on('websocket',ws=>ws.on('framesent',({payload})=>{if(typeof payload==='string'){const m=JSON.parse(payload);if(m.type==='pose')poses.push(m);}}));
   page.setDefaultTimeout(20000);
-  await page.goto(url);await page.waitForFunction(()=>window.COLOSSUS_READY===true);
+  await page.goto(url);await page.waitForFunction(()=>window.COLOSSUS_READY===true);await page.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
+  assert.deepEqual(await page.evaluate(()=>window.__COLOSSUS.assetStatus.failed),[],'Downloaded art must load without failures');
   return page;
  }
  const desktop=await browser.newContext({viewport:{width:1440,height:900}});

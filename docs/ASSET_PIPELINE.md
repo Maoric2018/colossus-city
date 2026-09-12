@@ -2,6 +2,18 @@
 
 The governing rule is **visual assets do not decide physics**. Client and server share a stable, explicit structural definition. A detailed asset can replace a bay's visuals without replacing its support graph or making simulation hardware-dependent.
 
+## Bundled visual upgrade
+
+The default district loads the downloaded assets listed in `public/assets/imported/SOURCES.json`. It includes original source pages, pack URLs, transformations, file sizes and SHA-256 hashes. Kenney supplies skyline buildings, vehicles, roof/harbor equipment, astronauts and effect sprites. Quaternius supplies the weathered Stan mech. Poly Haven supplies diffuse, normal and roughness maps plus the HDR sky.
+
+`src/assets.js` caches downloads, bakes source node transforms, grounds models and merges mesh parts by material. `src/district.js` instances repeated props and attaches roof equipment to cell transforms. The attachment uses a rigid cell transform, not the cell's nonuniform geometry scale. Hide/removal/reset and late asset loading all read the current cell state. Imported skyline buildings remain decorative; the playable bays retain their hollow collision geometry and new window trim.
+
+`src/avatars.js` fits the imported armor to the existing tracked head, hands and limb segments. `scripts/prepare-mech.mjs` recreates its rigid armor GLB from the original Stan glTF (download URL in the manifest). The bundled 1K JPEG is derived from Stan's embedded texture. No runtime skinning or animation buffers are needed. Raiders use a merged Kenney astronaut.
+
+The five downloaded effect textures use bounded instanced billboard pools, including stereo-correct camera-facing quads. Tracers share one instanced mesh. Quest uses 36 skyline buildings, a 1K sky and smaller smoke/spark pools; desktop uses 84 skyline buildings and a 2K sky. Window framing uses flat rails with a modeled ledge. Only changed destruction batches upload transforms.
+
+Run `npm run assets -- --verify` for a local asset-integrity check. `npm run assets` refreshes the photographic texture/HDR files after checking their published hashes, then verifies all bundled files. Run `npm run test:visual` for real Rapier collapse, attachment/removal/reset checks, browser error detection and screenshots. `HEADED=1 npm run test:browser` exercises the art in emulated Quest 2 stereo and desktop gameplay.
+
 ## The map contract
 
 `shared/environment.js` exports `city`, the environment registry, and `activeEnvironment`. Both the server and browser import the selected environment. To add a new map, define/register another object and change the single active selection:
@@ -54,7 +66,7 @@ bay_root
 
 `wall_n/e/s/w` and `roof` names are semantic: their descendants are rendered only on exposed sides or the top floor. Other mesh names are drawn on every bay. Slab/column names document your structure but are not individually fractured. Node transforms are retained. No skinned meshes or animated morph targets are supported by the instanced-bay replacement path. It instances ordinary mesh geometry/material per source node.
 
-Export ordinary glTF 2.0 binary `.glb` with embedded textures, PBR metal/rough materials, applied modifiers and sensible normals. Put it under `public/assets/`. The loader uses the local path through `GLTFLoader`. The current app does not instantiate Draco, Meshopt, KTX2 or external decoder workers: either export without those extensions or add and test them explicitly. Do not assume an arbitrary compressed download will load.
+Export ordinary glTF 2.0 binary `.glb` with local external texture files, PBR metal/rough materials, applied modifiers and sensible normals. Put it under `public/assets/`. The loader uses the local path through `GLTFLoader`. The current app does not instantiate Draco, Meshopt, KTX2 or external decoder workers: either export without those extensions or add and test them explicitly. Do not assume an arbitrary compressed download will load.
 
 The server still uses its hollow slab, column and exterior-wall cuboids. Keep art close to those envelopes. Oversized balconies, diagonal braces and inward protrusions will otherwise look collidable without having matching collision. Extending geometry meaningfully requires extending `cellColliders()` and its tests. A downloaded monolithic tower does not gain physically valid seams merely because a filename is listed in the manifest. Retopologize/split it into bays or design a new pre-fractured structural descriptor.
 
@@ -75,11 +87,11 @@ props: [{
 
 The fixed collider inherits the prop rotation and uniform scale. It is one box, not an automatically generated triangle mesh, and is not destructible. Omit `collider` only for genuinely decorative content outside active paths. A large decorative mesh placed in the gameplay area with no collider lets raiders fly through it. The camera's analytic occlusion query currently covers structural bays, not optional props; keep bulky props away from tight camera paths or extend that query.
 
-Failed props log a warning rather than blocking the match. Download and host assets locally; the shipped CSP is same-origin. Record the original creator, source page, license and modification requirements alongside the GLB. Many internet assets are not freely redistributable. No unverified external GLBs are bundled with this source release.
+Failed props log a warning rather than blocking the match. Download and host assets locally; the shipped CSP is same-origin. Record the original creator, source page, license and modification requirements alongside the GLB. Keep texture files next to their GLBs: the current CSP permits local images but does not allow the fetch-to-blob path used for embedded GLB images.
 
 ## Texture upgrade
 
-Five local generated maps are included. `npm run assets` optionally replaces only asphalt/concrete diffuse maps with 1K CC0 Poly Haven images, preserving `.original.jpg` backups and source records. This does not replace the authored facade atlas or suddenly turn the scene into photogrammetry. A grayscale high-resolution texture does not fix poor geometry/silhouette/material scale.
+The default environment selects downloaded 1K photographic diffuse/normal/roughness maps through `env.textures`. The facade diffuse, normal and emission atlas remains authored for the destructible bays. Original generated ground textures remain available as alternatives. Normal and roughness maps use linear color space; diffuse maps use sRGB.
 
 For a polished art pass, prioritize coherent building proportions, convincing glass/concrete roughness contrast, visible interior structure on broken surfaces, high-quality hero silhouette, and restrained effects. Import fewer, stronger materials instead of hundreds of unique textures. Avoid transparent facade stacks and unnecessary double-sided materials on Quest. Profile before increasing texture size or adding postprocessing.
 

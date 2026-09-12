@@ -18,7 +18,9 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 ## What passed locally
 
 - 44 automated Node tests, including real server physics and multiplayer.
-- Real Chromium rendering, mouse capture and keyboard movement.
+- Real Chromium rendering, mouse capture and keyboard movement with the downloaded visual upgrade.
+- All 52 bundled asset files pass hash verification. Downloaded roof equipment follows real Rapier collapse, removal and reset; smoke/impact sprites render without errors.
+- Upgraded intact emulated stereo scene: 154 draw calls and 442,524 submitted triangles across both eyes. This is a renderer count, not a physical headset frame-time measurement.
 - Meta IWER's Quest 2 profile: stereo VR, Touch mapping, movement, snap turns, calibration, controller loss/recovery, suspension, recentering and repeated entry/exit.
 - Eight-player server collapse benchmark: maximum 5.46 ms per simulation step on this Mac, within the 16.67 ms budget.
 - Dependency audit: zero reported vulnerabilities.
@@ -43,6 +45,8 @@ Raw reports and screenshots are in `artifacts/`; detailed boundaries are in [VAL
 npm ci
 npm run test:all
 npm run check
+npm run assets -- --verify
+npm run test:visual
 npm run bench
 HEADED=1 npm run test:browser
 ```

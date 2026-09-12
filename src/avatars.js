@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {loadModel,bakedModel} from './assets.js';
 import {TEAM_COLORS} from '../shared/config.js';
 import {rounded,mesh,glow,coloredGeometry,up} from './art.js';
 const metal=new T.MeshStandardMaterial({color:0x536978,metalness:.78,roughness:.34});
@@ -7,7 +8,7 @@ const trim=new T.MeshStandardMaterial({color:0x9aada8,metalness:.82,roughness:.3
 const reactor=new T.MeshBasicMaterial({color:0xdfff97,toneMapped:false});
 const cyan=new T.MeshBasicMaterial({color:0x83eeff,toneMapped:false});
 const tmp=new T.Vector3();
-function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();parent.add(g);const armor=mesh(rounded(width,1,depth,.1),material,g),joint=mesh(new T.SphereGeometry(width*.5,10,8),dark,g);return {g,armor,joint,width,set(a,b){g.position.copy(a).add(b).multiplyScalar(.5);g.quaternion.setFromUnitVectors(up,tmp.copy(b).sub(a).normalize());armor.scale.y=a.distanceTo(b);joint.position.y=-a.distanceTo(b)*.5;}};}
+function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();parent.add(g);const armor=mesh(rounded(width,1,depth,.1),material,g),joint=mesh(new T.SphereGeometry(width*.5,10,8),dark,g);return {g,armor,joint,width,set(a,b){g.position.copy(a).add(b).multiplyScalar(.5);g.quaternion.setFromUnitVectors(up,tmp.copy(b).sub(a).normalize());this.armor.scale.y=a.distanceTo(b);this.joint.position.y=-a.distanceTo(b)*.5;}};}
 export class GiantView{
  constructor(scene){
   this.root=new T.Group();scene.add(this.root);this.body=new T.Group();this.head=new T.Group();this.root.add(this.body,this.head);
@@ -30,7 +31,27 @@ export class GiantView{
   for(const s of [-1,1]){mesh(rounded(.48,2,2.6,.09),trim,this.head,[s*2,.35,.1]);mesh(rounded(.25,1.9,.5,.05),dark,this.head,[s*1.65,2.7,.7]);}
   this.eyeGlow=glow(this.head,0xbeff9e,5,[0,.35,-2.15]);
   this.arms=[-1,1].map(s=>({upper:segment(this.root,null,null,1.8,2),lower:segment(this.root,null,null,2.2,2.25),fist:this.fist()}));
+  this.ready=this.loadArmor();
   this.legs=[-1,1].map(s=>({thigh:segment(this.root,null,null,2.3,2.5),shin:segment(this.root,null,null,2.1,2.35),foot:mesh(rounded(2.65,1.3,4,.15),dark,this.root)}));
+ }
+ async loadArmor(){
+  try{
+   const model=await loadModel('/assets/imported/mechs/colossus.glb');
+   const replace=(parent,name,size)=>{const source=model.getObjectByName(name);if(!source)return;parent.traverse(o=>{if(o.isMesh)o.geometry.dispose();});parent.clear();const armor=new T.Mesh(source.geometry,source.material);armor.scale.set(...size);armor.castShadow=true;armor.receiveShadow=true;parent.add(armor);return armor;};
+   replace(this.body,'body',[8.8,9.5,4.7]);replace(this.head,'head',[4.5,4.3,3.8]);
+   // Weak points retain their exact gameplay positions and stay visible at a distance.
+   mesh(new T.TorusGeometry(1.42,.18,8,24),dark,this.body,[0,.05,-2.38]);
+   mesh(new T.SphereGeometry(1.08,16,10),reactor,this.body,[0,.05,-2.35]);this.coreGlow=glow(this.body,0xc3ff98,6,[0,.05,-2.95]);
+   this.eyeGlow=glow(this.head,0xc3ff98,1.2,[-1.13,.66,-1.98]);glow(this.head,0xc3ff98,1.2,[1.13,.66,-1.98]);
+   for(const [i,side]of ['R','L'].entries()){
+    const arm=this.arms[i],leg=this.legs[i];
+    for(const [segment,name,width,depth]of [[arm.upper,'upper',2.7,2.8],[arm.lower,'lower',2.7,2.7],[leg.thigh,'thigh',2.8,3],[leg.shin,'shin',2.15,2.6]]){
+     const replacement=replace(segment.g,name+side,[width,1,depth]);if(replacement){segment.armor=replacement;segment.joint=new T.Object3D();}
+    }
+    // The imported articulated fingers are closed around the tracked impact point.
+    replace(arm.fist,'fist'+side,[2.9,2.5,2.8]);
+   }
+  }catch(error){console.error('Mech armor failed to load',error);}
  }
  fist(){const g=new T.Group();this.root.add(g);mesh(rounded(2.7,1.9,2.6,.25),metal,g);for(let i=0;i<4;i++)mesh(rounded(.53,.85,1.25,.12),trim,g,[(i-1.5)*.64,-.55,-.95]);mesh(rounded(.25,.3,2.2,.04),reactor,g,[1.38,.25,0]);return g;}
  update(s,{local=false}={}){
@@ -68,6 +89,10 @@ export class RaiderView{
  constructor(scene,id){
   this.id=id;this.root=new T.Group();scene.add(this.root);const color=TEAM_COLORS[(id-1)%TEAM_COLORS.length];
   this.mesh=new T.Mesh(suitGeometry(color),new T.MeshStandardMaterial({vertexColors:true,metalness:.4,roughness:.56}));this.mesh.castShadow=true;this.root.add(this.mesh);
+  this.disposed=false;this.ready=bakedModel('/assets/imported/space-kit/astronautA.glb').then(model=>{
+   if(this.disposed)return;this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.removeFromParent();
+   this.mesh=new T.Group();const scale=2.2/model.size.y;for(const part of model.parts){const m=new T.Mesh(part.geometry,part.material);m.scale.setScalar(scale);m.position.y=-1.15;m.rotation.y=Math.PI;m.castShadow=true;this.mesh.add(m);}this.root.add(this.mesh);this.imported=true;
+  }).catch(error=>console.error('Raider model failed to load',error));
   this.jets=[-1,1].map(s=>glow(this.root,color,.9,[s*.27,-.21,.36]));this.color=color;
  }
  update(p,local=false,firstPerson=false){
@@ -75,7 +100,7 @@ export class RaiderView{
   const speed=Math.hypot(p.v[0],p.v[2]);this.mesh.rotation.x=-Math.min(.4,speed*.018);
   for(const j of this.jets){const on=(p.v[1]>1||speed>4)&&p.fuel>.01;j.visible=on;j.scale.setScalar(.8+Math.sin(performance.now()*.06)*.2);}
  }
- dispose(){this.root.removeFromParent();this.mesh.geometry.dispose();this.mesh.material.dispose();for(const j of this.jets)j.material.dispose();}
+ dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}for(const j of this.jets)j.material.dispose();}
 }
 export class RagView{
  constructor(scene,part,player){this.id=part.id;this.mesh=new T.Mesh(rounded(...part.size,.05),new T.MeshStandardMaterial({color:part.size[0]>.5?TEAM_COLORS[(player-1)%TEAM_COLORS.length]:0x8b9fa7,roughness:.55,metalness:.4}));this.mesh.castShadow=true;scene.add(this.mesh);this.update(part.p,part.q);}

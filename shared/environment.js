@@ -22,7 +22,9 @@ export const city = {
  // Optional per-style GLB: nodes named slab, col_nw, col_ne, col_sw, col_se,
  // wall_n, wall_s, wall_e, wall_w. Author a 1x1x1 bay. Loader scales to bay dimensions.
  cellAssets:{},
- textures:{concrete:'/assets/concrete.jpg',asphalt:'/assets/asphalt.jpg',facade:'/assets/facade.jpg',
+ textures:{concrete:'/assets/imported/textures/concrete-Diffuse.jpg',asphalt:'/assets/imported/textures/asphalt-Diffuse.jpg',
+  concreteNormal:'/assets/imported/textures/concrete-nor_gl.jpg',concreteRoughness:'/assets/imported/textures/concrete-Rough.jpg',
+  asphaltNormal:'/assets/imported/textures/asphalt-nor_gl.jpg',asphaltRoughness:'/assets/imported/textures/asphalt-Rough.jpg',facade:'/assets/facade.jpg',
   facadeNormal:'/assets/facade-normal.jpg',facadeEmissive:'/assets/facade-emissive.jpg'},
  spawns:[[0,1.3,61],[61,1.3,0],[0,1.3,-61],[-61,1.3,0]]
 };
