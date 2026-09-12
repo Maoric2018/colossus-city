@@ -18,7 +18,7 @@ import {FlightFX} from './flight-fx.js';
 import {XRControl} from './xr.js';
 const $=id=>document.getElementById(id),quest=/OculusBrowser|Quest|Mobile VR/i.test(navigator.userAgent),canvas=$('world');
 let selectedRole='raider',playing=false,paused=false,role='',welcome=null,seq=0,lastInput=0,yaw=0,pitch=0,firstPerson=false,quality=quest?0:1;
-let soar=false,dodgeSeq=0,missileFiring=false;
+let dodgeSeq=0,missileFiring=false;
 let keys=new Set(),firing=false,mouseX=0,mouseY=0,lastNow=performance.now(),lastHUD=0,frameCount=0,frameStart=performance.now(),fps=0,lastHP=100,toastUntil=0,hitUntil=0,flashUntil=0;
 let current=null,previousPhase=0,noticeTimer=null;
 const players=new Map(),rags=new Map();
@@ -48,14 +48,14 @@ async function start(create=false,practice=false,spectator=false){
  try{
   await net.connect({create,practice,role:spectator?'spectator':selectedRole,room:$('room-input').value.trim().toUpperCase(),name:$('name').value.trim()||'RAIDER'});
   playing=true;document.body.classList.add('playing');$('lobby').classList.add('hidden');$('scene-caption').classList.add('hidden');$('hud').classList.remove('hidden');
-  $('controls').textContent=role==='boss'?'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY':role==='spectator'?'WASD FLY · SPACE UP · C DOWN · MOUSE LOOK':'WASD MOVE · SPACE FLY · F SOAR / HOVER · SHIFT BOOST · E + DIRECTION DODGE · CLICK FIRE · V CAMERA';
+  $('controls').textContent=role==='boss'?'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY':role==='spectator'?'WASD FLY · SPACE UP · C DOWN · MOUSE LOOK':'WASD MOVE · SPACE FLY · HOLD SHIFT SOAR · E + DIRECTION DODGE · CLICK FIRE · V CAMERA';
   $('flight-status').classList.toggle('hidden',role!=='raider');
   $('telemetry').classList.toggle('hidden',role!=='raider');$('aim').classList.toggle('hidden',role!=='raider');
   $('vr-button').classList.toggle('hidden',role!=='boss');
   if(role==='boss'){
    $('vr-button').textContent=quest?'ENTER VR ↗':'ENTER VR / QUEST ↗';
    showOverlay('YOU ARE THE COLOSSUS.','Quest: close this panel, then select ENTER VR. Desktop: use mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles.');$('resume').textContent='CONTINUE ↗';
-  }else if(role==='spectator'){hideOverlay();views.setVisible(true);}else showOverlay(role==='spectator'?'WATCH THE CITY FALL.':'SMALL SQUAD. BIG PROBLEM.',role==='spectator'?'Fly freely with WASD, Space and C.':'Space lifts you. F switches to fast soaring; mouse steers. E + WASD/Space/C dodges. Shift boosts. Fire at the glowing head or core.');
+  }else if(role==='spectator'){hideOverlay();views.setVisible(true);}else showOverlay(role==='spectator'?'WATCH THE CITY FALL.':'SMALL SQUAD. BIG PROBLEM.',role==='spectator'?'Fly freely with WASD, Space and C.':'Space lifts you. Hold Shift to soar; release it to hover. Mouse steers. E + WASD/Space/C dodges. Fire at the glowing head or core.');
   const u=new URL(location.href);u.searchParams.set('room',net.room);history.replaceState({},'',u);localStorage.setItem('colossus-name',$('name').value);
  }catch(e){notice(e.message);$('connection-label').textContent='CONNECTION FAILED';}
  finally{$('create').disabled=$('join').disabled=false;}
@@ -97,9 +97,9 @@ function onDisconnect(){
  if(xr.session)xr.session.end().catch(()=>{});
  showOverlay('CONNECTION LOST','The shared simulation is no longer connected. Leave and rejoin the room; do not trust frozen positions.');$('resume').classList.add('hidden');
 }
-function leave(){views.setVisible(false);views.disconnect();missiles.reset();soar=false;dodgeSeq=0;net.close();playing=false;current=null;resetInput();document.exitPointerLock?.();if(xr.session)xr.session.end().catch(()=>{});document.body.classList.remove('playing','xr-active');$('lobby').classList.remove('hidden');$('scene-caption').classList.remove('hidden');$('hud').classList.add('hidden');$('overlay').classList.add('hidden');$('resume').classList.remove('hidden');cityView.reset();for(const p of players.values())p.dispose();players.clear();for(const r of rags.values())r.dispose();rags.clear();notice('READY FOR THE NEXT DROP.');}
+function leave(){views.setVisible(false);views.disconnect();missiles.reset();dodgeSeq=0;net.close();playing=false;current=null;resetInput();document.exitPointerLock?.();if(xr.session)xr.session.end().catch(()=>{});document.body.classList.remove('playing','xr-active');$('lobby').classList.remove('hidden');$('scene-caption').classList.remove('hidden');$('hud').classList.add('hidden');$('overlay').classList.add('hidden');$('resume').classList.remove('hidden');cityView.reset();for(const p of players.values())p.dispose();players.clear();for(const r of rags.values())r.dispose();rags.clear();notice('READY FOR THE NEXT DROP.');}
 function input(){
- const m={type:'input',x:(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),z:(keys.has('KeyS')?1:0)-(keys.has('KeyW')?1:0),up:(keys.has('Space')?1:0)-(keys.has('KeyC')?1:0),boost:keys.has('ShiftLeft')||keys.has('ShiftRight'),fire:firing,soar,dodge:dodgeSeq,missile:missileFiring||keys.has('KeyR'),yaw,pitch,seq:++seq};
+ const m={type:'input',x:(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),z:(keys.has('KeyS')?1:0)-(keys.has('KeyW')?1:0),up:(keys.has('Space')?1:0)-(keys.has('KeyC')?1:0),boost:false,fire:firing,soar:role==='raider'&&(keys.has('ShiftLeft')||keys.has('ShiftRight')),dodge:dodgeSeq,missile:missileFiring||keys.has('KeyR'),yaw,pitch,seq:++seq};
  // Camera-to-target convergence: third-person crosshair must not fire a parallel,
  // vertically displaced ray. The server still resolves and validates the hit.
  if(role==='raider'&&firing&&current){
@@ -175,7 +175,6 @@ window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camer
 window.addEventListener('keydown',e=>{
  if(!playing||/INPUT|TEXTAREA/.test(e.target.tagName))return;
  if(['Space','KeyW','KeyA','KeyS','KeyD','KeyC','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();
- if(!paused&&role==='raider'&&e.code==='KeyF'&&!e.repeat){soar=!soar;const pilot=current?.players.find(p=>p.id===net.id);toast(soar?(pilot?.p[1]>2?'SOARING · MOUSE STEERS · S BRAKES':'SOAR ARMED · SPACE TO LIFT OFF'):'HOVER · PRECISION FLIGHT');}
  if(!paused&&role==='raider'&&e.code==='KeyE'&&!e.repeat)dodgeSeq++;
  if(e.code==='KeyV'&&!e.repeat)firstPerson=!firstPerson;
  if(e.code==='KeyQ'&&!e.repeat&&!renderer.xr.isPresenting){quality=quality?0:1;renderer.shadowMap.enabled=!!quality;toast(quality?'QUALITY / CINEMATIC':'QUALITY / PERFORMANCE');}

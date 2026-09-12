@@ -53,7 +53,7 @@ The XR rig defaults to scale 14; hand reach is head + (tracked grip − head) ×
 
 Desktop third person sits over the right shoulder, 6.8 m behind the raider (8.2 m while soaring), with a 72-degree base field of view and wider fast-flight/dodge views. Obstructions shorten the camera arm. The imported raider faces game -Z; its whole body leans into flight. Lasers retain authoritative hitscan endpoints and add bounded core/glow/pulse meshes and surface impact particles.
 
-Hover and soaring approach server-owned target velocities; soaring follows camera pitch/yaw and rotates the raider’s capsule to match the prone body. Directional dodges use a monotonically increasing input sequence, fuel debit and cooldown, so holding or resending one input cannot retrigger them. Soar, dodge and pitch are replicated to all clients. No client position command bypasses the physics world.
+Either held Shift key requests soaring; releasing both, pausing or losing focus clears it. Shift replaces the former separate desktop boost and F toggle. Hover and soaring approach server-owned target velocities; soaring follows camera pitch/yaw and rotates the raider’s capsule to match the prone body. Directional dodges use a monotonically increasing input sequence, fuel debit and cooldown, so holding or resending one input cannot retrigger them. Soar, dodge and pitch are replicated to all clients. No client position command bypasses the physics world.
 
 ## Structural destruction
 

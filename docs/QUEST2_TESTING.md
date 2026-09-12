@@ -24,7 +24,7 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 - Upgraded intact emulated stereo scene: 160 draw calls and 446,612 submitted triangles across both eyes. This is a renderer count, not a physical headset frame-time measurement.
 - Meta IWER's Quest 2 profile: stereo VR, Touch mapping, movement, proportional smooth turns, giant reach, missile triggers, calibration, controller loss/recovery, suspension, recentering and repeated entry/exit.
 - Eight-player server collapse benchmark: maximum 6.37 ms per simulation step on this Mac, within the 16.67 ms budget.
-- Real hover/soar/dodge keyboard controls and a live spectator panel with two raiders and the headset view. Opening and closing the panel starts and stops player capture.
+- Real hold-Shift soaring, release/focus-loss return to hover, and directional dodge controls and a live spectator panel with two raiders and the headset view. Opening and closing the panel starts and stops player capture.
 - Dependency audit from the dependency installation: zero reported vulnerabilities.
 
 The startup physics import, VR cleanup, menu layering, tracking-loss handling and recenter contact behavior were repaired. VR always disables shadow rendering, uses the existing 0.85 framebuffer scale/foveation settings, and requests 72 Hz when supported. The VR HUD now shows observed frame callbacks per second alongside the requested refresh rate and network ping.

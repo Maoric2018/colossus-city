@@ -73,14 +73,14 @@ The server supports local TLS when both `TLS_CERT` and `TLS_KEY` are set. A cert
 
 | Player | Controls |
 | --- | --- |
-| Laptop raider | WASD move relative to view; mouse aim; hold Space for jetpack ascent; F toggles hover/soar; E + direction dodges; Shift boost; C descend; hold left mouse to fire; V first/third-person view; Q quality; Escape release pointer. |
+| Laptop raider | WASD move relative to view; mouse aim; hold Space for jetpack ascent; hold Shift to soar, release to hover; E + direction dodges; C descend; hold left mouse to fire; V first/third-person view; Q quality; Escape release pointer. |
 | Quest giant | Move your head and both controllers to embody the giant. Swing into raiders/buildings; no trigger is required for contact damage. Left stick moves the giant; right stick turns smoothly (90°/s default); either trigger launches a missile; right-controller A recalibrates standing height. |
 | Desktop giant | WASD locomotion; mouse view; hold left click for a sweeping hand; Space for repeated downward strikes; right click or R fires missiles. |
 | Spectator | Live views opens a panel with every player’s game camera. Select a feed to enlarge it. Free Camera enables mouse + WASD flight; Space up; C down. |
 
 **Giant reach:** the default 14× world scale maps a physical 0.5 m controller movement to 7 m in the city. The server now preserves that full reach without a slow positional catch-up. Before entering VR, open **Quest Controls** to adjust turn speed (30–180°/s) or reach gain (0.5–1.5×). A calibration adjusts the giant scale for your standing height; the headset HUD shows the resulting reach. Smooth turning pivots around your head, and artificial rotation is excluded from hand-strike velocity.
 
-**Flight:** hold Space to take off, then press F to soar. The pilot flies prone, mouse aim steers the flight path, and S brakes. Hover stays at 11 m/s (20 boosted); soaring reaches 32 m/s (42 boosted). E dodges in your held WASD/Space/C direction, or forward when no direction is held. Dodges use 12% thrust and have a 1.2-second cooldown. Speed streaks, a wider field of view and banking communicate acceleration.
+**Flight:** hold Space to take off, then hold either Shift key to soar. Release Shift to return to hover. The pilot flies prone, mouse aim steers the flight path, and S brakes. Normal flight stays at 11 m/s; holding Shift soars at up to 32 m/s. E dodges in your held WASD/Space/C direction, or forward when no direction is held. Dodges use 12% thrust and have a 1.2-second cooldown. Speed streaks, a wider field of view and banking communicate acceleration.
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode against scenery/raiders, damage nearby raiders and destroy building bays. The server enforces a shared 0.8-second firing cooldown and an eight-projectile cap.
 

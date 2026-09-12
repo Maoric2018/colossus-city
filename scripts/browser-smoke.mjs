@@ -41,11 +41,16 @@ try{
  await raider.screenshot({path:'artifacts/desktop-smoke.png'});
  // Clear the 16 m Union Works roof before testing full soaring speed.
  await raider.keyboard.down('Space');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].p[1]>22);await raider.keyboard.up('Space');
- await raider.keyboard.press('KeyF');await raider.waitForFunction(()=>{const p=window.__COLOSSUS.state.players[0];return (p.flags&16)&&Math.hypot(...p.v)>23;});
+ await raider.keyboard.down('ShiftLeft');await raider.waitForFunction(()=>{const p=window.__COLOSSUS.state.players[0];return (p.flags&16)&&Math.hypot(...p.v)>23;});
  assert.equal(await raider.locator('#flight-mode').textContent(),'SOARING');
  await raider.keyboard.down('KeyD');await raider.keyboard.press('KeyE');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].dodgeCooldown>.5);await raider.keyboard.up('KeyD');
- await raider.screenshot({path:'artifacts/raider-soaring.png'});await raider.keyboard.press('KeyF');await raider.waitForFunction(()=>!(window.__COLOSSUS.state.players[0].flags&16));
- checks.push('Raider hover/soar toggle, fast flight, directional dodge and cooldown HUD');
+ await raider.screenshot({path:'artifacts/raider-soaring.png'});
+ // Either Shift works; releasing one while the other is held must keep soaring.
+ await raider.keyboard.down('ShiftRight');await raider.keyboard.up('ShiftLeft');await raider.waitForTimeout(200);assert.ok(await raider.evaluate(()=>window.__COLOSSUS.state.players[0].flags&16));
+ await raider.keyboard.up('ShiftRight');await raider.waitForFunction(()=>!(window.__COLOSSUS.state.players[0].flags&16));
+ await raider.keyboard.down('ShiftRight');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].flags&16);
+ await raider.evaluate(()=>window.dispatchEvent(new Event('blur')));await raider.waitForFunction(()=>!(window.__COLOSSUS.state.players[0].flags&16));await raider.keyboard.up('ShiftRight');
+ checks.push('Hold either Shift to soar, release or lose focus to hover; fast flight, directional dodge and cooldown HUD');
  checks.push('Desktop WebGL rendering, room creation and keyboard jetpack ascent');console.log(checks.at(-1));
  const headset=await browser.newContext({viewport:{width:1200,height:800}});
  const iwer=await readFile('node_modules/iwer/build/iwer.js','utf8');
