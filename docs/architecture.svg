@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#111"/></marker>
+<style>
+.t{font:700 17px Arial, Helvetica, sans-serif;fill:#111;text-anchor:middle}.s{font:400 13.5px Arial, Helvetica, sans-serif;fill:#555;text-anchor:middle}
+.card{fill:#fff;stroke:#111;stroke-width:1.6}.inv .card{fill:#111}.inv .t{fill:#fff}.inv .s{fill:#cfcfcf}
+.grp{fill:#f6f6f6;stroke:#9c9c9c;stroke-width:1.2;stroke-dasharray:5 5}.g{font:700 11px Arial, Helvetica, sans-serif;fill:#6e6e6e;letter-spacing:2px}
+.h{font:700 15px Arial, Helvetica, sans-serif;fill:#111;letter-spacing:3px;text-anchor:middle}.hn{fill:#9a9a9a}
+.edge{fill:none;stroke:#111;stroke-width:1.8}.dash{stroke-dasharray:6 5}
+.ico{fill:none;stroke:#111;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.title{font:800 34px Arial, Helvetica, sans-serif;fill:#111;letter-spacing:6px}.sub{font:400 17px Arial, Helvetica, sans-serif;fill:#555}
+.num{font:800 38px Arial, Helvetica, sans-serif;fill:#111;text-anchor:middle}.cap{font:400 14px Arial, Helvetica, sans-serif;fill:#555;text-anchor:middle}
+.rate{font:700 11px Arial, Helvetica, sans-serif;fill:#111;text-anchor:middle}.lg{font:400 13px Arial, Helvetica, sans-serif;fill:#555}
+.chipt{font:700 13px Arial, Helvetica, sans-serif;fill:#fff;letter-spacing:2.5px;text-anchor:middle}
+</style></defs>
+<rect width="1920" height="1080" fill="#fff"/>
+<text x="70" y="80" class="title">COLOSSUS CITY</text><text x="70" y="112" class="sub">System architecture · asymmetric VR multiplayer on authoritative physics</text>
+<path d="M1520 96H1566" class="edge" marker-end="url(#a)"/><text x="1578" y="101" class="lg">data</text>
+<path d="M1650 96H1696" class="edge dash" marker-end="url(#a)"/><text x="1708" y="101" class="lg">deploy · verify</text>
+<text x="180" y="164" class="h"><tspan class="hn">01  </tspan>CLIENTS</text><path d="M70 180H290" stroke="#111" stroke-width="2.5"/>
+<text x="575" y="164" class="h"><tspan class="hn">02  </tspan>BROWSER</text><path d="M380 180H770" stroke="#111" stroke-width="2.5"/>
+<text x="965" y="164" class="h"><tspan class="hn">03  </tspan>CONTRACT</text><path d="M840 180H1090" stroke="#111" stroke-width="2.5"/>
+<text x="1375" y="164" class="h"><tspan class="hn">04  </tspan>SERVER</text><path d="M1180 180H1570" stroke="#111" stroke-width="2.5"/>
+<text x="1745" y="164" class="h"><tspan class="hn">05  </tspan>PLATFORM</text><path d="M1630 180H1860" stroke="#111" stroke-width="2.5"/>
+<g class="box" data-w="220"><rect x="70" y="230" width="220" height="150" rx="10" class="card"/><rect x="146" y="259" width="68" height="34" rx="12" class="ico"/><circle cx="166" cy="276" r="8" class="ico"/><circle cx="194" cy="276" r="8" class="ico"/><path d="M146 271H134M214 271H226" class="ico"/>
+<text x="180" y="332" class="t">Meta Quest 2</text><text x="180" y="355" class="s">the colossus</text></g>
+<g class="box" data-w="220"><rect x="70" y="420" width="220" height="150" rx="10" class="card"/><rect x="150" y="445" width="60" height="36" rx="3" class="ico"/><path d="M138 488H222" class="ico"/>
+<text x="180" y="522" class="t">Laptop</text><text x="180" y="545" class="s">raider · giant · spectator</text></g>
+<g class="box" data-w="220"><rect x="70" y="610" width="220" height="150" rx="10" class="card"/><rect x="165" y="630" width="30" height="52" rx="6" class="ico"/><path d="M175 674H185" class="ico"/>
+<text x="180" y="712" class="t">Phone</text><text x="180" y="735" class="s">touch raider</text></g>
+<path d="M318 685V305" class="edge"/>
+<path d="M290 495H318" class="edge"/>
+<path d="M290 685H318" class="edge"/>
+<path d="M290 305H378" class="edge" marker-end="url(#a)"/>
+<rect x="380" y="220" width="390" height="180" rx="14" class="grp"/><text x="394" y="242" class="g">INPUT</text>
+<g class="box" data-w="169"><rect x="396" y="256" width="169" height="128" rx="10" class="card"/>
+<text x="480.5" y="305" class="t">WebXR</text>
+<text x="480.5" y="328" class="s">stereo · controllers</text>
+<text x="480.5" y="347" class="s">haptics</text>
+</g>
+<g class="box" data-w="169"><rect x="585" y="256" width="169" height="128" rx="10" class="card"/>
+<text x="669.5" y="305" class="t">Pointer + Touch</text>
+<text x="669.5" y="328" class="s">pointer lock · touch</text>
+<text x="669.5" y="347" class="s">client prediction</text>
+</g>
+<rect x="380" y="420" width="390" height="180" rx="14" class="grp"/><text x="394" y="442" class="g">RENDER</text>
+<g class="box" data-w="169"><rect x="396" y="456" width="169" height="128" rx="10" class="card"/>
+<text x="480.5" y="505" class="t">Three.js r180</text>
+<text x="480.5" y="528" class="s">WebGL 2</text>
+<text x="480.5" y="547" class="s">instancing · LOD</text>
+</g>
+<g class="box" data-w="169"><rect x="585" y="456" width="169" height="128" rx="10" class="card"/>
+<text x="669.5" y="505" class="t">Quality tiers</text>
+<text x="669.5" y="528" class="s">adaptive</text>
+<text x="669.5" y="547" class="s">resolution</text>
+</g>
+<rect x="380" y="620" width="390" height="180" rx="14" class="grp"/><text x="394" y="642" class="g">OUTPUT</text>
+<g class="box" data-w="169"><rect x="396" y="656" width="169" height="128" rx="10" class="card"/>
+<text x="480.5" y="705" class="t">Web Audio</text>
+<text x="480.5" y="728" class="s">procedural</text>
+<text x="480.5" y="747" class="s">sound, no files</text>
+</g>
+<g class="box" data-w="169"><rect x="585" y="656" width="169" height="128" rx="10" class="card"/>
+<text x="669.5" y="705" class="t">Canvas 2D + DOM</text>
+<text x="669.5" y="728" class="s">HUD</text>
+<text x="669.5" y="747" class="s">generated textures</text>
+</g>
+<rect x="380" y="822" width="390" height="58" rx="29" fill="#111"/><text x="575" y="856" class="chipt">ES MODULES · NO BUILD STEP</text>
+<g class="box" data-w="250"><rect x="840" y="250" width="250" height="104" rx="10" class="card"/>
+<text x="965" y="287" class="t">WebSocket</text>
+<text x="965" y="310" class="s">JSON events</text>
+<text x="965" y="329" class="s">+ binary state</text>
+</g>
+<g class="box" data-w="250"><rect x="840" y="376" width="250" height="66" rx="10" class="card"/>
+<text x="965" y="403.5" class="t">COL3 binary</text>
+<text x="965" y="426.5" class="s">float32 · versioned</text>
+</g>
+<g class="box inv" data-w="250"><rect x="840" y="476" width="250" height="150" rx="10" class="card"/>
+<text x="965" y="526.5" class="t">shared/</text>
+<text x="965" y="549.5" class="s">one flight model</text>
+<text x="965" y="568.5" class="s">one city · one config</text>
+<text x="965" y="587.5" class="s">imported by both sides</text>
+</g>
+<g class="box" data-w="250"><rect x="840" y="740" width="250" height="90" rx="10" class="card"/>
+<text x="965" y="779.5" class="t">Live video</text>
+<text x="965" y="802.5" class="s">spectator feeds</text>
+</g>
+<path d="M965 376V358" class="edge" marker-end="url(#a)"/>
+<path d="M770 284H838" class="edge" marker-end="url(#a)"/>
+<text class="rate" x="805" y="276">30 Hz</text>
+<path d="M840 332H795V500H772" class="edge" marker-end="url(#a)"/>
+<text class="rate" transform="translate(809,416) rotate(90)">20 Hz</text>
+<path d="M840 580H772" class="edge" marker-end="url(#a)"/>
+<rect x="1180" y="220" width="390" height="180" rx="14" class="grp"/><text x="1194" y="242" class="g">RUNTIME</text>
+<g class="box" data-w="169"><rect x="1196" y="256" width="169" height="128" rx="10" class="card"/>
+<text x="1280.5" y="305" class="t">ws</text>
+<text x="1280.5" y="328" class="s">per-room</text>
+<text x="1280.5" y="347" class="s">fan-out</text>
+</g>
+<g class="box" data-w="169"><rect x="1385" y="256" width="169" height="128" rx="10" class="card"/>
+<text x="1469.5" y="305" class="t">Node.js 22</text>
+<text x="1469.5" y="328" class="s">one process</text>
+<text x="1469.5" y="347" class="s">60 Hz fixed step</text>
+</g>
+<path d="M1365 320H1383" class="edge" marker-end="url(#a)"/>
+<rect x="1180" y="420" width="390" height="300" rx="14" class="grp"/><text x="1194" y="442" class="g">SIMULATION</text>
+<g class="box" data-w="358"><rect x="1196" y="456" width="358" height="84" rx="10" class="card"/>
+<text x="1375" y="492.5" class="t">Room simulation</text>
+<text x="1375" y="515.5" class="s">authoritative movement, contact, ragdolls</text>
+</g>
+<g class="box" data-w="169"><rect x="1196" y="580" width="169" height="124" rx="10" class="card"/>
+<text x="1280.5" y="627" class="t">Destruction</text>
+<text x="1280.5" y="650" class="s">skins · loads</text>
+<text x="1280.5" y="669" class="s">progressive collapse</text>
+</g>
+<g class="box" data-w="169"><rect x="1385" y="580" width="169" height="124" rx="10" class="card"/>
+<text x="1469.5" y="627" class="t">Rapier3D</text>
+<text x="1469.5" y="650" class="s">WASM physics</text>
+<text x="1469.5" y="669" class="s">CCD · joints</text>
+</g>
+<path d="M1280 540V578" class="edge" marker-end="url(#a)"/>
+<path d="M1470 542V578" class="edge" marker-end="url(#a)" marker-start="url(#a)"/>
+<rect x="1180" y="740" width="390" height="140" rx="14" class="grp"/><text x="1194" y="762" class="g">DELIVERY</text>
+<g class="box" data-w="169"><rect x="1196" y="776" width="169" height="90" rx="10" class="card"/>
+<text x="1280.5" y="815.5" class="t">Streaming</text>
+<text x="1280.5" y="838.5" class="s">per-client blocks</text>
+</g>
+<g class="box" data-w="169"><rect x="1385" y="776" width="169" height="90" rx="10" class="card"/>
+<text x="1469.5" y="815.5" class="t">Static assets</text>
+<text x="1469.5" y="838.5" class="s">cached delivery</text>
+</g>
+<path d="M1090 302H1178" class="edge" marker-end="url(#a)" marker-start="url(#a)"/>
+<path d="M1090 500H1178" class="edge" marker-end="url(#a)"/>
+<path d="M1090 785H1178" class="edge" marker-end="url(#a)" marker-start="url(#a)"/>
+<g class="box" data-w="230"><rect x="1630" y="256" width="230" height="128" rx="10" class="card"/>
+<text x="1745" y="305" class="t">Docker + Fly.io</text>
+<text x="1745" y="328" class="s">one machine</text>
+<text x="1745" y="347" class="s">rooms in process</text>
+</g>
+<g class="box" data-w="230"><rect x="1630" y="520" width="230" height="128" rx="10" class="card"/>
+<text x="1745" y="569" class="t">Playwright + IWER</text>
+<text x="1745" y="592" class="s">real physics</text>
+<text x="1745" y="611" class="s">emulated Quest 2</text>
+</g>
+<g class="box" data-w="230"><rect x="1630" y="776" width="230" height="90" rx="10" class="card"/>
+<text x="1745" y="815.5" class="t">CC0 assets</text>
+<text x="1745" y="838.5" class="s">Kenney · Quaternius · Poly Haven</text>
+</g>
+<path d="M1570 320H1628" class="edge dash" marker-end="url(#a)"/>
+<text class="rate" x="1600" y="312">deploy</text>
+<path d="M1630 584H1572" class="edge dash" marker-end="url(#a)"/>
+<text class="rate" x="1601" y="576">verify</text>
+<path d="M1630 821H1572" class="edge" marker-end="url(#a)"/>
+<path d="M70 930H1850" stroke="#111" stroke-width="1"/>
+<text x="248" y="990" class="num">60 Hz</text><text x="248" y="1022" class="cap">authoritative physics step</text>
+<text x="604" y="990" class="num">20 Hz</text><text x="604" y="1022" class="cap">binary state snapshots</text>
+<text x="960" y="990" class="num">30 Hz</text><text x="960" y="1022" class="cap">input, predicted on-device</text>
+<text x="1316" y="990" class="num">0</text><text x="1316" y="1022" class="cap">build steps</text>
+<text x="1672" y="990" class="num">1</text><text x="1672" y="1022" class="cap">machine hosts every room</text>
+</svg>

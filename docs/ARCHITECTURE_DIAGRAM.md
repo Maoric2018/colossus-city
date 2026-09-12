@@ -1,66 +1,50 @@
 # Colossus City — architecture
 
-One slide: every technology the game runs on, and how they connect. Detail views are in the
-appendix; the file-by-file map is in [MODULES.md](MODULES.md).
+![Colossus City system architecture](architecture.png)
 
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111111","primaryBorderColor":"#111111","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","lineColor":"#111111","textColor":"#111111","clusterBkg":"#ffffff","clusterBorder":"#b8b8b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":26,"rankSpacing":70,"htmlLabels":true,"curve":"basis"}} }%%
-flowchart LR
+One slide at 1920 x 1080: drop [architecture.png](architecture.png) into a deck or edit [architecture.svg](architecture.svg) directly. A plain-text copy for speaker notes is in [architecture.txt](architecture.txt); the file-by-file map is in [MODULES.md](MODULES.md).
 
-subgraph D["CLIENTS"]
-  direction TB
-  Q["<b>Meta Quest 2</b><br/>the colossus"]
-  L["<b>Laptop</b><br/>raider · giant · spectator"]
-  P["<b>Phone</b><br/>touch raider"]
-end
+## Text version
 
-subgraph C["BROWSER"]
-  direction TB
-  THREE["<b>Three.js</b><br/>WebGL 2 · instancing"]
-  XR["<b>WebXR</b><br/>stereo · controllers · haptics"]
-  IN["<b>Pointer + Touch</b><br/>client-side prediction"]
-  AUD["<b>Web Audio</b><br/>procedural"]
-  DOM["<b>Canvas 2D + DOM</b><br/>HUD · textures"]
-  ESM["<b>ES modules</b><br/>no build step"]
-end
-
-subgraph S["CONTRACT"]
-  direction TB
-  SM["<b>shared/</b><br/>flight model · city · config"]
-  WSC["<b>WebSocket</b><br/>events + snapshots"]
-  PR["<b>COL3 binary</b><br/>float32 transforms"]
-  VID["<b>Live video</b><br/>spectator feeds"]
-end
-
-subgraph SV["SERVER"]
-  direction TB
-  NODE["<b>Node.js 22</b><br/>60 Hz fixed step"]
-  WSS["<b>ws</b><br/>per-room fan-out"]
-  SIM["<b>Room sim</b><br/>authoritative"]
-  DES["<b>Destruction</b><br/>skins · loads · collapse"]
-  RAP["<b>Rapier3D</b><br/>WASM physics"]
-end
-
-subgraph PL["PLATFORM"]
-  direction TB
-  FLY["<b>Docker + Fly.io</b><br/>one machine"]
-  AST["<b>CC0 assets</b><br/>GLB · HDR"]
-  TST["<b>Playwright + IWER</b><br/>real physics · fake headset"]
-end
-
-Q --> XR
-L --> IN
-P --> IN
-IN -->|"30 Hz"| WSC
-WSC -->|"20 Hz"| THREE
-SM --> IN
-PR --> WSC
-WSC <--> WSS
-SM --> SIM
-VID <--> NODE
-NODE --> FLY
-SIM -.-> TST
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ CLIENTS    Meta Quest 2 (colossus) · Laptop (raider, giant, spectator) · Phone  │
+└───────────────────────────────────────┬─────────────────────────────────────────┘
+                                        │  WebXR poses · pointer · touch
+┌───────────────────────────────────────▼─────────────────────────────────────────┐
+│ BROWSER    Three.js r180 · WebXR · Web Audio · Canvas 2D + DOM · ES modules     │
+│            client-side prediction runs the shared flight model                  │
+└───────────────────────────────────────┬─────────────────────────────────────────┘
+                          input 30 Hz ▲ │  ▼ snapshots 20 Hz
+┌───────────────────────────────────────▼─────────────────────────────────────────┐
+│ CONTRACT   shared/ modules · WebSocket · COL3 binary protocol · live video      │
+└───────────────────────────────────────┬─────────────────────────────────────────┘
+                                        │  one authoritative world
+┌───────────────────────────────────────▼─────────────────────────────────────────┐
+│ SERVER     Node.js 22 · ws · Rapier3D (WASM)                                    │
+│            room simulation -> destruction -> streaming   60 Hz fixed step       │
+└───────────────────────────────────────┬─────────────────────────────────────────┘
+                                        │  deploy · verify
+┌───────────────────────────────────────▼─────────────────────────────────────────┐
+│ PLATFORM   Docker + Fly.io · CC0 assets · Playwright + Meta IWER                │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+- **01 Clients** — Meta Quest 2 plays the colossus in WebXR. Laptops play raiders, the desktop giant or spectate. Phones play touch raiders.
+- **02 Browser** — Three.js r180 on WebGL 2 with instancing, LOD and adaptive quality tiers. WebXR for stereo, controllers and haptics. Pointer lock and touch input with client-side prediction. Web Audio for procedural sound. Canvas 2D and DOM for the HUD and generated textures. Native ES modules, no build step.
+- **03 Contract** — shared/ modules imported unchanged by both sides: one flight model, one city, one config. WebSocket carries JSON events and the COL3 binary state format. A live video channel feeds spectators.
+- **04 Server** — Node.js 22, one process, 60 Hz fixed step. ws fans out per room. Rapier3D (WASM) runs the physics. Authoritative room simulation, structural destruction with progressive collapse, per-client city streaming and cached asset delivery.
+- **05 Platform** — Docker on Fly.io, exactly one machine. CC0 art from Kenney, Quaternius and Poly Haven. Playwright with Meta IWER tests real physics against an emulated Quest 2.
+
+**One frame**
+
+1. A device reads input; the browser predicts locally with the shared flight model.
+2. Input and headset poses reach the server at 30 Hz over WebSocket.
+3. The server steps Rapier at 60 Hz: movement, hand contact, destruction.
+4. Every client receives events plus a binary snapshot at 20 Hz.
+5. Clients interpolate about 100 ms behind; the local player reconciles.
+
+**Key numbers:** 60 Hz physics · 20 Hz snapshots · 30 Hz input · 0 build steps · 1 machine
 
 ## Appendix A — how a tower comes down
 
@@ -151,18 +135,4 @@ sequenceDiagram
   A->>A: events drive particles, rubble, audio, haptics, HUD
 ```
 
-## Reading the stack
-
-- **Clients** — one codebase serves all three. The role and the input scheme are decided at
-  runtime from the device, not at build time.
-- **Browser** — platform APIs plus Three.js. No bundler and no build step: the browser
-  loads ES modules through an importmap, which is why a fresh checkout runs on `npm start` alone.
-- **Contract** — the load-bearing idea. `shared/` is pure logic with no Three.js, Rapier,
-  DOM or Node in it, imported unchanged by both sides; that is why the client can predict flight
-  exactly and why the server never has to trust a client. Beside it sits the wire: reliable JSON
-  for events, a versioned binary snapshot for transforms.
-- **Server** — nothing in the client decides damage, position or structural failure.
-- **Platform** — hosting, CC0 art, and the test rigs that run real physics and an emulated Quest 2.
-
-See [MODULES.md](MODULES.md) for the file-by-file map and the rules for changing each layer,
-and [ARCHITECTURE.md](ARCHITECTURE.md) for the budgets and failure modes.
+See [MODULES.md](MODULES.md) for the file-by-file map and [ARCHITECTURE.md](ARCHITECTURE.md) for budgets and failure modes.
