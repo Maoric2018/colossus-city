@@ -5,13 +5,14 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import path from 'node:path';
+import {measureViews} from './measure-views.mjs';
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.resolve('.cache/ms-playwright');
 const {chromium}=await import('playwright');
 await mkdir('artifacts',{recursive:true});
 const port=18000+Math.floor(Math.random()*1000),url=`http://localhost:${port}`;
 const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:String(port)},stdio:['ignore','pipe','pipe']});
 let serverLog='',browser;server.stdout.on('data',d=>serverLog+=d);server.stderr.on('data',d=>serverLog+=d);
-const errors=[],checks=[],poses=[];
+const errors=[],checks=[],poses=[];let videoMeasurements;
 try{
  for(let i=0;i<100;i++){if(await fetch(`${url}/healthz`).then(r=>r.ok).catch(()=>false))break;if(i===99)throw Error(serverLog);await delay(100);}
  browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
@@ -31,6 +32,10 @@ try{
  const raider=await pageFor(desktop);
  await raider.locator('#name').fill('SCOUT');await raider.locator('#create').click();await raider.waitForFunction(()=>window.__COLOSSUS.state!==null);
  const room=await raider.evaluate(()=>window.__COLOSSUS.net.room);
+ assert.equal(await raider.evaluate(()=>window.__COLOSSUS.firstPerson),true,'Raiders start in first person');
+ await raider.keyboard.press('KeyV');assert.equal(await raider.evaluate(()=>window.__COLOSSUS.firstPerson),false);
+ await raider.locator('#camera-toggle').click();assert.equal(await raider.evaluate(()=>window.__COLOSSUS.firstPerson),true);
+ checks.push('First-person default; V and pause-menu button switch camera modes');
  const before=await raider.evaluate(()=>window.__COLOSSUS.state.players[0].p);
  await raider.bringToFront();await raider.locator('#resume').click();
  await raider.waitForFunction(()=>document.pointerLockElement?.id==='world');
@@ -79,13 +84,28 @@ try{
  await quest.screenshot({path:'artifacts/quest-missile.png'});checks.push('Touch trigger launches a replicated, rendered missile');
  const second=await pageFor(desktop);await second.locator('#name').fill('STRIKER');await second.locator('#room-input').fill(room);await second.locator('#join').click();await second.waitForFunction(()=>window.__COLOSSUS.state!==null);
  const observerPromise=desktop.waitForEvent('page');await raider.bringToFront();await raider.keyboard.press('Escape');await raider.locator('#menu-spectator').click();const observer=await observerPromise;observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
- await observer.waitForFunction(()=>window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.frames>=2&&c.image.naturalWidth===640));
+ await observer.waitForFunction(()=>window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.frames>=2&&c.transport==='video'&&c.video.videoWidth===640));
  assert.ok(await observer.evaluate(()=>[...window.__COLOSSUS.views.cards.values()].some(c=>c.mode==='Headset left eye')));
  await observer.screenshot({path:'artifacts/spectator-panel.png'});
  await quest.screenshot({path:'artifacts/quest2-while-watched.png'});
  const mirrorStats=await quest.evaluate(()=>({active:window.__COLOSSUS.views.active,eyes:window.__COLOSSUS.renderer.xr.getCamera().cameras.length,enabled:window.__COLOSSUS.renderer.xr.enabled}));assert.equal(mirrorStats.active,true);assert.equal(mirrorStats.eyes,2);assert.equal(mirrorStats.enabled,true);
- checks.push('Spectator receives actual frames from both raiders and the headset left eye; stereo rendering survives capture');
- await observer.locator('#spectator-free').click();await quest.waitForFunction(()=>!window.__COLOSSUS.views.active);checks.push('Closing live views stops capture on players');await observer.locator('#menu-spectator').click();await quest.waitForFunction(()=>window.__COLOSSUS.views.active);checks.push('Live Views opens from a player pause menu and reopens from spectator free camera');
+ checks.push('Spectator receives WebRTC video from both raiders and the headset left eye; stereo rendering survives capture');
+ videoMeasurements=await measureViews([raider,second,quest],observer);console.log('Video capture-to-display measurements:',JSON.stringify(videoMeasurements,null,2));
+ for(const feed of videoMeasurements){assert.ok(feed.samples>50,'Video must keep presenting fresh frames');assert.ok(feed.presentedFps>=20,'Each concurrent video feed must exceed the old six-fps preview');assert.ok(feed.p95Ms<250,'Local capture-to-display p95 must remain below 250 ms');}
+ const raiderId=await raider.evaluate(()=>window.__COLOSSUS.net.id);
+ await observer.evaluate(id=>window.__COLOSSUS.views.stream.fail(id),raiderId);
+ await observer.waitForFunction(id=>{const c=window.__COLOSSUS.views.cards.get(id);return c.transport==='fallback'&&!c.surface.hidden&&c.received>performance.now()-500;},raiderId);
+ assert.ok(await observer.evaluate(()=>[...window.__COLOSSUS.views.cards.values()].filter(c=>c.transport==='video').length===2));
+ checks.push('Encoded timestamp verifies concurrent video latency; failed video falls back without interrupting other feeds');
+ await observer.locator('#spectator-free').click();await quest.waitForFunction(()=>!window.__COLOSSUS.views.active);assert.equal(await quest.evaluate(()=>window.__COLOSSUS.views.stream.track),null);assert.equal(await observer.evaluate(()=>window.__COLOSSUS.views.stream.peers.size),0);checks.push('Closing live views stops capture and releases tracks/connections');await observer.locator('#menu-spectator').click();await quest.waitForFunction(()=>window.__COLOSSUS.views.active);await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].every(c=>c.transport==='video'&&c.received>performance.now()-1000));checks.push('Reopening Live Views reconnects every feed, including the fallback peer');
+ assert.equal(await observer.evaluate(()=>window.__COLOSSUS.renderer.info.render.calls),0,'Human-video panel must skip the hidden scene render');
+ await observer.evaluate(()=>{window.oldViewStream=window.__COLOSSUS.views.stream;window.oldViewStream.socket.close();});
+ await observer.waitForFunction(()=>window.__COLOSSUS.views.stream!==window.oldViewStream&&window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.transport==='video'&&c.frames>=2));
+ await second.evaluate(()=>{window.oldViewStream=window.__COLOSSUS.views.stream;window.oldViewStream.socket.close();});
+ await second.waitForFunction(()=>window.__COLOSSUS.views.stream!==window.oldViewStream&&window.__COLOSSUS.views.active);
+ await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].every(c=>c.received>performance.now()-500));
+ checks.push('Publisher and spectator signaling reconnect automatically with the full current roster');
+ await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].every(c=>!c.status.textContent.includes('Connecting')));await observer.screenshot({path:'artifacts/spectator-panel.png'});
  await observer.close();await second.close();
 
  const z=await quest.evaluate(()=>window.__COLOSSUS.net.latest.bossZ);
@@ -130,10 +150,10 @@ try{
  checks.push('Exit and re-enter immersive VR in the same room');
  const practice=await pageFor(desktop);await practice.locator('[data-role="boss"]').click();await practice.locator('#practice').click();await practice.waitForFunction(()=>window.__COLOSSUS.state?.players.length===3);
  const practiceRoom=await practice.evaluate(()=>window.__COLOSSUS.net.room),botObserver=await pageFor(desktop);await botObserver.locator('#room-input').fill(practiceRoom);await botObserver.locator('#spectate').click();
- await botObserver.waitForFunction(()=>{const cards=[...window.__COLOSSUS.views.cards.values()];return cards.length===4&&cards.every(c=>c.image.naturalWidth===640)&&cards.filter(c=>c.role==='bot').length===3;});
+ await botObserver.waitForFunction(()=>{const cards=[...window.__COLOSSUS.views.cards.values()];return cards.length===4&&cards.every(c=>c.role==='bot'?c.frames>=2:c.transport==='video'&&c.video.videoWidth===640)&&cards.filter(c=>c.role==='bot').length===3;});
  await botObserver.screenshot({path:'artifacts/spectator-practice.png'});checks.push('Practice panel shows all three simulated drone cameras and the live desktop giant');
  assert.deepEqual(errors,[]);
- const report={created:new Date().toISOString(),result:'PASS',checks,render,posePackets:poses.length,browserErrors:errors,notValidated:'Physical Quest 2 hardware, tracking accuracy, haptics, comfort, headset FPS or thermal behavior'};
+ const report={created:new Date().toISOString(),result:'PASS',checks,videoMeasurements,render,posePackets:poses.length,browserErrors:errors,notValidated:'Physical Quest 2 hardware, tracking accuracy, haptics, comfort, headset FPS or thermal behavior'};
  await writeFile('artifacts/browser-smoke.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }catch(e){
  if(browser)for(const [i,c]of browser.contexts().entries())for(const [j,p]of c.pages().entries())await p.screenshot({path:`artifacts/browser-failure-${i}-${j}.png`}).catch(()=>{});

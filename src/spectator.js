@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {ViewStream} from './view-stream.js';
 // Feed pixels come from each player's renderer. XR is rendered with the actual
 // left-eye matrices; it is not reconstructed from delayed multiplayer snapshots.
 export class SpectatorViews{
@@ -8,24 +9,31 @@ export class SpectatorViews{
   this.mirror=new T.PerspectiveCamera();
   this.panel=document.getElementById('spectator-panel');this.grid=document.getElementById('spectator-grid');this.cards=new Map();this.roster=[];this.lastFrame=0;this.botCursor=0;this.active=false;
  }
- connect(welcome){
-  if(this.key===welcome.viewKey&&this.socket?.readyState<=1)return;this.disconnect();this.key=welcome.viewKey;this.role=welcome.role;this.roster=welcome.roster||[];this.updateRoster(this.roster);
-  const socket=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/views`);socket.binaryType='arraybuffer';this.socket=socket;
-  socket.onopen=()=>socket.send(JSON.stringify({room:welcome.room,id:welcome.id,key:welcome.viewKey,watch:this.visible===true}));
-  socket.onmessage=({data})=>{
-   if(typeof data==='string'){const m=JSON.parse(data);if(m.type==='capture')this.active=m.active;if(m.type==='view-info'){const card=this.cards.get(m.id);if(card){card.mode=m.mode;card.paused=m.paused;card.tracking=m.tracking;}}return;}
-   const header=new DataView(data),id=header.getUint32(0,true),card=this.cards.get(id);if(!card)return;
-   const url=URL.createObjectURL(new Blob([data.slice(12)],{type:'image/jpeg'}));const old=card.url;card.url=url;card.image.src=url;if(old)URL.revokeObjectURL(old);card.received=performance.now();card.frames=(card.frames||0)+1;
-  };
-  socket.onclose=()=>{if(this.socket===socket){this.active=false;for(const card of this.cards.values())card.received=0;setTimeout(()=>{if(this.socket===socket&&this.key===welcome.viewKey){this.key=null;this.connect(welcome);}},2000);}};
+ connect(welcome,retry=false){
+  if(!retry&&this.key===welcome.viewKey&&this.stream?.socket.readyState<=1)return;
+  if(retry)welcome={...welcome,roster:this.roster};
+  this.disconnect();this.key=welcome.viewKey;this.role=welcome.role;this.updateRoster(welcome.roster||[]);this.stream=new ViewStream(this,welcome);
  }
- disconnect(){this.key=null;this.socket?.close();this.socket=null;this.active=false;this.busy=false;for(const c of this.cards.values())if(c.url)URL.revokeObjectURL(c.url);this.cards.clear();this.grid.replaceChildren();}
- setVisible(visible){this.visible=visible;if(this.role==='spectator'&&this.socket?.readyState===1)this.socket.send(JSON.stringify({type:'watch',active:visible}));this.panel.classList.toggle('hidden',!visible);document.body.classList.toggle('spectator-open',visible);}
+ disconnect(){this.key=null;this.stream?.close();this.stream=null;this.active=false;for(const c of this.cards.values())c.video.srcObject=null;this.cards.clear();this.grid.replaceChildren();}
+ setVisible(visible){this.visible=visible;if(this.role==='spectator')this.stream?.watch(visible);this.panel.classList.toggle('hidden',!visible);document.body.classList.toggle('spectator-open',visible);}
  updateRoster(roster){
   this.roster=roster;const ids=new Set();for(const p of roster){if(p.role==='spectator')continue;ids.add(p.id);if(this.cards.has(p.id))continue;
-   const card=document.createElement('article'),title=document.createElement('header'),image=document.createElement('img'),status=document.createElement('p');title.textContent=`${p.role==='boss'?'COLOSSUS':p.role==='bot'?'DRONE':'RAIDER'} / ${p.name}`;image.alt=`${p.name}'s game view`;status.textContent=p.role==='bot'?'AI camera · simulated':'Waiting for player view…';card.append(title,image,status);card.className=p.role==='boss'?'view-card colossus-view':'view-card';card.tabIndex=0;card.title='Select to enlarge';const focus=()=>card.classList.toggle('expanded');card.onclick=focus;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')focus();};this.grid.append(card);this.cards.set(p.id,{card,image,status,role:p.role,received:0,frames:0});
+   const card=document.createElement('article'),title=document.createElement('header'),video=document.createElement('video'),surface=document.createElement('canvas'),status=document.createElement('p');
+   title.textContent=`${p.role==='boss'?'COLOSSUS':p.role==='bot'?'DRONE':'RAIDER'} / ${p.name}`;
+   video.autoplay=true;video.muted=true;video.playsInline=true;video.hidden=true;video.setAttribute('aria-label',`${p.name}'s live game view`);surface.width=640;surface.height=400;
+   status.textContent=p.role==='bot'?'AI camera · simulated':'Connecting live video…';card.append(title,video,surface,status);card.className=p.role==='boss'?'view-card colossus-view':'view-card';card.tabIndex=0;card.title='Select to enlarge';const focus=()=>card.classList.toggle('expanded');card.onclick=focus;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();focus();}};this.grid.append(card);this.cards.set(p.id,{card,video,surface,status,role:p.role,received:0,frames:0});
   }
-  for(const [id,c]of this.cards)if(!ids.has(id)){if(c.url)URL.revokeObjectURL(c.url);c.card.remove();this.cards.delete(id);}
+  for(const [id,c]of this.cards)if(!ids.has(id)){this.stream?.remove(id);c.card.remove();this.cards.delete(id);}
+ }
+ async receiveImage(data,stream){
+  if(data.byteLength<16)return;const id=new DataView(data).getUint32(0,true),card=this.cards.get(id);
+  try{
+   if(!card||!this.visible)return;
+   const bitmap=await createImageBitmap(new Blob([data.slice(12)],{type:'image/jpeg'}));
+   if(this.stream===stream&&this.visible&&this.cards.get(id)===card){card.surface.getContext('2d').drawImage(bitmap,0,0);card.video.hidden=true;card.surface.hidden=false;card.transport='fallback';card.received=performance.now();card.frames++;}
+   bitmap.close();
+  }catch{/* A bad preview must not interrupt gameplay or stop subsequent frames. */}
+  finally{stream.send({type:'frame-ack',id});}
  }
  // Extra view rendering occurs only while somebody has the debug panel connected.
  renderCamera(camera,aspect=1.6){
@@ -33,7 +41,7 @@ export class SpectatorViews{
   // The desktop framebuffer applies the same tone mapping as direct XR rendering.
   // Rendering to a normal texture target would bypass material tone mapping.
   const width=r.domElement.width,height=r.domElement.height,w=Math.min(width,640,height*aspect,400*aspect),h=w/aspect,vx=(width-w)/2,vy=(height-h)/2,dpr=r.getPixelRatio();
-  try{r.xr.enabled=false;r.shadowMap.autoUpdate=false;r.setRenderTarget(null);r.setViewport(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissorTest(false);r.clear();r.render(this.scene,camera);
+  try{r.xr.enabled=false;r.shadowMap.autoUpdate=false;r.setRenderTarget(null);r.setViewport(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissor(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissorTest(true);r.clear();r.render(this.scene,camera);
    this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);const dw=Math.min(640,400*aspect),dh=dw/aspect;
    this.context.drawImage(r.domElement,vx,height-vy-h,w,h,(640-dw)/2,(400-dh)/2,dw,dh);
   }finally{r.setRenderTarget(previous.target);r.setViewport(previous.viewport);r.setScissor(previous.scissor);r.setScissorTest(previous.test);r.shadowMap.autoUpdate=previous.shadows;r.xr.enabled=previous.enabled;}
@@ -42,18 +50,27 @@ export class SpectatorViews{
  update(now){
   if(this.role==='spectator'){
    if(!this.visible)return;
-   const state=this.getState();for(const [id,c]of this.cards){const age=c.received?(now-c.received)/1000:Infinity,p=state?.players.find(p=>p.id===id);c.status.textContent=c.role==='bot'?`AI camera · simulated · ${Math.round(p?.hp||0)} HP`:age>3?'Waiting for live view…':`${c.mode||'Game view'} · ${c.paused?'PAUSED':c.tracking===false&&c.mode==='Headset left eye'?'TRACKING LOST':'LIVE'} · ${(age*1000).toFixed(0)} ms since frame${p?' · '+Math.round(p.hp)+' HP':''}`;}
-   if(now-this.lastFrame>300&&state){this.lastFrame=now;const bots=state.players.filter(p=>p.flags&8);if(bots.length){const p=bots[this.botCursor++%bots.length],card=this.cards.get(p.id),pilot=this.players.get(p.id);if(card){const camera=new T.PerspectiveCamera(65,1.6,.05,650);camera.position.set(p.p[0],p.p[1]+.67,p.p[2]);camera.rotation.set(p.pitch||0,p.yaw,0,'YXZ');const visible=pilot?.root.visible;if(pilot)pilot.root.visible=false;try{this.renderCamera(camera);card.image.src=this.canvas.toDataURL('image/jpeg',.6);}finally{if(pilot)pilot.root.visible=visible;}}}}
+   const state=this.getState();
+   if(!this.lastStatus||now-this.lastStatus>250){this.lastStatus=now;for(const [id,c]of this.cards){const age=c.received?now-c.received:Infinity,p=state?.players.find(p=>p.id===id);c.status.textContent=c.role==='bot'?`AI camera · simulated · ${Math.round(p?.hp||0)} HP`:age>3000?'Connecting live view…':`${c.mode||'Game view'} · ${c.paused?'PAUSED':c.tracking===false&&c.mode==='Headset left eye'?'TRACKING LOST':'LIVE'} · ${c.transport==='video'?`${c.fps?Math.round(c.fps)+' fps':'VIDEO'}${c.latency!==undefined?' · ~'+Math.round(c.latency)+' ms':''}`:'NETWORK FALLBACK · reduced frame rate'}${p?' · '+Math.round(p.hp)+' HP':''}`;}}
+   // Bots have no browser to stream. Render directly into their display canvas,
+   // without JPEG encoding, one per frame and at most ten updates/s per bot.
+   const bots=state?.players.filter(p=>p.flags&8)||[];
+   if(bots.length){const p=bots[this.botCursor++%bots.length],card=this.cards.get(p.id),pilot=this.players.get(p.id);if(card&&now-card.received>=100){
+    const camera=this.botCamera??=new T.PerspectiveCamera(65,1.6,.05,650);camera.position.set(p.p[0],p.p[1]+.67,p.p[2]);camera.rotation.set(p.pitch||0,p.yaw,0,'YXZ');const visible=pilot?.root.visible;if(pilot)pilot.root.visible=false;
+    try{this.renderCamera(camera);card.surface.getContext('2d').drawImage(this.canvas,0,0);card.received=now;card.frames++;}finally{if(pilot)pilot.root.visible=visible;}
+   }}
    return;
   }
-  if(!this.active||this.busy||now-this.lastFrame<166||this.socket?.readyState!==1||this.socket.bufferedAmount>96*1024)return;
-  this.lastFrame=now;const socket=this.socket;this.busy=true;
+  const stream=this.stream,headset=this.renderer.xr.isPresenting,interval=1000/(headset?24:30);
+  if(!this.active||!stream||now-this.lastFrame<interval-.5)return;
+  this.lastFrame+=Math.max(1,Math.floor((now-this.lastFrame+.5)/interval))*interval;
   try{
-   const headset=this.renderer.xr.isPresenting;if(headset){if(!this.captureXR()){this.busy=false;return;}}
+   if(headset){if(!this.captureXR())return;}
    else{const source=this.renderer.domElement,aspect=source.width/source.height,w=Math.min(640,400*aspect),h=w/aspect,x=(640-w)/2,y=(400-h)/2;this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);this.context.drawImage(source,x,y,w,h);this.context.drawImage(document.getElementById('flight-effects'),x,y,w,h);this.drawHUD();}
-   socket.send(JSON.stringify({type:'view-info',mode:headset?'Headset left eye':this.getMode(),paused:this.getPaused(),tracking:this.getTracking()}));
-   this.canvas.toBlob(blob=>{this.busy=false;if(blob&&blob.size<96*1024&&this.socket===socket&&socket.readyState===1&&socket.bufferedAmount<96*1024)socket.send(blob);},'image/jpeg',.62);
-  }catch(error){this.busy=false;console.warn('View capture unavailable',error);this.active=false;}
+   const info=JSON.stringify({type:'view-info',mode:headset?'Headset left eye':this.getMode(),paused:this.getPaused(),tracking:this.getTracking()});
+   if(info!==this.lastInfo||now-(this.lastInfoAt||0)>1000){stream.send(JSON.parse(info));this.lastInfo=info;this.lastInfoAt=now;}
+   stream.publish();if(now-(this.lastImage||0)>=1000/15){this.lastImage=now;stream.image();}
+  }catch(error){console.warn('View capture unavailable',error);}
  }
  drawHUD(){
   const state=this.getState();if(!state)return;const p=state.players.find(p=>p.id===this.getPlayerId()),ctx=this.context;

@@ -17,7 +17,7 @@ import {MissileView} from './missiles.js';
 import {FlightFX} from './flight-fx.js';
 import {XRControl} from './xr.js';
 const $=id=>document.getElementById(id),quest=/OculusBrowser|Quest|Mobile VR/i.test(navigator.userAgent),canvas=$('world');
-let selectedRole='raider',playing=false,paused=false,role='',welcome=null,seq=0,lastInput=0,yaw=0,pitch=0,firstPerson=false,quality=quest?0:1;
+let selectedRole='raider',playing=false,paused=false,role='',welcome=null,seq=0,lastInput=0,yaw=0,pitch=0,firstPerson=true,quality=quest?0:1;
 let dodgeSeq=0,missileFiring=false;
 let keys=new Set(),firing=false,mouseX=0,mouseY=0,lastNow=performance.now(),lastHUD=0,frameCount=0,frameStart=performance.now(),fps=0,lastHP=100,toastUntil=0,hitUntil=0,flashUntil=0;
 let current=null,previousPhase=0,noticeTimer=null;
@@ -38,7 +38,7 @@ function notice(text){$('notice').textContent=text;}
 function toast(text,seconds=2){$('toast').textContent=text;toastUntil=performance.now()+seconds*1000;}
 function resetInput(){keys.clear();firing=false;missileFiring=false;}
 function showOverlay(title='READY TO DROP?',text='Click to capture your mouse. Escape releases it.'){
- if(renderer.xr.isPresenting)return;paused=true;resetInput();$('overlay-title').textContent=title;$('overlay-text').textContent=text;$('overlay').classList.remove('hidden');$('resume').textContent=role==='boss'?'DESKTOP CONTROLS ↗':'DEPLOY ↗';$('restart').classList.toggle('hidden',!current?.phase||net.id!==welcome?.host);
+ if(renderer.xr.isPresenting)return;paused=true;resetInput();$('overlay-title').textContent=title;$('overlay-text').textContent=text;$('overlay').classList.remove('hidden');$('camera-toggle').classList.toggle('hidden',role!=='raider');$('camera-toggle').textContent=firstPerson?'SWITCH TO THIRD PERSON · V':'SWITCH TO FIRST PERSON · V';$('resume').textContent=role==='boss'?'DESKTOP CONTROLS ↗':'DEPLOY ↗';$('restart').classList.toggle('hidden',!current?.phase||net.id!==welcome?.host);
 }
 function hideOverlay(){paused=false;$('overlay').classList.add('hidden');}
 function pointer(){hideOverlay();fx.unlockAudio();try{const p=canvas.requestPointerLock();p?.catch?.(()=>showOverlay('CLICK THE CITY TO PLAY','Your browser needs a fresh click to lock the pointer.'));}catch{}}
@@ -55,7 +55,7 @@ async function start(create=false,practice=false,spectator=false){
   if(role==='boss'){
    $('vr-button').textContent=quest?'ENTER VR ↗':'ENTER VR / QUEST ↗';
    showOverlay('YOU ARE THE COLOSSUS.','Quest: close this panel, then select ENTER VR. Desktop: use mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles.');$('resume').textContent='CONTINUE ↗';
-  }else if(role==='spectator'){hideOverlay();views.setVisible(true);}else showOverlay(role==='spectator'?'WATCH THE CITY FALL.':'SMALL SQUAD. BIG PROBLEM.',role==='spectator'?'Fly freely with WASD, Space and C.':'Space lifts you. Hold Shift to soar; release it to hover. Mouse steers. E + WASD/Space/C dodges. Fire at the glowing head or core.');
+  }else if(role==='spectator'){hideOverlay();views.setVisible(true);}else showOverlay(role==='spectator'?'WATCH THE CITY FALL.':'SMALL SQUAD. BIG PROBLEM.',role==='spectator'?'Fly freely with WASD, Space and C.':'Space lifts you. Hold Shift to soar; release it to hover. Mouse steers. E + WASD/Space/C dodges. V switches first / third person. Fire at the glowing head or core.');
   const u=new URL(location.href);u.searchParams.set('room',net.room);history.replaceState({},'',u);localStorage.setItem('colossus-name',$('name').value);
  }catch(e){notice(e.message);$('connection-label').textContent='CONNECTION FAILED';}
  finally{$('create').disabled=$('join').disabled=false;}
@@ -167,7 +167,7 @@ function frame(now,xrFrame){
  }
  missiles.update((net.latest?.time||0)+Math.min(.15,(now-net.receivedAt)/1000));flightFX.update(dt,current?.players.find(p=>p.id===net.id),playing&&role==='raider'&&!paused&&!renderer.xr.isPresenting);
  cityView.update(dt);fx.update(dt);$('hit-marker').style.opacity=now<hitUntil?'1':'0';$('damage-flash').style.opacity=!renderer.xr.isPresenting&&now<flashUntil?'.65':'0';if(now>toastUntil)$('toast').textContent='';
- renderer.info.reset();if(renderer.xr.isPresenting||quality===0)renderer.render(scene,camera);else ensureComposer().render(dt);
+ renderer.info.reset();if(!(playing&&role==='spectator'&&views.visible)){if(renderer.xr.isPresenting||quality===0)renderer.render(scene,camera);else ensureComposer().render(dt);}
  if(playing){views.update(now);$('capture-status').classList.toggle('hidden',!views.active);}
 }
 renderer.setAnimationLoop(frame);
@@ -176,7 +176,7 @@ window.addEventListener('keydown',e=>{
  if(!playing||/INPUT|TEXTAREA/.test(e.target.tagName))return;
  if(['Space','KeyW','KeyA','KeyS','KeyD','KeyC','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();
  if(!paused&&role==='raider'&&e.code==='KeyE'&&!e.repeat)dodgeSeq++;
- if(e.code==='KeyV'&&!e.repeat)firstPerson=!firstPerson;
+ if(e.code==='KeyV'&&!e.repeat)toggleCamera();
  if(e.code==='KeyQ'&&!e.repeat&&!renderer.xr.isPresenting){quality=quality?0:1;renderer.shadowMap.enabled=!!quality;toast(quality?'QUALITY / CINEMATIC':'QUALITY / PERFORMANCE');}
  if(!paused)keys.add(e.code);
 });
@@ -190,6 +190,8 @@ $('resume').onclick=()=>{if(role==='boss'&&quest){hideOverlay();}else pointer();
 $('create').onclick=()=>start(true);$('join').onclick=()=>start(false);$('practice').onclick=()=>start(true,true);$('spectate').onclick=()=>start(false,false,true);
 $('open-spectator').onclick=()=>{if(role==='spectator'){document.exitPointerLock?.();hideOverlay();resetInput();views.setVisible(true);}else{const url=new URL(location.href);url.searchParams.set('spectator','1');window.open(url.toString(),'_blank','noopener');}};
 $('menu-spectator').onclick=$('open-spectator').onclick;
+function toggleCamera(){if(role!=='raider'||renderer.xr.isPresenting)return;firstPerson=!firstPerson;$('camera-toggle').textContent=firstPerson?'SWITCH TO THIRD PERSON · V':'SWITCH TO FIRST PERSON · V';toast(firstPerson?'FIRST PERSON':'THIRD PERSON');}
+$('camera-toggle').onclick=toggleCamera;
 $('spectator-free').onclick=()=>{views.setVisible(false);showOverlay('FREE CAMERA','WASD moves; Space and C change height. Use LIVE VIEWS to return to the panel.');};$('spectator-leave').onclick=leave;
 function controlsSettings(){const turn=Number($('turn-speed').value),reach=Number($('hand-reach').value);xr.setSettings({turnDegrees:turn,reachGain:reach});$('turn-value').textContent=`${turn}°/s`;$('reach-value').textContent=`${reach.toFixed(1)}× giant scale`;localStorage.setItem('colossus-turn',String(turn));localStorage.setItem('colossus-reach',String(reach));}
 $('turn-speed').value=localStorage.getItem('colossus-turn')||'90';$('hand-reach').value=localStorage.getItem('colossus-reach')||'1';$('turn-speed').oninput=controlsSettings;$('hand-reach').oninput=controlsSettings;controlsSettings();
@@ -202,4 +204,4 @@ const artReady=Promise.all([cityView.ready,giant.ready,missiles.ready,installDis
 if(params.get('spectator')==='1'&&params.get('room'))artReady.then(()=>start(false,false,true));
 window.COLOSSUS_READY=true;notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test.
-window.__COLOSSUS={renderer,scene,net,city:cityView,camera,rig,xr,giant,fx,missiles,views,flightFX,artReady,assetStatus,get state(){return current;},get role(){return role;}};
+window.__COLOSSUS={renderer,scene,net,city:cityView,camera,rig,xr,giant,fx,missiles,views,flightFX,artReady,assetStatus,get state(){return current;},get role(){return role;},get firstPerson(){return firstPerson;}};
