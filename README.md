@@ -106,7 +106,7 @@ This is a game structural model, not engineering analysis: no bending moments, f
 
 ### Game feel
 
-Client-side prediction runs the shared flight model locally against the held input and reconciles with each snapshot, so the raider's own movement has no interpolation lag; the desktop giant camera is dead-reckoned. Procedural Web Audio (no audio files) covers weapons, glass, masonry, steel, creaks, collapses, thrust and wind with distance attenuation. Trauma camera shake (desktop only), hit markers, floating damage numbers, an announcer feed (tower down, close call, core exposed, combos), material-specific haptics for the giant, a camera-locked damage vignette in VR (the VR camera is never shaken), and a round-end scoreboard.
+Client-side prediction runs the shared flight model locally against the held input and reconciles with each snapshot, so the raider's own movement has no interpolation lag; the desktop giant camera is dead-reckoned. Procedural Web Audio (no audio files) covers weapons, glass, masonry, steel, creaks, collapses, thrust and wind with distance attenuation. Trauma camera shake (desktop only), hit markers, material-specific haptics for the giant, a camera-locked damage vignette in VR (the VR camera is never shaken), and a round-end scoreboard. Gameplay announcements, combo banners and floating damage numbers are removed from the desktop and headset views; health, thrust, controls and connection notices remain.
 
 ## 3. Performance and verification
 

@@ -33,13 +33,13 @@ const scene = new T.Scene(); scene.background = new T.Color(city.sky.horizon);
 const camera = new T.PerspectiveCamera(72, innerWidth / innerHeight, .05, tier.far), rig = new T.Group(); rig.add(camera); scene.add(rig);
 const cityView = new CityView(scene, city, {tier, quest});
 const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
-const net = new Connection(onMessage, onDisconnect), hud = new HUD(camera), cameraRig = new CameraRig(camera, rig, cityView, shake, prediction);
+const net = new Connection(onMessage, onDisconnect), hud = new HUD(), cameraRig = new CameraRig(camera, rig, cityView, shake, prediction);
 const players = new Map(), rags = new Map();
 let lastNow = performance.now(), lastHUD = 0, lastInput = 0, frameCount = 0, frameStart = performance.now(), lastReconciled = -1;
 const input = new Input(canvas, {
- onSoar(on){ const pilot = me(state.current); hud.toast(on ? (pilot?.p[1] > 2 ? 'SOARING · MOUSE STEERS · S BRAKES' : 'SOAR ARMED · SPACE TO LIFT OFF') : 'HOVER · PRECISION FLIGHT'); audio.play('ui'); },
+ onSoar(){ audio.play('ui'); },
  onCamera:toggleCamera,
- onQuality(){ if(renderer.xr.isPresenting) return; const name = gr.toggleCinematic(); cityView.sun.castShadow = gr.shadows; hud.toast(`QUALITY / ${name}`); },
+ onQuality(){ if(renderer.xr.isPresenting) return; gr.toggleCinematic(); cityView.sun.castShadow = gr.shadows; },
  onChargeStart(){ audio.play('charge'); }, onHeavyFire(){}, onChargeCancel(){ hud.toast('BREACH NEEDS A FULL CHARGE', 1); },
  onScoreboard(show){ if(state.playing && !state.current?.phase) hud.setScoreboardVisible(show); }
 });
@@ -57,7 +57,7 @@ const lobby = bindLobby({
  async copyLink(){ const u = new URL(location.href); u.searchParams.set('room', net.room); try{ await navigator.clipboard.writeText(u.toString()); hud.toast('INVITE LINK COPIED'); }catch{ hud.toast(`ROOM CODE / ${net.room}`, 5); } },
  settings(s){ xr.setSettings(s); }
 });
-function toggleCamera(){ if(state.role !== 'raider' || renderer.xr.isPresenting) return; state.firstPerson = !state.firstPerson; $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V'; hud.toast(state.firstPerson ? 'FIRST PERSON' : 'THIRD PERSON'); }
+function toggleCamera(){ if(state.role !== 'raider' || renderer.xr.isPresenting) return; state.firstPerson = !state.firstPerson; $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V'; }
 function pointer(){ hud.hideOverlay(); audio.unlock(); lockPointer(canvas, () => hud.showOverlay('CLICK THE CITY TO PLAY', 'Your browser needs a fresh click to lock the pointer.', {renderer, net})); }
 async function start(create = false, practice = false, spectator = false){
  $('create').disabled = $('join').disabled = true; notice('CONNECTING TO THE CITY…');
@@ -71,7 +71,6 @@ async function start(create = false, practice = false, spectator = false){
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
   else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift for fast soaring; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant. Topple a tower onto the colossus for massive damage.', {renderer, net});
   const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u); localStorage.setItem('colossus-name', $('name').value);
-  setTimeout(() => hud.feed(role === 'boss' ? 'OBJECTIVE · LEVEL THE CITY · SMASH TOWER BASES' : role === 'raider' ? 'OBJECTIVE · DODGE MISSILES · ATTACK THE COLOSSUS CORE' : 'OBSERVING MIDTOWN', 'big'), 400);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
  finally{ $('create').disabled = $('join').disabled = false; }
 }
@@ -81,7 +80,7 @@ function onMessage(m){
   state.current = null; state.previousPhase = 0; xr.resetPose(); cityView.reset(); for(const r of rags.values()) r.dispose(); rags.clear(); for(const p of players.values()) p.dispose(); players.clear();
   for(const car of m.cars||[])cityView.cars.setState(car);cityView.hideCells(m.clearedCells || []); for(const s of m.skins || []) cityView.setSkin(s[0], s[1], s[2], false); for(const e of m.entities) cityView.addDebris(e); for(const r of m.rags) addRag(r); cityView.commit();
   $('room-label').textContent = `ROOM / ${m.room}`; $('connection-label').textContent = m.practice ? 'PRACTICE / SERVER ONLINE' : 'SERVER CONNECTED';
-  const spawn = city.spawns[(m.id - 1) % city.spawns.length]; input.yaw = state.role === 'raider' ? (spawn[3] ?? Math.atan2(spawn[0], spawn[2])) : 0; input.pitch = 0; cameraRig.reset(spawn); prediction.reset(null); lastReconciled = -1; hud.lastHP = 100; hud.clearFeed(); $('scoreboard').classList.add('hidden'); return;
+  const spawn = city.spawns[(m.id - 1) % city.spawns.length]; input.yaw = state.role === 'raider' ? (spawn[3] ?? Math.atan2(spawn[0], spawn[2])) : 0; input.pitch = 0; cameraRig.reset(spawn); prediction.reset(null); lastReconciled = -1; hud.lastHP = 100; $('scoreboard').classList.add('hidden'); return;
  }
  if(m.type === 'roster'){
   views.updateRoster(m.players); if(state.welcome){ state.welcome.host = m.host; state.welcome.roster = m.players; }
@@ -101,7 +100,7 @@ function onDisconnect(){
 function leave(){
  views.setVisible(false); views.disconnect(); missiles.reset(); input.soar = false; net.close(); state.playing = false; state.current = null; input.reset(); document.exitPointerLock?.(); if(xr.session) xr.session.end().catch(() => {});
  document.body.classList.remove('playing', 'xr-active'); $('lobby').classList.remove('hidden'); $('scene-caption').classList.remove('hidden'); $('hud').classList.add('hidden'); $('overlay').classList.add('hidden'); $('resume').classList.remove('hidden'); $('scoreboard').classList.add('hidden');
- cityView.reset(); for(const p of players.values()) p.dispose(); players.clear(); for(const r of rags.values()) r.dispose(); rags.clear(); hud.clearFeed(); notice('READY FOR THE NEXT DROP.');
+ cityView.reset(); for(const p of players.values()) p.dispose(); players.clear(); for(const r of rags.values()) r.dispose(); rags.clear(); notice('READY FOR THE NEXT DROP.');
 }
 // Camera-to-target convergence: the third-person crosshair must not fire a parallel, vertically
 // displaced ray. The server still resolves and validates the hit.

@@ -37,7 +37,7 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
   app/prediction.js client-side prediction + reconciliation for the local raider
   app/camera.js    desktop cameras (predicted raider, dead-reckoned giant, spectator, intro)
   app/shake.js     trauma camera shake (desktop only; never in XR)
-  app/hud.js       DOM HUD, announcer feed, damage numbers, charge ring, scoreboard, overlay
+  app/hud.js       DOM HUD, essential notices, charge ring, scoreboard, overlay
   app/events.js    server event -> effects/audio/haptics/HUD dispatcher (one switch)
   app/lobby.js     lobby/menu DOM wiring (pure UI, callbacks from main.js)
   render/quality.js GPU tier detection + material factories (Lambert on integrated GPUs)

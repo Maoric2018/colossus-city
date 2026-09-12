@@ -9,14 +9,8 @@
 .colossus-view{order:-1}
 
 .view-card [hidden]{display:none}
-/* Announcer feed, combos, breach charge ring, floating damage numbers, scoreboard. */
-#feed{position:fixed;left:50%;top:78px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;z-index:4;font:11px monospace;letter-spacing:2px;text-align:center}
-.feed-item{color:#d6e4e6;text-shadow:0 2px 10px #000;padding:2px 10px;background:#07191b8c;border-left:2px solid #bfdfdb55;animation:feed-in .18s ease-out}
-.feed-item.good{color:var(--acid);border-color:var(--acid)}.feed-item.warn{color:#ffb070;border-color:#ffb070}.feed-item.big{font-size:17px;letter-spacing:4px;color:var(--acid);border-color:var(--acid);padding:6px 18px;background:#07191bd0}
-@keyframes feed-in{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
-#combo{position:fixed;right:30px;top:120px;font:bold 22px monospace;letter-spacing:3px;color:#ffd166;text-shadow:0 0 18px #ffb03080;opacity:0;transition:opacity .25s;pointer-events:none}
+/* Breach charge ring, hit feedback and scoreboard. */
 #charge{position:fixed;left:50%;top:50%;width:54px;height:54px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;opacity:0;transition:opacity .1s;--charge:0;background:conic-gradient(#ffa640 calc(var(--charge)*360deg),#ffffff18 0);-webkit-mask:radial-gradient(circle,transparent 22px,#000 23px);mask:radial-gradient(circle,transparent 22px,#000 23px)}
-#numbers{position:fixed;inset:0;pointer-events:none;z-index:4}#numbers .num{position:absolute;left:0;top:0;font:bold 15px monospace;color:var(--acid);text-shadow:0 1px 6px #000;will-change:transform,opacity}#numbers .num.crit{font-size:22px;color:#ffa640}
 #hit-marker.weak{color:#ffa640;font-size:46px}
 #boss-caption.exposed{color:#ffb070;animation:exposed .5s ease-in-out infinite alternate}@keyframes exposed{from{opacity:.55}to{opacity:1}}
 #scoreboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;border-collapse:collapse;background:#0d212bf0;border:1px solid #abcdb733;font:12px monospace;letter-spacing:1px;min-width:420px}

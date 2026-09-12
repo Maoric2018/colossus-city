@@ -5,7 +5,7 @@ const axis = new T.Vector3(0, 1, 0), q = new T.Quaternion(), euler = new T.Euler
 const HAPTICS = {glass:[.28, .35, 40], brick:[.45, .4, 70], stone:[.55, .4, 90], concrete:[.55, .4, 90], steel:[.8, .2, 120], body:[.6, .3, 80]};
 export class XRControl {
  constructor(renderer, camera, rig, connection, {onEnter, onExit} = {}){
-  this.renderer = renderer; this.camera = camera; this.rig = rig; this.net = connection; this.onEnter = onEnter; this.onExit = onExit; this.local = null; this.lastSend = 0; this.lastUpdate = null; this.pendingTurn = 0; this.scale = C.GIANT_SCALE; this.turn = 0; this.turnSpeed = C.TURN_SPEED; this.reachGain = 1; this.originOffset = new T.Vector3(); this.session = null; this.hudTime = 0; this.comboText = ''; this.comboUntil = 0; this.flashLevel = 0; this.localImpact = null; this.lastLocalFx = [0, 0];
+  this.renderer = renderer; this.camera = camera; this.rig = rig; this.net = connection; this.onEnter = onEnter; this.onExit = onExit; this.local = null; this.lastSend = 0; this.lastUpdate = null; this.pendingTurn = 0; this.scale = C.GIANT_SCALE; this.turn = 0; this.turnSpeed = C.TURN_SPEED; this.reachGain = 1; this.originOffset = new T.Vector3(); this.session = null; this.hudTime = 0; this.flashLevel = 0; this.localImpact = null; this.lastLocalFx = [0, 0];
   renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local-floor');
   // Resolution is set by the renderer tier before session creation. No effects composer is used in XR.
   renderer.xr.setFoveation(1);
@@ -101,15 +101,14 @@ export class XRControl {
   }
   if(now - this.hudTime > 120){ this.paintHUD(latest, !!poses.left && !!poses.right, now); this.hudTime = now; } return local;
  }
- combo(n){ this.comboText = `DEMOLITION ×${n}`; this.comboUntil = performance.now() + 1800; }
  flash(power = .5){ this.flashLevel = Math.min(1, this.flashLevel + power); }
  paintHUD(s, tracking, now = performance.now()){
   const x = this.hudCanvas.getContext('2d'); x.clearRect(0, 0, 1024, 256); x.fillStyle = 'rgba(6,22,29,.85)'; x.fillRect(0, 0, 1024, 256); x.fillStyle = '#cfff94'; x.font = 'bold 38px Arial'; x.fillText('COLOSSUS', 35, 53); x.fillStyle = '#c5d7d8'; x.font = '24px monospace'; x.fillText(`ROOM ${this.net.room || '------'}`, 715, 50);
   const hp = s ? Math.max(0, s.bossHP / C.BOSS_HP) : 1; x.fillStyle = '#31474b'; x.fillRect(35, 80, 955, 13); x.fillStyle = s?.bossStagger > .35 ? '#ffb070' : '#cfff94'; x.fillRect(35, 80, 955 * hp, 13);
   x.font = '27px monospace'; x.fillStyle = '#e2eeee'; const sec = Math.ceil(s?.remaining || 0); x.fillText(`CORE ${Math.ceil(hp * 100)}%    ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}    TAKEDOWNS ${s?.kills || 0}    TOWERS ${s?.towersDown || 0}    CITY ${Math.round(s?.damage || 0)}%`, 35, 144);
   x.font = '20px monospace'; x.fillStyle = tracking ? '#99b7bd' : '#ffbc80';
-  const status = !tracking ? 'CONTROLLER TRACKING LOST · HOLD STILL' : s?.phase === 1 ? 'RAIDERS WIN · NEW ROUND IN 20 SECONDS' : s?.phase === 2 ? 'COLOSSUS WINS · NEW ROUND IN 20 SECONDS' : s?.bossStagger > .35 ? 'STAGGERED · CORE EXPOSED' : now < this.comboUntil ? this.comboText : 'LEFT: MOVE   RIGHT: TURN   TRIGGERS: MISSILES   SMASH THE BASE OF A TOWER';
-  if(now < this.comboUntil && tracking && !s?.phase){ x.fillStyle = '#ffd166'; x.font = 'bold 26px monospace'; } x.fillText(status, 35, 204);
+  const status = !tracking ? 'CONTROLLER TRACKING LOST · HOLD STILL' : s?.phase === 1 ? 'RAIDERS WIN · NEW ROUND IN 20 SECONDS' : s?.phase === 2 ? 'COLOSSUS WINS · NEW ROUND IN 20 SECONDS' : s?.bossStagger > .35 ? 'STAGGERED · CORE EXPOSED' : 'LEFT: MOVE   RIGHT: TURN   TRIGGERS: MISSILES   SMASH THE BASE OF A TOWER';
+  x.fillText(status, 35, 204);
   x.font = '18px monospace'; x.fillStyle = '#99b7bd'; x.fillText(`${this.fps || 0} FPS · ${this.net.ping || 0}ms · REACH ${(this.scale * this.reachGain).toFixed(1)}× · 0.5m → ${(this.scale * this.reachGain * .5).toFixed(1)}m`, 35, 238); this.hudTexture.needsUpdate = true;
  }
  haptic(power = .3, ms = 55){ for(const s of this.session?.inputSources || []){ try{ s.gamepad?.hapticActuators?.[0]?.pulse(Math.min(1, power), ms)?.catch?.(() => {}); }catch{} } }
