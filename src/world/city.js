@@ -36,6 +36,7 @@ export class CityView {
   this.textures = parent?.textures || {concrete:tex(t.concrete, 30), concreteNormal:tex(tier.normalMaps&&t.concreteNormal, 30, false), concreteRoughness:tex(!tier.lambert&&t.concreteRoughness, 30, false), asphalt:tex(t.asphalt, 38), asphaltNormal:tex(tier.normalMaps&&t.asphaltNormal, 38, false), asphaltRoughness:tex(!tier.lambert&&t.asphaltRoughness, 38, false)};
   if(!parent)this.makeSkyAndLights(); this.ground = parent ? {update(){}} : buildGround(this.root, env, tier, this.textures);
   this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || this.texture(t.concrete, 1),resources:parent?.buildings,components:parent?.buildings.components});
+  if(!parent&&env.infinite)this.buildings.components.radius=Math.max(this.buildings.components.radius,this.scene.fog.far+12);
   this.buildings.attachments=this.attachments;this.transforms = this.buildings.entries;
   this.fine=parent?.fine||new FineBuildings(this.root,tier);
   if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{if(scene.userData.reuseCityVisibility)return;this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.fine.select(camera);this.commit();};
@@ -46,11 +47,11 @@ export class CityView {
  texture(url, repeat = 1, srgb = true){ const t = this.loader.load(url); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = this.quest ? 2 : 4; if(srgb) t.colorSpace = T.SRGBColorSpace; return t; }
  makeSkyAndLights(){
   const env = this.env;
-  // A full neighboring block is detailed in every direction. Fade completely
+  // Two neighboring blocks are detailed in every direction. Fade completely
   // inside that footprint, before unloaded buildings or simpler facades appear.
   if(env.infinite)installDistanceFog();
   const headset=this.quest||this.tier.name==='QUEST';
-  this.scene.fog = env.infinite ? new T.Fog(env.sky.fog,headset?32:40,headset?60:65) : new T.FogExp2(env.sky.fog, env.sky.fogDensity);
+  this.scene.fog = env.infinite ? new T.Fog(env.sky.fog,headset?64:80,headset?120:130) : new T.FogExp2(env.sky.fog, env.sky.fogDensity);
   const sky = new T.Mesh(new T.SphereGeometry(800, 24, 12), new T.ShaderMaterial({vertexShader:skyVertex, fragmentShader:skyFragment, toneMapped:false, uniforms:{topColor:{value:new T.Color(env.infinite?0x6e8eaa:env.sky.top)}, horizon:{value:new T.Color(env.infinite?env.sky.fog:env.sky.horizon)}}, side:T.BackSide, depthWrite:false})); this.sky = sky; sky.renderOrder = -100; this.root.add(sky);
   // Neutral ground bounce: a green ground colour tints Lambert facades olive.
   this.root.add(new T.HemisphereLight(0xdcecf5, 0x8f887c, this.tier.lambert ? 1.7 : 1.4));
