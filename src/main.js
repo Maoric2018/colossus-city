@@ -17,7 +17,6 @@ import {FlightFX} from './flight-fx.js';
 import {XRControl} from './xr.js';
 import {GameAudio} from './audio.js';
 import {GameRenderer} from './render/renderer.js';
-import {gpuLabel} from './render/quality.js';
 import {state, quest, me, $} from './app/state.js';
 import {Input, lockPointer} from './app/input.js';
 import {CameraRig} from './app/camera.js';
@@ -59,18 +58,23 @@ const lobby = bindLobby({
 });
 function toggleCamera(){ if(state.role !== 'raider' || renderer.xr.isPresenting) return; state.firstPerson = !state.firstPerson; $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V'; }
 function pointer(){ hud.hideOverlay(); audio.unlock(); lockPointer(canvas, () => hud.showOverlay('CLICK THE CITY TO PLAY', 'Your browser needs a fresh click to lock the pointer.', {renderer, net})); }
+// The callsign field was removed from the lobby, but the roster and the spectator
+// cards still label players, so each session generates a short one.
+const tag = Math.random().toString(16).slice(2, 5).toUpperCase();
+const callsign = role => `${role === 'boss' ? 'TITAN' : role === 'spectator' ? 'WATCH' : 'SCOUT'}-${tag}`;
 async function start(create = false, practice = false, spectator = false){
  $('create').disabled = $('join').disabled = true; notice('CONNECTING TO THE CITY…');
  try{
-  const m = await net.connect({create, practice, role:spectator ? 'spectator' : state.selectedRole, room:$('room-input').value.trim().toUpperCase(), name:$('name').value.trim() || 'RAIDER'});
-  state.playing = true; document.body.classList.add('playing'); $('lobby').classList.add('hidden'); $('scene-caption').classList.add('hidden'); $('hud').classList.remove('hidden');
+  const wanted = spectator ? 'spectator' : state.selectedRole;
+  const m = await net.connect({create, practice, role:wanted, room:$('room-input').value.trim().toUpperCase(), name:callsign(wanted)});
+  state.playing = true; document.body.classList.add('playing'); $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden');
   const role = state.role;
   $('controls').textContent = role === 'boss' ? 'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY' : role === 'spectator' ? 'WASD FLY · SPACE UP · C DOWN · SHIFT FAST · MOUSE LOOK' : 'WASD MOVE · SPACE FLY · HOLD SHIFT SOAR · E DODGE · CLICK FIRE · HOLD RIGHT CLICK: BREACH SHOT · V CAMERA · TAB SCORES';
   $('flight-status').classList.toggle('hidden', role !== 'raider'); $('telemetry').classList.toggle('hidden', role !== 'raider'); $('aim').classList.toggle('hidden', role !== 'raider'); $('vr-button').classList.toggle('hidden', role !== 'boss');
-  if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE COLOSSUS.', 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
+  if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE TITAN.', 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
   else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift to soar and smash through buildings; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant.', {renderer, net});
-  const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u); localStorage.setItem('colossus-name', $('name').value);
+  const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
  finally{ $('create').disabled = $('join').disabled = false; }
 }
@@ -86,7 +90,7 @@ function onMessage(m){
  if(m.type === 'roster'){
   views.updateRoster(m.players); if(state.welcome){ state.welcome.host = m.host; state.welcome.roster = m.players; }
   $('roster').replaceChildren(...m.players.map(p => { const d = document.createElement('div'); d.textContent = `${p.role === 'boss' ? '◆' : p.role === 'bot' ? '◇' : '›'} ${p.name}${p.id === net.id ? ' / YOU' : ''}`; return d; }));
-  $('boss-caption').textContent = m.bossPresent ? 'COLOSSUS / HUMAN PILOT' : 'COLOSSUS / AI STAND-IN'; return;
+  $('boss-caption').textContent = m.bossPresent ? 'TITAN / HUMAN PILOT' : 'TITAN / AI STAND-IN'; return;
  }
  if(m.type === 'events') for(const e of m.events) handleEvent(e);
  if(m.type === 'error') hud.toast(m.message, 4);
@@ -100,8 +104,8 @@ function onDisconnect(){
 }
 function leave(){
  views.setVisible(false); views.disconnect(); missiles.reset(); input.soar = false; net.close(); state.playing = false; state.current = null; input.reset(); document.exitPointerLock?.(); if(xr.session) xr.session.end().catch(() => {});
- document.body.classList.remove('playing', 'xr-active'); $('lobby').classList.remove('hidden'); $('scene-caption').classList.remove('hidden'); $('hud').classList.add('hidden'); $('overlay').classList.add('hidden'); $('resume').classList.remove('hidden'); $('scoreboard').classList.add('hidden');
- cityView.reset(); for(const p of players.values()) p.dispose(); players.clear(); for(const r of rags.values()) r.dispose(); rags.clear(); notice('READY FOR THE NEXT DROP.');
+ document.body.classList.remove('playing', 'xr-active'); $('lobby').classList.remove('hidden'); $('hud').classList.add('hidden'); $('overlay').classList.add('hidden'); $('resume').classList.remove('hidden'); $('scoreboard').classList.add('hidden');
+ cityView.reset(); for(const p of players.values()) p.dispose(); players.clear(); for(const r of rags.values()) r.dispose(); rags.clear(); notice('');
 }
 // Camera-to-target convergence: the third-person crosshair must not fire a parallel, vertically
 // displaced ray. The server still resolves and validates the hit.
@@ -163,10 +167,14 @@ function frame(now, xrFrame){
 renderer.setAnimationLoop(frame);
 window.addEventListener('resize', () => gr.resize(camera));
 input.bind();
+// Pointer lock sends clicks to the canvas, so the controls panel needs a key.
+addEventListener('keydown', e => { if(e.code === 'KeyH' && state.playing && !e.repeat){ const p = $('controls-panel'); if(p) p.open = !p.open; } });
 canvas.addEventListener('click', () => { if(state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
 document.addEventListener('pointerlockchange', () => { if(state.playing && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
-const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(`CITY READY · ${gr.tier.name} MODE ON ${gpuLabel(gr.gpu)} · CREATE A ROOM OR JOIN YOUR FRIENDS`); });
+const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(''); });
 if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.then(() => start(false, false, true));
+// Practice lost its lobby button in the retheme; keep a URL entry point for the drone tests.
+if(lobby.params.get('practice') === '1') artReady.then(() => start(true, true));
 window.COLOSSUS_READY = true; notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test and profiling tools.
 window.__COLOSSUS = {renderer, gameRenderer:gr, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};

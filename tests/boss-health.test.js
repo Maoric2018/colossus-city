@@ -58,6 +58,6 @@ test('Quest and spectator HUDs use the scaled maximum and clamp bar widths',()=>
  const texts=[],rects=[],ctx={clearRect(){},fillRect(...a){rects.push(a);},fillText(t){texts.push(t);}},s={bossHP:10400,bossMaxHP:20800,players:[],remaining:120};
  XRControl.prototype.paintHUD.call({hudCanvas:{getContext:()=>ctx},hudTexture:{},net:{},scale:14,reachGain:1},s,true,0);
  assert.ok(texts.some(t=>t.startsWith('CORE 50%')));assert.deepEqual(rects.filter(a=>a[1]===80).map(a=>a[2]),[955,477.5]);
- SpectatorViews.prototype.drawHUD.call({getState:()=>s,getPlayerId:()=>1,getPaused:()=>false,context:ctx});assert.ok(texts.includes('COLOSSUS · 50% CORE'));
+ SpectatorViews.prototype.drawHUD.call({getState:()=>s,getPlayerId:()=>1,getPaused:()=>false,context:ctx});assert.ok(texts.includes('TITAN · 50% NAPE'));
  assert.equal(bossHealthFraction({...s,bossHP:30000}),1);assert.equal(bossHealthFraction({...s,bossHP:-10}),0);
 });

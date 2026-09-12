@@ -33,7 +33,7 @@ try{
    console.log(tier, label, JSON.stringify(r)); return r;
   };
   const lobby = await sample('lobby', 3);
-  await page.locator('[data-role="raider"]').click();await page.locator('#name').fill('PROFILE'); await page.locator('#practice').click(); await page.waitForFunction(() => window.__COLOSSUS.state !== null);
+  await page.goto(`${url}/?quality=${tier}&role=boss&practice=1`); await page.waitForFunction(() => window.COLOSSUS_ART_READY === true); await page.waitForFunction(() => window.__COLOSSUS.state !== null);
   await page.locator('#resume').click(); await page.waitForTimeout(500);
   await page.keyboard.down('Space'); await page.keyboard.down('KeyW'); await page.waitForTimeout(1500);
   const flight = await sample('flight', 4);

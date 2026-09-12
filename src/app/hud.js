@@ -19,14 +19,14 @@ export class HUD {
  hideOverlay(){ state.paused = false; $('overlay').classList.add('hidden'); }
  scoreboard(players, winner){
   const rows = players.slice().sort((a, b) => b.score - a.score).map(p => `<tr><td>${p.bot ? '◇' : '›'} ${escapeText(p.name)}${p.id === state.localId ? ' / YOU' : ''}</td><td>${p.kills}</td><td>${p.damage}</td><td>${p.score}</td></tr>`).join('');
-  $('scoreboard').innerHTML = `<caption>${winner === 'giant' ? 'THE COLOSSUS SURVIVES' : 'THE GIANT HAS FALLEN'} · RAIDER SQUAD</caption><tr><th>PILOT</th><th>DOWN</th><th>DMG</th><th>SCORE</th></tr>${rows}`;
+  $('scoreboard').innerHTML = `<caption>${winner === 'giant' ? 'THE TITAN SURVIVES' : 'THE TITAN HAS FALLEN'} · SCOUT REGIMENT</caption><tr><th>PILOT</th><th>DOWN</th><th>DMG</th><th>SCORE</th></tr>${rows}`;
   $('scoreboard').classList.remove('hidden');
  }
  setScoreboardVisible(visible){ if(!visible){ $('scoreboard').classList.add('hidden'); return; } const s = state.current; if(!s) return; this.scoreboard(s.players.map(p => ({id:p.id, name:state.welcome?.roster?.find(r => r.id === p.id)?.name || `PILOT ${p.id}`, bot:!!(p.flags & F.BOT), kills:0, damage:Math.round(p.score), score:Math.round(p.score)})), null); }
  // Ten times per second.
  refresh(s, now, {net, renderer, input}){
   const core=bossHealthFraction(s);$('boss-percent').textContent = `${Math.ceil(core * 100)}%`; $('boss-fill').style.width = `${core * 100}%`;
-  $('boss-caption').textContent=`COLOSSUS / ${Math.ceil(s.bossHP).toLocaleString()} OF ${(s.bossMaxHP||C.BOSS_HP).toLocaleString()} HP`;
+  $('boss-caption').textContent=`TITAN / ${Math.ceil(s.bossHP).toLocaleString()} OF ${(s.bossMaxHP||C.BOSS_HP).toLocaleString()} HP`;
   $('boss-caption').classList.toggle('exposed', s.bossStagger > .35);
   const sec = Math.max(0, Math.ceil(s.remaining)); $('timer').textContent = `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
   $('destruction').textContent = `${Math.round(s.damage)}%`; $('kills').textContent = s.kills; $('towers').textContent = s.towersDown || 0;
@@ -41,7 +41,7 @@ export class HUD {
   }
   const r = renderer.stats;
   $('performance').textContent = `${this.fps || 0} FPS · ${r.frameMs.toFixed(1)}ms · ${net.ping}ms · ${Math.round(net.kbps)} kb/s · ${r.calls} DC · ${Math.round(r.scale * 100)}% RES · ${renderer.cinematic ? 'CINEMATIC' : renderer.tier.name}`;
-  if(s.phase && !state.previousPhase && !renderer.renderer.xr.isPresenting && state.role !== 'spectator'){ document.exitPointerLock?.(); this.showOverlay(s.phase === 1 ? 'THE GIANT HAS FALLEN.' : 'THE COLOSSUS SURVIVES.', `${s.kills} raiders down. ${Math.round(s.damage)}% structural damage, ${s.towersDown} towers down. A new round starts automatically after 20 seconds.`, {renderer:renderer.renderer, net}); }
+  if(s.phase && !state.previousPhase && !renderer.renderer.xr.isPresenting && state.role !== 'spectator'){ document.exitPointerLock?.(); this.showOverlay(s.phase === 1 ? 'THE TITAN HAS FALLEN.' : 'THE TITAN SURVIVES.', `${s.kills} raiders down. ${Math.round(s.damage)}% structural damage, ${s.towersDown} towers down. A new round starts automatically after 20 seconds.`, {renderer:renderer.renderer, net}); }
   state.previousPhase = s.phase;
  }
  // Every frame: essential feedback fades. DOM is only touched when a value changes.
