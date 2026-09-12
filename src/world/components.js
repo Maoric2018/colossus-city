@@ -1,6 +1,7 @@
 import {modernLandmark} from '../../shared/city/modern-landmarks.js';
 import {catalogLandmark} from '../../shared/city/catalog.js';
 import {componentGeometry} from '../render/component-geometry.js';
+import {CellIndex} from '../render/cell-index.js';
 import * as T from 'three';
 import {mergeParts} from '../art.js';
 import {surface} from '../render/quality.js';
@@ -11,6 +12,7 @@ const sides=Array.from({length:4},(_,side)=>new T.Matrix4().makeRotationY(-side*
 // affected instances; unchanged city detail never needs another GPU upload.
 export class Components{
  constructor(buildings,cells,tier,concrete){
+  this.nearIndex=new CellIndex();this.landmarkIndex=new CellIndex();this.landmarks=new Set();this.candidates=new Set();
   this.buildings=buildings;this.tier=tier;this.radius=tier.name==='QUEST'?64:tier.lambert?85:115;this.lastPosition=null;this.lastRotation=new T.Quaternion();this.entries=new Map();this.cells=new Map();this.poses=new Map();this.batches=new Map();this.capacities=new Map();this.active=new Map();this.activeCells=new Set();
   const colors={stone:0xd2c9b8,steel:0x465059,concrete:0x999d99,bronze:0x8c7047,silver:0xc5cac9,chrome:0xdde7eb,marble:0xeeeae0,slate:0x29363d,crownGlass:0x162f3e,blueGlass:0x7095a9,terracotta:0xc9bfac,clearGlass:0xa8cede,jade:0x538a79,copper:0xad7351,ruby:0x863d32,darkBronze:0x514436};
   this.materials=Object.fromEntries(Object.entries(colors).map(([k,color])=>[k,surface(tier,{color,roughness:k==='blueGlass'?.22:k==='chrome'?.28:k==='silver'?.5:.86,metalness:k==='blueGlass'?.45:k==='chrome'?.75:0,map:k==='stone'||k==='concrete'?concrete:null})]));
@@ -19,11 +21,12 @@ export class Components{
   this.register(buildings,cells);
  }
  register(buildings,cells){
-  for(const c of cells){const e=buildings.entries.get(c.id);this.cells.set(c.id,c);this.poses.set(c.id,e);this.entries.set(c.id,componentPlacements(c,{interiors:!this.tier.lambert}).map(p=>({...p,index:-1,cell:c,pose:e,signature:COMPONENTS[p.type].signature||p.type.startsWith('wtc')||p.type.startsWith('empire')||p.type.startsWith('chrysler')||(/^hudson(Roof|Edge|Ribbon|SilverLip|KnifeFin)|^vanderbilt(Spandrel|Mullion|VolumeFin|Setback|Crown|Needle)/.test(p.type)),fine:p.type==='vanderbiltFlutes'||p.type==='hudsonPanelSeam'})));}
+  for(const c of cells){const e=buildings.entries.get(c.id);this.nearIndex.set(c.id,e.p.x,e.p.z);if(c.architecture==='wtc'||c.architecture==='empire'||c.architecture==='chrysler'||modernLandmark(c.architecture)||catalogLandmark(c.architecture)||c.roof&&c.catalogRoof&&c.catalogRoof!=='flat'){this.landmarks.add(c.id);this.landmarkIndex.set(c.id,e.p.x,e.p.z);}}
+  for(const c of cells){const e=buildings.entries.get(c.id);this.cells.set(c.id,c);this.poses.set(c.id,e);this.entries.set(c.id,(c.preparedComponents||componentPlacements(c,{interiors:!this.tier.lambert})).map(p=>({...p,index:-1,cell:c,pose:e,signature:COMPONENTS[p.type].signature||p.type.startsWith('wtc')||p.type.startsWith('empire')||p.type.startsWith('chrysler')||(/^hudson(Roof|Edge|Ribbon|SilverLip|KnifeFin)|^vanderbilt(Spandrel|Mullion|VolumeFin|Setback|Crown|Needle)/.test(p.type)),fine:p.type==='vanderbiltFlutes'||p.type==='hudsonPanelSeam'})));delete c.preparedComponents;}
   for(const c of cells)for(const p of this.entries.get(c.id))if(!this.batches.has(p.type)){this.active.set(p.type,[]);this.reserve(p.type,32);}
   this.lastPosition=null;
  }
- unregister(cells){for(const c of cells){for(const part of this.entries.get(c.id))this.remove(part);this.cells.delete(c.id);this.poses.delete(c.id);this.entries.delete(c.id);this.activeCells.delete(c.id);}this.lastPosition=null;}
+ unregister(cells){for(const c of cells){for(const part of this.entries.get(c.id))this.remove(part);this.cells.delete(c.id);this.poses.delete(c.id);this.entries.delete(c.id);this.activeCells.delete(c.id);this.nearIndex.delete(c.id);this.landmarkIndex.delete(c.id);this.landmarks.delete(c.id);}this.lastPosition=null;}
  reserve(type,count){
   if((this.capacities.get(type)||0)>=count)return;
   const old=this.batches.get(type),spec=COMPONENTS[type],geometry=old?.geometry||mergeParts(spec.parts.map(p=>[componentGeometry(p),p.p,p.r])),capacity=2**Math.ceil(Math.log2(Math.max(32,count)));
@@ -36,8 +39,9 @@ export class Components{
   if(!this.selectionDirty&&this.lastPosition&&position.distanceToSquared(this.lastPosition)<1&&Math.abs(rotation.dot(this.lastRotation))>.99985&&now-(this.lastUpdate||0)<100)return;
   (this.lastPosition??=new T.Vector3()).copy(position);this.lastRotation.copy(rotation);this.lastUpdate=now;this.selectionDirty=false;
   const radius2=this.radius*this.radius;
-  for(const c of this.cells.values()){
-   const e=this.poses.get(c.id),distance2=e.p.distanceToSquared(position),near=distance2<radius2,landmark=c.architecture==='wtc'||c.architecture==='empire'||c.architecture==='chrysler'||modernLandmark(c.architecture)||catalogLandmark(c.architecture)||c.roof&&c.catalogRoof&&c.catalogRoof!=='flat';
+  this.candidates.clear();for(const id of this.activeCells)this.candidates.add(id);this.nearIndex.addNear(this.candidates,position.x,position.z,this.radius);this.landmarkIndex.addNear(this.candidates,position.x,position.z,230);
+  for(const id of this.candidates){const c=this.cells.get(id);
+   const e=this.poses.get(c.id),distance2=e.p.distanceToSquared(position),near=distance2<radius2,landmark=this.landmarks.has(id);
    const eligible=!e.hidden&&e.inView!==false&&(near||(landmark&&distance2<230*230));
    if(!eligible&&!this.activeCells.has(c.id))continue;let any=false;
    for(const part of this.entries.get(c.id)){
@@ -64,6 +68,7 @@ export class Components{
   this.batches.get(part.type).setMatrixAt(part.index,hidden?zero:this.matrices(part.cell,e)[part.side>=0?part.side:4]);
  }
  setCell(c,e){
+  this.nearIndex.set(c.id,e.p.x,e.p.z);if(this.landmarks.has(c.id))this.landmarkIndex.set(c.id,e.p.x,e.p.z);
   this.selectionDirty=true;if(!this.activeCells.has(c.id))return;
   for(const part of this.entries.get(c.id))if(part.index>=0)this.write(part);
  }

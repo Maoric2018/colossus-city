@@ -2,7 +2,7 @@
 // small; these piece IDs and holes are shared by authority, prediction and rendering.
 import {roofColliders} from '../props.js';
 import {sideBit} from './materials.js';
-const cache=new WeakMap();
+const cache=new WeakMap(),colliderCache=new WeakMap();
 const windows={brick:[[.1,.28,.2,.42],[.4,.28,.2,.42],[.7,.28,.2,.42]],stone:[[.12,.22,.3,.5],[.58,.22,.3,.5]],concrete:[[.06,.3,.88,.36]],empire:[[.13,.15,.16,.71],[.42,.15,.16,.71],[.71,.15,.16,.71]],chrysler:[[.13,.14,.16,.7],[.42,.14,.16,.7],[.71,.14,.16,.7]]};
 export function fractureRecipe(c){
  if(cache.has(c))return cache.get(c);
@@ -38,8 +38,14 @@ export function pieceAlive(piece,skin,gone){
 // Greedily combine adjacent surviving tiles into contact rectangles. A thousand
 // visible bricks need only a handful of colliders around the punched opening.
 export function fractureColliders(c,skin){
- const {pieces,groups}=fractureRecipe(c),gone=new Set(skin.parts||[]),out=[];
+ const parts=skin.parts||[],previous=colliderCache.get(c);
+ if(previous&&previous.glass===skin.glass&&previous.facade===skin.facade&&previous.parts.length===parts.length&&parts.every((id,i)=>id===previous.parts[i]))return previous.out;
+ const {pieces,groups}=fractureRecipe(c),gone=new Set(parts),out=[],byGroup=[];
  for(const g of groups){
+  const missing=[];for(let i=g.start,end=i+g.n[0]*g.n[1]*g.n[2];i<end;i++)if(gone.has(i))missing.push(i);
+  const old=previous?.byGroup[g.id],mask=g.kind==='wall'?((skin.glass&sideBit(g.side))?1:0)|((skin.facade&sideBit(g.side))?2:0):0;
+  if(old&&old.mask===mask&&old.missing.length===missing.length&&missing.every((id,i)=>id===old.missing[i])){byGroup.push(old);out.push(...old.boxes);continue;}
+  const boxes=[];
   const [nx,ny,nz]=g.n,live=new Uint8Array(nx*ny*nz),at=(x,y,z)=>x+nx*(y+ny*z);
   for(let i=0;i<live.length;i++){const p=pieces[g.start+i];live[i]=!gone.has(p.id)&&(p.kind!=='wall'||!!(skin[p.layer]&sideBit(p.side)))?1:0;}
   for(let z=0;z<nz;z++)for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){
@@ -48,9 +54,10 @@ export function fractureColliders(c,skin){
    const row=yy=>{for(let xx=x;xx<ex;xx++)if(!live[at(xx,yy,z)])return false;return true;};while(ey<ny&&row(ey))ey++;
    const plane=zz=>{for(let yy=y;yy<ey;yy++)for(let xx=x;xx<ex;xx++)if(!live[at(xx,yy,zz)])return false;return true;};while(ez<nz&&plane(ez))ez++;
    for(let zz=z;zz<ez;zz++)for(let yy=y;yy<ey;yy++)for(let xx=x;xx<ex;xx++)live[at(xx,yy,zz)]=0;
-   const lo=[x,y,z],hi=[ex,ey,ez],a=lo.map((v,k)=>g.center[k]+((v+hi[k])/2-g.n[k]/2)*g.unit[k]);a.push(...lo.map((v,k)=>(hi[k]-v)*g.unit[k]/2));a.kind=g.kind;a.side=g.side;a.part=pieces[g.start+at(x,y,z)].id;out.push(a);
+   const lo=[x,y,z],hi=[ex,ey,ez],a=lo.map((v,k)=>g.center[k]+((v+hi[k])/2-g.n[k]/2)*g.unit[k]);a.push(...lo.map((v,k)=>(hi[k]-v)*g.unit[k]/2));a.kind=g.kind;a.side=g.side;a.part=pieces[g.start+at(x,y,z)].id;boxes.push(a);
   }
- }return out;
+  byGroup.push({mask,missing,boxes});out.push(...boxes);
+ }colliderCache.set(c,{parts:[...parts],glass:skin.glass,facade:skin.facade,byGroup,out});return out;
 }
 export function pieceDistance(piece,point){return Math.hypot(...point.map((v,k)=>Math.max(0,Math.abs(v-piece.p[k])-piece.size[k]/2)));}
 export function fractureStrength(c,skin){
@@ -62,9 +69,9 @@ export function fractureStrength(c,skin){
 export const pieceEnergy=p=>({glass:2,brick:5,stone:7,concrete:8,steel:12}[p.material]||6);
 // Small islands surrounded by a hole cannot remain suspended in a facade.
 // Border-connected masonry still benefits from the building's strong frame.
-export function unsupportedWallPieces(c,gone){
+export function unsupportedWallPieces(c,gone,changedGroups){
  const {pieces,groups}=fractureRecipe(c),out=[];
- for(const g of groups){if(g.kind!=='wall')continue;const [nx,ny,nz]=g.n,count=nx*ny*nz,seen=new Set(),queue=[],index=(x,y,z)=>g.start+x+nx*(y+ny*z);
+ for(const g of groups){if(g.kind!=='wall'||changedGroups&&!changedGroups.has(g.id))continue;const [nx,ny,nz]=g.n,count=nx*ny*nz,seen=new Set(),queue=[],index=(x,y,z)=>g.start+x+nx*(y+ny*z);
   for(let i=g.start;i<g.start+count;i++){const p=pieces[i];if(!gone.has(i)&&p.grid.some((v,k)=>g.n[k]>1&&(v===0||v===g.n[k]-1))){seen.add(i);queue.push(p);}}
   for(let j=0;j<queue.length;j++)for(let k=0;k<3;k++)for(const d of [-1,1]){const xyz=[...queue[j].grid];xyz[k]+=d;if(xyz[k]<0||xyz[k]>=g.n[k])continue;const id=index(...xyz);if(!gone.has(id)&&!seen.has(id)){seen.add(id);queue.push(pieces[id]);}}
   for(let i=g.start;i<g.start+count;i++)if(!gone.has(i)&&!seen.has(i))out.push(pieces[i]);

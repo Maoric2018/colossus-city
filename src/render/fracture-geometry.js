@@ -5,6 +5,7 @@ import {fractureRecipe} from '../../shared/city/fracture.js';
 import {capFaces} from './fracture-caps.js';
 import {skinKey} from './building-skin.js';
 const white=new T.Color(0xffffff),wtc=new T.Color(0x718087);
+const remainders=new WeakMap(),fragmentCache=new WeakMap();
 const vertex=(g,i,tint)=>{const a=g.attributes,p=a.position,n=a.normal,u=a.uv,c=a.color;return [p.getX(i),p.getY(i),p.getZ(i),n?.getX(i)||0,n?.getY(i)||0,n?.getZ(i)||0,u?.getX(i)||0,u?.getY(i)||0,(c?c.getX(i):1)*tint.r,(c?c.getY(i):1)*tint.g,(c?c.getZ(i):1)*tint.b];};
 const interpolate=(a,b,t)=>a.map((n,k)=>n+(b[k]-n)*t);
 function split(poly,axis,value,sign){
@@ -16,15 +17,17 @@ function subtract(poly,b){
  for(let k=0;k<3;k++)if(poly.every(p=>p[k]<b.lo[k]-1e-8)||poly.every(p=>p[k]>b.hi[k]+1e-8))return [poly];
  const result=[];for(const [k,v,s]of planes(b)){const [inside,outside]=split(poly,k,v,s);if(outside.length>=3)result.push(outside);poly=inside;if(poly.length<3)break;}return result;
 }
-function intersect(poly,b){for(const [k,v,s]of planes(b)){poly=split(poly,k,v,s)[0];if(poly.length<3)return [];}return poly;}
+function intersect(poly,b){for(let k=0;k<3;k++)if(poly.every(p=>p[k]<b.lo[k]-1e-8)||poly.every(p=>p[k]>b.hi[k]+1e-8))return [];for(const [k,v,s]of planes(b)){poly=split(poly,k,v,s)[0];if(poly.length<3)return [];}return poly;}
 function geometry(polygons){
- const arrays={position:[],normal:[],uv:[],color:[]};for(const p of polygons)for(let i=1;i<p.length-1;i++)for(const v of [p[0],p[i],p[i+1]]){arrays.position.push(...v.slice(0,3));arrays.normal.push(...v.slice(3,6));arrays.uv.push(...v.slice(6,8));arrays.color.push(...v.slice(8));}
- if(!arrays.position.length)return null;const g=new T.BufferGeometry();for(const [name,a]of Object.entries(arrays))g.setAttribute(name,new T.Float32BufferAttribute(a,name==='uv'?2:3));g.computeBoundingBox();g.computeBoundingSphere();return g;
+ const count=polygons.reduce((n,p)=>n+Math.max(0,p.length-2)*3,0);if(!count)return null;
+ const arrays={position:new Float32Array(count*3),normal:new Float32Array(count*3),uv:new Float32Array(count*2),color:new Float32Array(count*3)};let index=0;
+ for(const p of polygons)for(let i=1;i<p.length-1;i++)for(const j of [0,i,i+1]){const v=p[j],a=index*3,b=index*2;for(let k=0;k<3;k++){arrays.position[a+k]=v[k];arrays.normal[a+k]=v[k+3];arrays.color[a+k]=v[k+8];}arrays.uv[b]=v[6];arrays.uv[b+1]=v[7];index++;}
+ const g=new T.BufferGeometry();for(const [name,a]of Object.entries(arrays))g.setAttribute(name,new T.BufferAttribute(a,name==='uv'?2:3));g.computeBoundingBox();g.computeBoundingSphere();return g;
 }
 export function appearanceSources(c,resources){
  const pose=resources.pose(c.id),recipe=fractureRecipe(c),scale=new T.Matrix4().makeScale(...c.size),records=[],materials=new Map();
  const add=(mesh,transform,tint,groups,layer='frame',side=-1)=>{
-  if(!mesh||!groups.length)return;const g=mesh.geometry.clone().applyMatrix4(transform),key=mesh.material.uuid+':'+!!mesh.castShadow;materials.set(key,{material:mesh.material,castShadow:mesh.castShadow});if(!mesh.material.vertexColors)g.deleteAttribute('color');
+  if(!mesh||!groups.length)return;const castShadow=mesh.userData?.fractureCastShadow??mesh.castShadow,g=mesh.geometry.clone().applyMatrix4(transform),key=mesh.material.uuid+':'+!!castShadow;materials.set(key,{material:mesh.material,castShadow});if(!mesh.material.vertexColors)g.deleteAttribute('color');
   const targets=new Map();for(let i=0,n=g.index?.count||g.attributes.position.count;i<n;i+=3){const tri=[0,1,2].map(k=>vertex(g,g.index?g.index.getX(i+k):i+k,tint)),center=[0,1,2].map(k=>tri.reduce((n,v)=>n+v[k],0)/3);
    let best=groups[0],distance=Infinity;for(const group of groups){const d=Math.hypot(...center.map((n,k)=>Math.max(0,Math.abs(n-group.center[k])-group.size[k]/2)));if(d<distance){distance=d;best=group;}}
    if(!targets.has(best.id))targets.set(best.id,[]);targets.get(best.id).push(tri);
@@ -46,12 +49,18 @@ export function appearanceSources(c,resources){
 }
 function bounds(piece,group){return {piece,group,lo:piece.p.map((v,k)=>piece.grid[k]===0?-Infinity:v-piece.size[k]/2),hi:piece.p.map((v,k)=>piece.grid[k]===group.n[k]-1?Infinity:v+piece.size[k]/2)};}
 export function cutAppearance(source,ids,skin,keep){
+ let cache,key;if(!keep){cache=fragmentCache.get(source);if(!cache){cache=new Map();fragmentCache.set(source,cache);}key=skin.glass+':'+skin.facade+':'+ids.join(',');if(cache.has(key))return cache.get(key).map(draw=>({...draw}));}
  const byGroup=new Map();for(const id of ids){const p=source.recipe.pieces[id];if(!p)continue;if(!byGroup.has(p.group))byGroup.set(p.group,[]);byGroup.get(p.group).push(bounds(p,source.recipe.groups[p.group]));}
  const output=new Map();for(const record of source.records){if(record.side>=0&&record.layer!=='frame'&&!(skin[record.layer]&(1<<record.side)))continue;const cuts=byGroup.get(record.group)||[];if(!keep&&!cuts.length)continue;let polys=[];
-  if(keep){polys=record.polygons;for(const b of cuts)polys=polys.flatMap(p=>subtract(p,b));}
+  if(keep){
+   const selected=new Set(cuts.map(b=>b.piece.id)),old=remainders.get(record),extendsOld=old&&old.ids.size<=selected.size&&[...old.ids].every(id=>selected.has(id));
+   polys=extendsOld?old.polygons:record.polygons;for(const b of cuts)if(!extendsOld||!old.ids.has(b.piece.id))polys=polys.flatMap(p=>subtract(p,b));
+   remainders.set(record,{ids:selected,polygons:polys});polys=[...polys];
+  }
   else for(const b of cuts)for(const p of record.polygons){const fragment=intersect(p,b);if(fragment.length>=3)polys.push(fragment);}
   if(cuts.length)polys.push(...capFaces(record,cuts,keep,intersect));
   if(!output.has(record.key))output.set(record.key,[]);output.get(record.key).push(...polys);
  }
- return [...output].flatMap(([key,polys])=>{const g=geometry(polys);return g?[{key,geometry:g,...source.materials.get(key)}]:[];});
+ const result=[...output].flatMap(([key,polys])=>{const g=geometry(polys);return g?[{key,geometry:g,...source.materials.get(key)}]:[];});
+ if(cache){if(cache.size>=128)cache.delete(cache.keys().next().value);cache.set(key,result);}return result.map(draw=>({...draw}));
 }

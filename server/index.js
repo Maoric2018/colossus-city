@@ -12,6 +12,7 @@ import {WebSocketServer,WebSocket} from 'ws';
 import {Room,physicsReady} from './room.js';
 import {C} from '../shared/config.js';
 import {encodeSnapshot} from '../shared/protocol.js';
+import {packEvents} from '../shared/event-codec.js';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PORT=Number(process.env.PORT)||8080,rooms=new Map();
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.bin':'application/octet-stream'};
@@ -65,7 +66,7 @@ wss.on('connection',ws=>{
     if(m.create){if(rooms.size>=C.MAX_ROOMS)throw Error('Server is full. Try again after a room closes.');room=new Room(freshCode(),{practice:!!m.practice});rooms.set(room.code,room);}
     else{const code=String(m.room||'').toUpperCase();if(!/^[A-F0-9]{6}$/.test(code)||!rooms.has(code))throw Error('Room not found. Ask the host for its six-character code.');room=rooms.get(code);}
     if(room.clients.size>=16)throw Error('This room is full.');
-    client=room.attach(ws,role,name);clearTimeout(joinTimeout);send(ws,room.welcome(client));
+    client=room.attach(ws,role,name);client.eventFormat=m.eventFormat===1?1:0;clearTimeout(joinTimeout);send(ws,room.welcome(client));
     broadcast(room,{type:'roster',players:room.roster(),bossPresent:!!room.bossClient,host:room.hostId()});return;
    }
    room.input(client,m);
@@ -88,7 +89,10 @@ const interval=setInterval(()=>{
    // their lower bandwidth cadence. Destruction need not wait another 50 ms.
    const events=room.drainEvents();
    if(events.some(e=>e.type==='reset'))for(const c of room.clients.values())send(c.ws,room.welcome(c));
-   if(events.length)broadcast(room,{type:'events',events});
+   if(events.length){let legacy,packed;for(const c of room.clients.values()){
+    if(c.eventFormat===1){packed??=JSON.stringify({type:'events',eventFormat:1,events:packEvents(events)});send(c.ws,packed);}
+    else{legacy??=JSON.stringify({type:'events',events});send(c.ws,legacy);}
+   }}
    if(room.tick%C.SNAPSHOT_EVERY===0){
     const snapshot=Buffer.from(encodeSnapshot(room.snapshot()));
     for(const c of room.clients.values())if(c.ws.readyState===WebSocket.OPEN&&c.ws.bufferedAmount<128*1024)c.ws.send(snapshot);

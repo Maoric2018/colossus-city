@@ -24,14 +24,17 @@ try{
  await physicsReady;const room=new Room('VISUAL');
  let events,poses;
  try{
-  room.breakCells(room.cells.filter(c=>c.building===3&&c.ground).map(c=>c.id),{x:-12,y:0,z:16});events=room.drainEvents().filter(e=>e.type==='debris');assert.ok(events.length>0);
+  // Select a bay that actually owns downloaded equipment. Upper bays now fail
+  // progressively, so breaking an arbitrary ground floor does not release a roof immediately.
+  const roofId=attached.find(id=>room.cellMap.has(id));assert.ok(roofId);room.breakCells([roofId],{x:-12,y:0,z:16});events=room.drainEvents().filter(e=>e.type==='debris');assert.ok(events.length>0);
   for(let i=0;i<140;i++)room.world.step();poses=[...room.debris.values()].map(e=>({id:e.id,p:Object.values(e.body.translation()),q:Object.values(e.body.rotation())}));
  }finally{room.dispose();}
  const checks=await page.evaluate(async({events,poses})=>{
   const T=await import('three'),{city,renderer,camera,scene,fx,giant}=window.__COLOSSUS;
   const affected=events.flatMap(e=>e.cells),roofId=affected.find(id=>city.attachments.has(id));if(!roofId)throw Error('No downloaded rooftop in this collapse');
+  const faceRoof=()=>{const p=city.transforms.get(roofId).p;camera.position.copy(p).add(new T.Vector3(10,6,20));camera.lookAt(p);camera.updateMatrixWorld(true);city.buildings.select(camera,65,false);};faceRoof();
   const part=city.attachments.get(roofId)[0],before=new T.Matrix4();part.batch.getMatrixAt(part.index,before);
-  for(const event of events)city.addDebris(event);for(const pose of poses)city.poseDebris(pose.id,pose.p,pose.q);city.commit();
+  for(const event of events)city.addDebris(event);for(const pose of poses)city.poseDebris(pose.id,pose.p,pose.q);faceRoof();city.commit();
   const after=new T.Matrix4();part.batch.getMatrixAt(part.index,after);const moved=!after.equals(before);
   const state=city.transforms.get(roofId),expected=new T.Matrix4().compose(state.p,state.q,new T.Vector3(1,1,1)).multiply(part.local);
   const aligned=after.elements.every((v,i)=>Math.abs(v-expected.elements[i])<.0001);
@@ -40,7 +43,7 @@ try{
  },{events,poses});
  assert.ok(checks.moved&&checks.aligned,'Roof props must follow actual fallen-cell transforms');assert.ok(checks.particles>0);
  await page.screenshot({path:'artifacts/visual-destruction.png'});
- const removal=await page.evaluate(async({events,roofId})=>{const T=await import('three'),{city}=window.__COLOSSUS,part=city.attachments.get(roofId)[0],m=new T.Matrix4();for(const e of events)city.removeDebris(e.id);part.batch.getMatrixAt(part.index,m);const hidden=m.elements[0]===0&&m.elements[5]===0&&m.elements[10]===0;city.reset();part.batch.getMatrixAt(part.index,m);return {hidden,restored:m.determinant()>0};},{events,roofId:checks.roofId});assert.ok(removal.hidden&&removal.restored);
+ const removal=await page.evaluate(async({events,roofId})=>{const T=await import('three'),{city,camera}=window.__COLOSSUS,part=city.attachments.get(roofId)[0],m=new T.Matrix4();for(const e of events)city.removeDebris(e.id);part.batch.getMatrixAt(part.index,m);const hidden=m.elements[0]===0&&m.elements[5]===0&&m.elements[10]===0;city.reset();const p=city.transforms.get(roofId).p;camera.position.copy(p).add(new T.Vector3(10,6,20));camera.lookAt(p);camera.updateMatrixWorld(true);city.buildings.select(camera,65,false);part.batch.getMatrixAt(part.index,m);return {hidden,restored:m.determinant()>0};},{events,roofId:checks.roofId});assert.ok(removal.hidden&&removal.restored);
  await page.evaluate(()=>{const {renderer,camera,scene,giant,fx}=window.__COLOSSUS;camera.position.set(13,10,-40);camera.lookAt(0,15,0);giant.update({head:[0,24,0],left:[-8,12,-3],right:[9,17,-6],bossYaw:0});fx.impact([6,3,-12],1.2);fx.update(.16);renderer.render(scene,camera);});
  await page.screenshot({path:'artifacts/visual-street.png'});
  const props=await page.evaluate(async()=>{const T=await import('three'),{city}=window.__COLOSSUS,car=city.cars.placements[0],box=car.boxes[0],turn=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),car.yaw),origin=new T.Vector3(0,box[1],box[5]+3).applyQuaternion(turn).add(new T.Vector3(...car.position)),direction=new T.Vector3(0,0,-1).applyQuaternion(turn),distance=city.rayDistance(origin,direction,5,.25);return {distance};});assert.ok(Math.abs(props.distance-2.75)<.01,'Shoulder camera must stop at the padded car surface');

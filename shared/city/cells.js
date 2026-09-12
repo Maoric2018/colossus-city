@@ -6,10 +6,12 @@ import {fractureColliders} from './fracture.js';
 import {C} from '../config.js';
 import {roofColliders} from '../props.js';
 import {MATERIALS, ALL_SIDES, sideBit, wallSolid} from './materials.js';
+const intactColliders=new WeakMap();
 export function generateCells(env){
  const cells = [];
  let id = (env.cellBase || 0) + 1;
  env.buildings.forEach((b, localIndex) => {
+  const firstCell=cells.length;
   const bi=b.index??localIndex;
   const ids = new Map(), totalFloors = b.tiers.reduce((s, t) => s + t.floors, 0);
   const base = b.tiers[0], originX = b.x - (base.nx - 1) / 2 * b.bay, originZ = b.z - (base.nz - 1) / 2 * b.bay;
@@ -28,7 +30,7 @@ export function generateCells(env){
      ids.set(`${ix}:${floor}:${iz}`, cell.id); cells.push(cell);
     }
   });
-  const mine = cells.filter(c => c.building === bi), byId = new Map(mine.map(c => [c.id, c]));
+  const mine = cells.slice(firstCell), byId = new Map(mine.map(c => [c.id, c]));
   for(const c of mine){
    const at = (dx, dy, dz) => ids.get(`${c.ix + dx}:${c.floor + dy}:${c.iz + dz}`) || 0;
    c.below = at(0, -1, 0); c.above = at(0, 1, 0);
@@ -44,7 +46,7 @@ export function generateCells(env){
   if(b.architecture==='chrysler'){const top=mine.find(c=>c.floor===totalFloors-1&&c.ix===2&&c.iz===2);if(top)top.chryslerCrown=true;for(const c of mine)delete c.roofAsset;}
   finishModernCells(mine,b);
   finishCatalogCells(mine,b);
-  for(const c of mine){ let n = 0, up = c.above; while(up){ n++; up = byId.get(up).above; } c.stackAbove = n; }
+  for(let i=mine.length-1;i>=0;i--){const c=mine[i];c.stackAbove=c.above?byId.get(c.above).stackAbove+1:0;}
  });
  return cells;
 }
@@ -58,6 +60,7 @@ export const exteriorMask = c => c.walls.reduce((acc, w, side) => acc | (w ? sid
 // while its solid skin layer stands, so broken windows/facades become openings.
 export function cellColliders(c, skin){
  if(skin?.parts?.length)return fractureColliders(c,skin);
+ const signature=c.walls.reduce((mask,w,side)=>mask|(w&&!c.openSkin&&(!skin||wallSolid(c.material,skin.glass,skin.facade,side))?1<<side:0),0),cached=intactColliders.get(c);if(cached?.signature===signature)return cached.out;
  const [w, h, d] = c.size, slab = .13, col = .15, out = [];
  out.push([0, h / 2 - slab, 0, w / 2, slab, d / 2]);
  for(const x of [-1, 1]) for(const z of [-1, 1]) out.push([x * (w / 2 - col), 0, z * (d / 2 - col), col, h / 2 - .26, col]);
@@ -69,7 +72,7 @@ export function cellColliders(c, skin){
  for(let i=0;i<5;i++)out[i].kind='frame';
  let index=5;for(let side=0;side<4;side++)if(solid(side)){out[index].kind='wall';out[index++].side=side;}
  for(const a of roofColliders(c)){a.kind='attachment';out.push(a);}
- return out;
+ intactColliders.set(c,{signature,out});return out;
 }
 // Which exterior side of a bay faces a world point (dominant horizontal axis).
 export function facingSide(c, point){

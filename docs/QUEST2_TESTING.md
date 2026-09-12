@@ -17,6 +17,8 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 
 ## What passed locally
 
+The later fine-destruction optimization pass preserves piece identities, collision holes, cut-face colors/UVs and persistent rubble. Its matched geometry workload is about 80% faster after warmup, and fragment settlement refreshes the query tree once per tick instead of up to 17 times. See [PERFORMANCE_FINE.md](PERFORMANCE_FINE.md) for workload details and current checks. Earlier validation figures below describe their original snapshots, not a fresh physical headset measurement.
+
 - 115 automated Node tests, including real server physics, multiplayer, generated-block IDs, damage archives, distant movement, separated players, colossus health scaling, deferred collision queries, incremental instance buffers and compressed asset delivery.
 - Colossus health scales by the raider roster; two-raider browser checks receive 5,200 maximum HP on every client. Quest and spectator HUD checks use the same scaled fraction and keep bars within their bounds. Joins/departures preserve damage percentage, and dead raiders awaiting respawn still count.
 - Movable-car checks: gentle pushes, hard strikes, missile blasts, matching crushed collision/rendering, persistent wrecks, sleeping pose traffic, late spectators and round reset.
@@ -46,6 +48,7 @@ No headset was detected during this validation. Emulated 72 Hz is a requested se
 - Nudge a car gently, punch it hard, walk into one and hit one with a missile. Check the explosion, brief smoke and solid movable wreck; confirm the colossus loses no health and a late spectator sees the same wreck in the same position.
 - Watch a raider enter soaring, turn, dodge and return to hover. Confirm the limbs animate smoothly in the headset and spectator feed. On the raider laptop, press V to inspect the same animation in third person.
 - Open Live Views on a laptop. Compare the colossus preview against what you see, turn your head, and test controller motion while watched. Compare headset FPS with the panel open and closed.
+- Repeat rapid punches in the same bay, then collapse several adjacent bays. Check original textures on every broken face, persistent rubble, reopened support holes and recovery after leaving and returning. The client now keeps up to 25 detailed blocks with 64–120 m Quest fog; watch for loading pauses and roof props floating beyond their supporting building. Spectator capture may reduce its own cadence/resolution under pressure; the player's destruction detail should remain intact.
 - Walk into a building: it should stop the torso and chip only slightly. Hold a hand still against it: damage must stop. Punch the facade, then its exposed columns; confirm the wreckage persists and a late spectator sees it. Swing at a building and a raider. Confirm a laptop in the same room sees the same hand movement, destruction and ragdoll. Confirm haptics work if supported.
 - Remove/re-wear the headset, open/close the system menu, and disconnect/rejoin the room. Confirm controls stop during tracking loss and resume correctly.
 - Run one, four, then eight raiders through repeated collapses for at least 15 minutes. Record the VR HUD FPS/ping and inspect frame timing with [Chrome remote debugging](https://developers.meta.com/horizon/documentation/web/browser-remote-debugging/). Verify sustained performance and comfort; the Mac's CPU benchmark does not measure the headset GPU.
@@ -61,6 +64,12 @@ npm run check
 npm run assets -- --verify
 npm run test:visual
 npm run test:cars
+npm run test:traffic
+npm run test:streets
+npm run test:fine-destruction
+npm run test:fracture-render
+npm run profile:destruction
+npm run profile:destruction-render
 npm run test:flight-animation
 npm run test:xr-view
 npm run test:streaming

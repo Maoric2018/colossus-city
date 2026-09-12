@@ -5,6 +5,7 @@
 import * as T from 'three';
 import {skinKey} from '../render/building-skin.js';
 import {Components} from './components.js';
+import {BuildingShadows} from '../render/building-shadows.js';
 import {WORLD_STYLE_BY_ID} from '../../shared/city/world-landmarks.js';
 import {partialInstanceUpdates,commitInstances} from '../render/instances.js';
 import {mergeParts} from '../art.js';
@@ -70,11 +71,16 @@ export class Buildings {
   if(moved||!e.initialized)e.revision++;e.initialized=true;e.skinDirty=false;this.selectionDirty=true;
   if(p) e.p.copy(p); if(q) e.q.copy(q); e.hidden = hidden;
   this.writeCore(c,e);
+  this.shadowView?.write(e);
   this.components?.setCell(c,e);
+  this.writeAttachments?.(e);
  }
  // Compact only render slots. Cell identities, collision geometry and attachments
  // retain their world transforms even while a bay is behind the headset.
  select(camera,far=Infinity,shadows=this.tier.shadows){
+  const shadowChanged=this.shadowView?.enabled!==shadows;
+  if(shadows&&!this.shadowView)this.shadowView=new BuildingShadows(this);
+  if(this.shadowView)this.shadowView.enabled=shadows;
   const eyes=camera.cameras?.length?camera.cameras:[camera];let changed=this.selectionDirty||this.eyeCount!==eyes.length||this.lastFar!==far||this.lastShadows!==shadows;
   this.frustums||=[];
   for(let i=0;i<eyes.length;i++){
@@ -85,11 +91,12 @@ export class Buildings {
   if(!changed)return;this.selectionDirty=false;this.eyeCount=eyes.length;this.lastFar=far;this.lastShadows=shadows;
   eyePosition.setFromMatrixPosition(eyes[0].matrixWorld);
   for(const e of this.entries.values()){
-   sphere.center.copy(e.p);sphere.radius=e.radius;const near=e.p.distanceToSquared(eyePosition)<(far+e.radius)**2;
+   sphere.center.copy(e.p);sphere.radius=e.radius;const near=e.p.distanceToSquared(eyePosition)<(far+e.radius)**2;e.renderNear=near;
    e.inView=false;if(near)for(let i=0;i<eyes.length;i++)if(this.frustums[i].intersectsSphere(sphere)){e.inView=true;break;}
-   const rendered=!e.hidden&&near&&(shadows||e.inView);
-   if(rendered===e.rendered)continue;e.rendered=rendered;
-   if(rendered)this.show(e);else this.hide(e);
+   if(this.shadowView&&(e.shadowNear!==near||shadowChanged)){e.shadowNear=near;this.shadowView.write(e);}
+   const rendered=!e.hidden&&near&&e.inView;
+   if(rendered!==e.rendered){e.rendered=rendered;if(rendered)this.show(e);else this.hide(e);}
+   this.writeAttachments?.(e);
   }
  }
  show(e){
@@ -128,7 +135,7 @@ export class Buildings {
    if(glass){ matrix.multiplyMatrices(core, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
   }
  }
- commit(){for(const mesh of this.batches)mesh.visible=mesh.count>0;commitInstances(this.dirty);}
+ commit(){for(const mesh of this.batches)mesh.visible=mesh.count>0;commitInstances(this.dirty);this.shadowView?.commit();}
  // Current transform of a bay (shared object, do not mutate).
  pose(id){ return this.entries.get(id); }
 }

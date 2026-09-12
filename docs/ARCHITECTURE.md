@@ -38,7 +38,7 @@ severity but is not anti-cheat: a client can fabricate plausible poses.
 
 60 Hz accumulator, at most eight catch-up steps per timer callback. Snapshots every three
 steps. Round resets send a fresh welcome before the reset event; clients clear interpolation
-history and instances. Remote interpolation targets ~100 ms behind the newest state.
+history and instances. Remote interpolation starts with a 100 ms cushion, gradually approaches 60 ms on stable arrivals and increases up to 150 ms for jitter. Its target clock never moves backward; local player prediction is unchanged.
 
 Step order per tick: physics block streaming → giant (locomotion, hand sweeps, torso shove) → raiders (flight, rifle,
 breach) → missiles → `world.step` → collision events (debris↔raider knockdowns, debris↔bay
@@ -63,6 +63,8 @@ At 144 legacy chunks + 96 fine fragment groups + 8 × 11 ragdoll parts + 37 awak
 debris send reliable final poses and leave the repeated snapshot list.
 
 Fine destruction uses `fracture` (cell and removed piece IDs), `shards` (small debris group with piece IDs and pose), and `fine-collapse` (fully released cells). Welcome and block states retain the same identities, including resting fragments. Unsupported fine sections release two bays per tick; intact sections remain visible until release. See [FINE_DESTRUCTION.md](FINE_DESTRUCTION.md).
+
+Clients may advertise `eventFormat:1` in `join`. Their `events` envelopes include that version and losslessly pack consecutive `shards` events into `shard-batch` rows, using a presence bitmask and full-precision values. Consecutive piece IDs may use `{runs:[start,count,...]}` in shard rows and `fracture.parts`. `shared/event-codec.js` restores the original event objects and order before application dispatch. Unrecognized future shard fields fall back to the original event representation. Legacy clients, welcome/block archives and the COL6 binary layout remain compatible; each wire variant serializes once per broadcast.
 
 Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
 `skin` (batched `[id, glassMask, facadeMask]` changes), `strike` (a bay was hit; material,
@@ -93,6 +95,8 @@ Live views use a separate `/views` WebSocket for room-token authentication, offe
 
 Capture exists only while at least one spectator watches; closing/disconnecting releases media tracks and peer connections. XR preserves the actual left-eye projection and matrices, including the in-world HUD, and restores framebuffer, scissor and XR state afterward. Desktop copies its rendered canvas plus a compact HUD. The panel skips the obscured full-screen scene render. AI cameras render locally into their own canvases at up to ten updates/s each, staggered one per animation frame, and are explicitly labeled simulated.
 
+The capture budget measures CPU work and the extra capture cost. It skips capture when the current frame has no headroom and limits its average cost to roughly one eighth of a frame budget. Under pressure the XR mirror source gradually scales to 70%; the published canvas remains 640 × 400. Normal load retains the existing 24/30 fps ceilings. Player resolution, destruction geometry, stereo eyes and simulation rates are unaffected. GPU time is not directly measured by this heuristic.
+
 After eight seconds without usable video, the viewer requests a per-publisher JPEG fallback. It targets 15 fps, requires publisher and viewer acknowledgements, allows one in-flight image plus one replaceable newest pending image per feed, and discards pending images older than 250 ms. Buffers prevent additional image sends under congestion. Slow viewers cannot build an application-level history of frames or force video-capable viewers onto the fallback. Reopening the panel retries video. TCP loss can still delay fallback packets already on the wire.
 
 `VIEW_ICE_SERVERS` configures STUN/TURN (JSON array); the default uses Google's public STUN service. A TURN service is not included. Local USB HTTP forwarding does not forward WebRTC media; Quest and laptop still need a reachable Wi-Fi/ICE path. Use one spectator for the demo to limit per-publisher bandwidth/encoding overhead. Background tabs can suspend rendering; each actual player's game should stay visible on its device. Menus, browser chrome, operating-system overlays and audio are not streamed.
@@ -119,7 +123,7 @@ The original five-by-five Midtown grid remains the home district. Beyond it, `ge
 
 Unloading releases fixed structures, ground, hand-query entries and debris bodies, and recycles building array slots. The sparse round journal stores exact structural/glass/facade HP, skin masks, detached IDs, collapsed-building state, pending failure delays, body poses and velocities. Pristine blocks need no archive. Offscreen physics pauses; loading recreates the same damage and resumes movement and pending failures. An owner block stays active when one of its thrown pieces is within 100 m of a player. Damaged history grows with destruction until round reset; it is not saved across server restarts.
 
-The client independently keeps up to nine detailed generated blocks around the viewing camera with no simplified silhouette ring. State arriving for an unloaded view is retained and applied when approached. Shared architectural batches span all detailed views. Hand contact queries use 35 m spatial buckets and query child views, avoiding a scan of every bay for each sweep.
+The client independently keeps up to 25 detailed generated blocks (a 5 × 5 neighborhood) around the viewing camera with no simplified silhouette ring. A module worker prepares cells and component placements for queued blocks; scene and GPU construction stay on the main thread, with the original synchronous path when preparation is unavailable. Resets, unloads and landmark changes reject stale prepared data. State arriving for an unloaded view is retained and applied when approached. Shared architectural batches span all detailed views. Hand contact queries use 35 m spatial buckets and query child views, avoiding a scan of every bay for each sweep. Server physics retains its separate 3 × 3 neighborhood.
 
 ## Structural destruction
 
@@ -166,7 +170,7 @@ Visible core/detail instances retain their slots; removing one swaps only the la
 
 The exact left-eye spectator mirror reuses visibility from the just-rendered stereo frame. Independent bot/free cameras still select their own view. Nearby block construction uses a queue rebuilt at block boundaries instead of sorting all preview blocks every frame. Low tiers avoid fetching maps their materials do not use, and the infinite city's source HDR texture is released after preparing its reflection map.
 
-Linear fog covers 32–60 m on Quest and 40–65 m on desktop, inside the fully detailed neighborhood. The shader measures distance per pixel, so the sides of a wide or stereo view also fade before radial visibility culling. The moving sky uses the same horizon color and output color space as full fog, hiding the terrain and detailed-block cutoff. A world-space road shader repeats the street grid over a moving plane using downloaded asphalt/concrete textures. Nearby roof equipment reuses the existing downloaded models and rides destructible bays. Generated blocks replace the old decorative skyline ring and harbor boundary.
+Linear fog covers 64–120 m on Quest and 80–130 m on desktop, inside the fully detailed neighborhood. The shader measures distance per pixel, so the sides of a wide or stereo view also fade before radial visibility culling. The moving sky uses the same horizon color and output color space as full fog, hiding the terrain and detailed-block cutoff. A world-space road shader repeats the street grid over a moving plane using downloaded asphalt/concrete textures. Nearby roof equipment reuses the existing downloaded models, rides destructible bays and follows their visibility. Generated blocks replace the old decorative skyline ring and harbor boundary.
 
 XR uses the tier's framebuffer scale (0.8 on Quest) and foveation; the camera is never shaken
 (haptics and a camera-locked red vignette carry damage instead). Do not mistake desktop FPS for

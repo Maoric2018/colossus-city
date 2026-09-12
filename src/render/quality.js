@@ -30,5 +30,5 @@ export function surface(tier, options = {}){
  return new T.MeshStandardMaterial({normalMap:tier.normalMaps ? normalMap : null, normalScale, roughnessMap:tier.normalMaps ? roughnessMap : null, roughness, metalness, envMapIntensity, ...rest});
 }
 export function glassMaterial(tier, options = {}){
- return new T.MeshStandardMaterial({color:0x9fd3ea, metalness:.85, roughness:.14, transparent:true, opacity:tier.lambert ? .62 : .55, envMapIntensity:1.2, depthWrite:false, side:T.DoubleSide, ...options});
+ return new T.MeshStandardMaterial({color:0x9fd3ea, metalness:.85, roughness:.14, transparent:true, opacity:tier.lambert ? .62 : .55, envMapIntensity:1.2, depthWrite:false, side:T.DoubleSide, forceSinglePass:true, ...options});
 }

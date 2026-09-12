@@ -117,6 +117,7 @@ function aim(){
 }
 const localOverride = {p:[0, 0, 0], v:[0, 0, 0]};
 function frame(now, xrFrame){
+ const frameStartCPU=performance.now();
  const dt = Math.min((now - lastNow) / 1000, .05); lastNow = now; frameCount++;
  if(now - frameStart > 1000){ hud.fps = Math.round(frameCount * 1000 / (now - frameStart)); frameCount = 0; frameStart = now; }
  gr.adapt(dt, now);
@@ -158,7 +159,7 @@ function frame(now, xrFrame){
  cityView.update(dt);cityView.cars.update(dt,fx); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
  renderer.info.reset();
  if(!(state.playing && state.role === 'spectator' && views.visible)) gr.render(scene, camera, dt);
- if(state.playing){ views.update(now); $('capture-status').classList.toggle('hidden', !views.active); }
+ if(state.playing){ views.update(now,frameStartCPU); $('capture-status').classList.toggle('hidden', !views.active); }
 }
 renderer.setAnimationLoop(frame);
 window.addEventListener('resize', () => gr.resize(camera));

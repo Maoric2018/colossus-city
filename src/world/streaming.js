@@ -3,11 +3,13 @@ import {CityView} from './city.js';
 import {generateBlock,blockAt,blockKey,homeBlock,cellBlock,BLOCK_SIZE} from '../../shared/city/layout.js';
 import {installRoofDressing} from '../district.js';
 import {streamGround} from './stream-ground.js';
+import {BlockPreparation} from './block-preparation.js';
 const keyOf=id=>{const p=cellBlock(id);return p?blockKey(...p):null;};
 export class StreamedBlocks{
  constructor(owner){
   this.owner=owner;this.views=new Map();this.previews=new Map();this.records=new Map();this.entityOwners=new Map();this.lastKey='';this.lastBuild=-Infinity;this.pending=[];this.position=new T.Vector3();
   this.ground=streamGround(owner.root,owner.tier,owner.textures);
+  this.preparation=new BlockPreparation(!owner.tier.lambert);
  }
  record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),fractures:new Map(),shards:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
  state(meta){
@@ -29,7 +31,7 @@ export class StreamedBlocks{
  removeDebris(id){const key=this.entityOwners.get(id),r=this.records.get(key),e=r?.entities.get(id);if(e){for(const c of e.cells)r.cleared.add(c);r.entities.delete(id);}this.views.get(key)?.removeDebris(id);this.entityOwners.delete(id);}
  crumble(e){this.hideCells(e.cells);if(e.id)this.removeDebris(e.id);}
  getCell(id){return this.views.get(keyOf(id))?.byId.get(id);}
- reset(){for(const view of this.views.values()){this.owner.handWorld.children.delete(view.handWorld);view.dispose();}this.views.clear();this.previews.clear();this.pending=[];this.records.clear();this.entityOwners.clear();this.lastKey='';}
+ reset(){this.preparation.clear();for(const view of this.views.values()){this.owner.handWorld.children.delete(view.handWorld);view.dispose();}this.views.clear();this.previews.clear();this.pending=[];this.records.clear();this.entityOwners.clear();this.lastKey='';}
  select(camera){
   const viewCamera=camera.cameras?.[0]||camera,p=this.position.setFromMatrixPosition(viewCamera.matrixWorld),[cx,cz]=blockAt(p.x,p.z),key=blockKey(cx,cz),now=performance.now();
   this.ground.update(p);this.owner.sky.position.copy(p);this.owner.sun.position.set(p.x-120,160,p.z-90);this.owner.sun.target.position.set(p.x,0,p.z);this.owner.sun.target.updateMatrixWorld();
@@ -42,10 +44,11 @@ export class StreamedBlocks{
    // are shown while streaming, and no distant silhouette ring is generated.
    for(let z=cz-radius;z<=cz+radius;z++)for(let x=cx-radius;x<=cx+radius;x++)if(!homeBlock(x,z)){const k=blockKey(x,z);if(!this.previews.has(k))this.previews.set(k,generateBlock(x,z,this.owner.env.seed,{landmark:this.records.get(k)?.landmark}));}
    this.pending=[...this.previews.values()].filter(e=>Math.abs(e.block[0]-cx)<=radius&&Math.abs(e.block[1]-cz)<=radius&&!this.views.has(e.key)).sort((a,b)=>Math.hypot(a.center[0]-p.x,a.center[1]-p.z)-Math.hypot(b.center[0]-p.x,b.center[1]-p.z));
+   this.preparation.retain(new Set(this.pending.map(e=>e.key)));for(const env of this.pending)this.preparation.prepare(env);
   }
   // One nearby block per rendered frame avoids building a complete district in one frame.
   if(this.pending.length&&now-this.lastBuild>12){
-   const env=this.pending.shift(),view=new CityView(this.owner.scene,env,{tier:this.owner.tier,quest:this.owner.quest,parent:this.owner});this.views.set(env.key,view);this.owner.handWorld.children.add(view.handWorld);const record=this.records.get(env.key);if(record)this.apply(view,record);installRoofDressing(view).catch(error=>console.error('Streamed roof assets failed',error));this.lastBuild=now;
+   const env=this.pending.shift(),view=new CityView(this.owner.scene,env,{tier:this.owner.tier,quest:this.owner.quest,parent:this.owner,preparedCells:this.preparation.take(env)});this.views.set(env.key,view);this.owner.handWorld.children.add(view.handWorld);const record=this.records.get(env.key);if(record)this.apply(view,record);installRoofDressing(view).catch(error=>console.error('Streamed roof assets failed',error));this.lastBuild=now;
   }
   const homeVisible=Math.max(Math.abs(p.x)-175,Math.abs(p.z)-175)<far;
   for(const mesh of this.owner.batches)mesh.visible=homeVisible;

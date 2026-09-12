@@ -144,9 +144,9 @@ function refreshStaticColliders(room, c, sides){
 }
 // Streaming restores exact accumulated damage without applying a second hit.
 export function restoreSkin(room,c,skin){const changed=c.skin.glass!==skin.glass||c.skin.facade!==skin.facade;Object.assign(c.skin,skin);if(skin.parts?.length)refreshFineColliders(room,c);else if(changed)refreshStaticColliders(room,c,ALL_SIDES);room.handWorld?.setSkin(c.id,c.skin);}
-export function refreshFineColliders(room,c){
+export function refreshFineColliders(room,c,changed){
  if(c.entity||room.detached.has(c.id))return;
- const {pieces}=fractureRecipe(c),lost=(c.skin.parts||[]).map(id=>pieces[id]),f=floorOf(room,c);
+ const {pieces}=fractureRecipe(c),lost=changed||(c.skin.parts||[]).map(id=>pieces[id]),f=floorOf(room,c);
  if(lost.some(p=>p.kind==='frame')){unmergeStructure(room,f);removeHandles(room,c.structureHandles);attachStructure(room,c);}
  for(const side of new Set(lost.filter(p=>p.kind==='wall').map(p=>p.side))){unmergeWall(room,f,side);removeHandles(room,c.wallHandles[side]);attachWall(room,c,side);}
  if(lost.some(p=>p.kind==='attachment')){removeHandles(room,c.roofHandles);for(const a of cellColliders(c,c.skin).filter(a=>a.kind==='attachment'))c.roofHandles.push(staticCollider(room,room.buildingBodies[c.building],[...a.slice(0,3).map((n,k)=>n+c.p[k]),...a.slice(3)],{cell:c.id,kind:a.kind,part:a.part}));}
@@ -379,7 +379,7 @@ export function settleDebris(room,id){
 
 // ---- per-tick collapse processing ---------------------------------------------------
 function releaseFineCells(room,ids,kick){
- for(const id of ids){const c=room.cellMap.get(id);chipCell(room,c,c.p,Infinity,Infinity,c.lastHitBy,kick,true);detachCellColliders(room,c);room.detached.add(id);c.entity=0;room.handWorld?.setCell(id,null,undefined,true);room.pendingFailures.delete(id);room.dirtyBuildings.add(c.building);}
+ for(const id of ids){const c=room.cellMap.get(id);detachCellColliders(room,c);chipCell(room,c,c.p,Infinity,Infinity,c.lastHitBy,kick,true,null,true);room.detached.add(id);c.entity=0;room.handWorld?.setCell(id,null,undefined,true);room.pendingFailures.delete(id);room.dirtyBuildings.add(c.building);}
  room.destroyedThisRound+=ids.length;room.event({type:'fine-collapse',cells:ids});
 }
 export function processFineCollapses(room){

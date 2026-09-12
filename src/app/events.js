@@ -18,7 +18,7 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
    case 'soar-start':fx.sonicBoom(e.p,e.direction);audio.play('sonicboom',{p:e.p});if(e.player===state.localId){flightFX.sonicBoom();if(!vr())shake.add(.1);}return;
    case 'soar-breach': fx.particle(fx.flares,e.p,{life:.18,size:2.5,color:new T.Color(0xa7edff),growth:1.8});audio.play('heavy',{p:e.p,power:.65});if(e.player===state.localId){flightFX.dodge();shake.add(.18);}return;
    case 'skin': for(const [id, glass, facade] of e.cells) city.setSkin(id, glass, facade); city.commit(); return;
-   case 'fracture': city.setFracture(e.cell,e.parts);city.commit();return;
+   case 'fracture': city.setFracture(e.cell,e.parts);return;
    case 'shards': city.addShards(e);return;
    case 'fine-collapse':city.hideCells(e.cells);return;
    case 'strike': {

@@ -30,3 +30,13 @@ test('a hollow member retains its bore through the cut surface',()=>{
  const hollow=new T.ExtrudeGeometry(shape,{depth:2,bevelEnabled:false}),caps=crossSection(polygons(hollow),2,1);assert.ok(Math.abs(triangleArea(caps)-3)<1e-6,'cap area excludes the central hole');hollow.dispose();
 });
 test('a single glass sheet does not gain an invented solid cap',()=>{assert.deepEqual(crossSection(polygons(new T.PlaneGeometry(2,2)),0,0),[]);});
+test('incremental holes match fresh clipping through reordered hits and resets',()=>{
+ const s=source(polygons(new T.BoxGeometry(2,2,2))),group={id:0,n:[5,5,1]},pieces=[];for(let y=0;y<5;y++)for(let x=0;x<5;x++)pieces.push({id:pieces.length,group:0,grid:[x,y,0],p:[-.8+x*.4,-.8+y*.4,0],size:[.4,.4,2]});s.recipe={groups:[group],pieces};
+ const material=new T.MeshBasicMaterial({side:T.DoubleSide}),rays=[];for(let y=-1.1;y<1.2;y+=.137)for(let x=-1.1;x<1.2;x+=.137)rays.push(new T.Raycaster(new T.Vector3(x,y,3),new T.Vector3(0,0,-1)));
+ for(const ids of [[12],[12,7,17],[7,11,12,13,17],[7,11,12,13,17,18,22],[],[1,2],[12]]){
+  const fresh={...s,records:s.records.map(r=>({...r}))},a=cutAppearance(s,ids,{},true),b=cutAppearance(fresh,ids,{},true),ma=a.map(d=>new T.Mesh(d.geometry,material)),mb=b.map(d=>new T.Mesh(d.geometry,material));for(const m of [...ma,...mb])m.updateMatrixWorld();
+  assert.ok(Math.abs(a.reduce((n,d)=>n+triangleArea(polygons(d.geometry)),0)-b.reduce((n,d)=>n+triangleArea(polygons(d.geometry)),0))<1e-5,'cached cuts preserve all exposed surface area');
+  for(const ray of rays){const x=ray.intersectObjects(ma)[0]?.distance??0,y=ray.intersectObjects(mb)[0]?.distance??0;assert.ok(Math.abs(x-y)<1e-5,'incremental holes must match fresh holes');}
+  for(const d of [...a,...b])d.geometry.dispose();
+ }material.dispose();
+});
