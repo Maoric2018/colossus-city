@@ -1,0 +1,5 @@
+
+> colossus-city@0.1.0 check
+> node scripts/check.mjs
+
+19 JavaScript modules checked; 0 errors.

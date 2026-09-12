@@ -1,0 +1,39 @@
+# Override this placeholder using --app YOUR-UNIQUE-APP on each Fly command,
+# or replace it with the name of an app you own.
+app = "colossus-city-change-me"
+primary_region = "iad"
+kill_signal = "SIGTERM"
+kill_timeout = 5
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+
+[deploy]
+  strategy = "immediate"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 100
+    hard_limit = 160
+  [[http_service.checks]]
+    interval = "20s"
+    timeout = "5s"
+    grace_period = "25s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  # A starting configuration, not a measured capacity guarantee. This incurs charges.
+  cpu_kind = "performance"
+  cpus = 1
+  memory = "1gb"

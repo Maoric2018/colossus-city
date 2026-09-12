@@ -1,0 +1,11 @@
+node_modules
+.cache
+.tools
+.git
+__pycache__
+*.zip
+*.log
+*.pem
+.env*
+artifacts
+public/assets/*.original.jpg

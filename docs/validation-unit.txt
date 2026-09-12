@@ -1,0 +1,158 @@
+
+> colossus-city@0.1.0 test
+> node --test tests/unit.test.js
+
+TAP version 13
+# Subtest: map generation is deterministic and all cell IDs are unique
+ok 1 - map generation is deterministic and all cell IDs are unique
+  ---
+  duration_ms: 4.202259
+  type: 'test'
+  ...
+# Subtest: every support edge is reciprocal and inside one building
+ok 2 - every support edge is reciprocal and inside one building
+  ---
+  duration_ms: 0.670421
+  type: 'test'
+  ...
+# Subtest: intact map has no unsupported nodes
+ok 3 - intact map has no unsupported nodes
+  ---
+  duration_ms: 0.650811
+  type: 'test'
+  ...
+# Subtest: destroying every foundation releases that building, not its neighbours
+ok 4 - destroying every foundation releases that building, not its neighbours
+  ---
+  duration_ms: 0.507536
+  type: 'test'
+  ...
+# Subtest: one intact foundation retains a path through connected bays
+ok 5 - one intact foundation retains a path through connected bays
+  ---
+  duration_ms: 0.332601
+  type: 'test'
+  ...
+# Subtest: severing a complete floor releases precisely the upper storeys
+ok 6 - severing a complete floor releases precisely the upper storeys
+  ---
+  duration_ms: 0.392131
+  type: 'test'
+  ...
+# Subtest: empty support graph has no remaining nodes to detach
+ok 7 - empty support graph has no remaining nodes to detach
+  ---
+  duration_ms: 0.176486
+  type: 'test'
+  ...
+# Subtest: collision cells are genuinely hollow, not full solid boxes
+ok 8 - collision cells are genuinely hollow, not full solid boxes
+  ---
+  duration_ms: 1.003003
+  type: 'test'
+  ...
+# Subtest: compound shapes are finite and stay inside each bay
+ok 9 - compound shapes are finite and stay inside each bay
+  ---
+  duration_ms: 1.928549
+  type: 'test'
+  ...
+# Subtest: segment sweep catches a fast hand passing entirely through a target
+ok 10 - segment sweep catches a fast hand passing entirely through a target
+  ---
+  duration_ms: 0.50384
+  type: 'test'
+  ...
+# Subtest: sweep handles parallel misses and stationary hands
+ok 11 - sweep handles parallel misses and stationary hands
+  ---
+  duration_ms: 0.240823
+  type: 'test'
+  ...
+# Subtest: ray-sphere intersection chooses the nearest forward hit
+ok 12 - ray-sphere intersection chooses the nearest forward hit
+  ---
+  duration_ms: 0.118368
+  type: 'test'
+  ...
+# Subtest: movement and aim share the same yaw convention
+ok 13 - movement and aim share the same yaw convention
+  ---
+  duration_ms: 0.125579
+  type: 'test'
+  ...
+# Subtest: hostile input cannot introduce nonfinite axes or unbounded speeds
+ok 14 - hostile input cannot introduce nonfinite axes or unbounded speeds
+  ---
+  duration_ms: 0.150817
+  type: 'test'
+  ...
+# Subtest: tracked poses must be finite, bounded triples
+ok 15 - tracked poses must be finite, bounded triples
+  ---
+  duration_ms: 0.109224
+  type: 'test'
+  ...
+# Subtest: collision masks allow giant/debris but not giant/player rigid contact
+ok 16 - collision masks allow giant/debris but not giant/player rigid contact
+  ---
+  duration_ms: 0.09919
+  type: 'test'
+  ...
+# Subtest: binary protocol round-trips empty state
+ok 17 - binary protocol round-trips empty state
+  ---
+  duration_ms: 0.309046
+  type: 'test'
+  ...
+# Subtest: binary packet size matches documented bandwidth budget
+ok 18 - binary packet size matches documented bandwidth budget
+  ---
+  duration_ms: 0.574196
+  type: 'test'
+  ...
+# Subtest: truncated, forged and oversized binary packets are rejected
+ok 19 - truncated, forged and oversized binary packets are rejected
+  ---
+  duration_ms: 0.330448
+  type: 'test'
+  ...
+# Subtest: seeded visual randomness is reproducible
+ok 20 - seeded visual randomness is reproducible
+  ---
+  duration_ms: 0.147763
+  type: 'test'
+  ...
+# Subtest: 500 randomized transform packets survive the codec within float32 tolerance
+ok 21 - 500 randomized transform packets survive the codec within float32 tolerance
+  ---
+  duration_ms: 15.037362
+  type: 'test'
+  ...
+# Subtest: interpolation preserves flags and normalizes quaternion interpolation
+ok 22 - interpolation preserves flags and normalizes quaternion interpolation
+  ---
+  duration_ms: 1.22
+  type: 'test'
+  ...
+# Subtest: camera collision ray handles inside, parallel, forward and limited-distance cases
+ok 23 - camera collision ray handles inside, parallel, forward and limited-distance cases
+  ---
+  duration_ms: 0.557521
+  type: 'test'
+  ...
+# Subtest: weapon convergence is separate from movement yaw and rejects invalid aim
+ok 24 - weapon convergence is separate from movement yaw and rejects invalid aim
+  ---
+  duration_ms: 0.111298
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 92.228065

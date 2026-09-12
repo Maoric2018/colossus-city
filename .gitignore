@@ -1,0 +1,10 @@
+node_modules/
+.cache/
+.tools/
+.env*
+*.pem
+*.log
+__pycache__/
+artifacts/
+.DS_Store
+public/assets/*.tmp

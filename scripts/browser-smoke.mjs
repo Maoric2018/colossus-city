@@ -1,0 +1,107 @@
+// Actual WebGL + WebSocket + Rapier, with Meta IWER emulating Quest 2 WebXR.
+// The emulator tests API behavior, not physical tracking, comfort or headset FPS.
+import assert from 'node:assert/strict';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import {setTimeout as delay} from 'node:timers/promises';
+import path from 'node:path';
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.resolve('.cache/ms-playwright');
+const {chromium}=await import('playwright');
+await mkdir('artifacts',{recursive:true});
+const port=18000+Math.floor(Math.random()*1000),url=`http://localhost:${port}`;
+const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:String(port)},stdio:['ignore','pipe','pipe']});
+let serverLog='',browser;server.stdout.on('data',d=>serverLog+=d);server.stderr.on('data',d=>serverLog+=d);
+const errors=[],checks=[],poses=[];
+try{
+ for(let i=0;i<100;i++){if(await fetch(`${url}/healthz`).then(r=>r.ok).catch(()=>false))break;if(i===99)throw Error(serverLog);await delay(100);}
+ browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader']});
+ async function pageFor(context){
+  const page=await context.newPage();
+  page.on('pageerror',e=>errors.push(e.message));
+  page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
+  page.on('requestfailed',r=>errors.push(`${r.failure()?.errorText} ${r.url()}`));
+  page.on('websocket',ws=>ws.on('framesent',({payload})=>{if(typeof payload==='string'){const m=JSON.parse(payload);if(m.type==='pose')poses.push(m);}}));
+  page.setDefaultTimeout(20000);
+  await page.goto(url);await page.waitForFunction(()=>window.COLOSSUS_READY===true);
+  return page;
+ }
+ const desktop=await browser.newContext({viewport:{width:1440,height:900}});
+ const raider=await pageFor(desktop);
+ await raider.locator('#create').click();await raider.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ const room=await raider.evaluate(()=>window.__COLOSSUS.net.room);
+ const before=await raider.evaluate(()=>window.__COLOSSUS.state.players[0].p);
+ await raider.bringToFront();await raider.locator('#resume').click();
+ await raider.waitForFunction(()=>document.pointerLockElement?.id==='world');
+ await raider.keyboard.down('Space');await raider.keyboard.down('KeyW');
+ await raider.waitForFunction(y=>window.__COLOSSUS.state.players[0].p[1]>y+.3,before[1]);
+ await raider.keyboard.up('Space');await raider.keyboard.up('KeyW');
+ assert.ok(await raider.evaluate(()=>window.__COLOSSUS.renderer.info.render.calls)>0);
+ await raider.screenshot({path:'artifacts/desktop-smoke.png'});
+ checks.push('Desktop WebGL rendering, room creation and keyboard jetpack ascent');console.log(checks.at(-1));
+ const headset=await browser.newContext({viewport:{width:1200,height:800}});
+ const iwer=await readFile('node_modules/iwer/build/iwer.js','utf8');
+ await headset.addInitScript({content:iwer+`\nwindow.questDevice=new IWER.XRDevice(IWER.metaQuest2,{stereoEnabled:true});questDevice.installRuntime({forceInstall:true});questDevice.position.set(0,1.7,0);questDevice.controllers.left.position.set(-.4,1.2,-.3);questDevice.controllers.right.position.set(.4,1.2,-.3);`});
+ const quest=await pageFor(headset);
+ assert.equal(await quest.locator('[data-role="boss"]').getAttribute('class'),'role active');
+ await quest.locator('#room-input').fill(room);await quest.locator('#join').click();
+ await quest.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ await quest.locator('#resume').click();await quest.locator('#vr-button').click();
+ await quest.waitForFunction(()=>window.__COLOSSUS.renderer.xr.isPresenting);
+ await quest.waitForFunction(()=>window.__COLOSSUS.renderer.xr.getCamera().cameras.length===2);
+ await quest.waitForFunction(()=>Math.abs(window.__COLOSSUS.net.latest.head[1]-23.8)<.4);
+ assert.ok(poses.length>0,'Tracked pose messages must reach the real server');
+ assert.ok(poses.at(-1).left[0]<poses.at(-1).right[0],'Left and right Touch hands must not be swapped');
+ const render=await quest.evaluate(()=>({calls:window.__COLOSSUS.renderer.info.render.calls,triangles:window.__COLOSSUS.renderer.info.render.triangles,shadows:window.__COLOSSUS.renderer.shadowMap.enabled,frameRate:window.__COLOSSUS.renderer.xr.getSession().frameRate}));
+ assert.equal(render.shadows,false);assert.equal(render.frameRate,72);
+ await quest.screenshot({path:'artifacts/quest2-emulated-stereo.png'});
+ checks.push('Quest 2 profile: auto-selected giant, two stereo views, tracked poses and 72 Hz request');
+ const z=await quest.evaluate(()=>window.__COLOSSUS.net.latest.bossZ);
+ await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,-1));
+ await quest.waitForFunction(z=>window.__COLOSSUS.net.latest.bossZ<z-.4,z);
+ await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,0));
+ await quest.evaluate(()=>questDevice.controllers.right.updateAxes('thumbstick',1,0));
+ await quest.waitForFunction(()=>Math.abs(window.__COLOSSUS.net.latest.bossYaw+Math.PI/6)<.02);
+ await quest.evaluate(()=>questDevice.controllers.right.updateAxes('thumbstick',0,0));
+ checks.push('Left Touch stick locomotion and right Touch 30-degree snap turn');
+ await quest.evaluate(()=>{questDevice.position.y=1.4;questDevice.controllers.right.updateButtonValue('a-button',1);});
+ await quest.waitForFunction(()=>Math.abs(window.__COLOSSUS.rig.scale.y-17)<.01&&Math.abs(window.__COLOSSUS.net.latest.head[1]-23.8)<.3);
+ await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('a-button',0));
+ checks.push('Right Touch A-button height calibration');
+ await quest.evaluate(()=>{questDevice.controllers.left.updateAxes('thumbstick',0,-1);questDevice.controllers.right.connected=false;});
+ await quest.waitForFunction(()=>window.__COLOSSUS.xr.trackingStopped);
+ const stoppedZ=await quest.evaluate(()=>window.__COLOSSUS.net.latest.bossZ);
+ const lostPoseCount=poses.filter(m=>m.head).length;
+ await quest.waitForTimeout(500);
+ assert.equal(poses.filter(m=>m.head).length,lostPoseCount,'Missing right controller must stop pose streaming');
+ assert.ok(Math.abs(await quest.evaluate(()=>window.__COLOSSUS.net.latest.bossZ)-stoppedZ)<.15,'Tracking loss must stop movement');
+ await quest.evaluate(()=>{questDevice.controllers.left.updateAxes('thumbstick',0,0);questDevice.controllers.right.connected=true;});
+ await quest.waitForFunction(()=>!window.__COLOSSUS.xr.trackingStopped);
+ assert.equal(poses.filter(m=>m.head)[lostPoseCount].reset,true);
+ checks.push('Controller tracking loss stops server movement; recovery safely rebases hands');
+ await quest.evaluate(()=>questDevice.updateVisibilityState('visible-blurred'));
+ await quest.waitForFunction(()=>window.__COLOSSUS.xr.trackingStopped);
+ await quest.evaluate(()=>questDevice.updateVisibilityState('visible'));
+ await quest.waitForFunction(()=>!window.__COLOSSUS.xr.trackingStopped);
+ checks.push('Suspended/blurred XR session stops input and resumes');
+ await quest.evaluate(()=>questDevice.recenter());
+ await quest.waitForTimeout(200);
+ checks.push('Reference-space recenter keeps rendering and pose streaming active');
+ await quest.evaluate(()=>window.__COLOSSUS.renderer.xr.getSession().end());
+ await quest.waitForFunction(()=>!window.__COLOSSUS.renderer.xr.isPresenting);
+ await quest.locator('#resume').click();await quest.locator('#vr-button').click();
+ await quest.waitForFunction(()=>window.__COLOSSUS.renderer.xr.isPresenting);
+ await quest.evaluate(()=>window.__COLOSSUS.renderer.xr.getSession().end());
+ await quest.waitForFunction(()=>!window.__COLOSSUS.renderer.xr.isPresenting);
+ assert.equal(await quest.evaluate(()=>window.__COLOSSUS.camera.fov),65);
+ assert.equal(await quest.evaluate(()=>window.__COLOSSUS.rig.scale.y),1);
+ checks.push('Exit and re-enter immersive VR in the same room');
+ assert.deepEqual(errors,[]);
+ const report={created:new Date().toISOString(),result:'PASS',checks,render,posePackets:poses.length,browserErrors:errors,notValidated:'Physical Quest 2 hardware, tracking accuracy, haptics, comfort, headset FPS or thermal behavior'};
+ await writeFile('artifacts/browser-smoke.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}catch(e){
+ if(browser)for(const [i,c]of browser.contexts().entries())for(const [j,p]of c.pages().entries())await p.screenshot({path:`artifacts/browser-failure-${i}-${j}.png`}).catch(()=>{});
+ console.error('Completed checks:',checks,'Browser errors:',errors);throw e;
+}finally{
+ await browser?.close();server.kill('SIGTERM');await writeFile('artifacts/browser-server.log',serverLog);
+}

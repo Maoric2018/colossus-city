@@ -1,0 +1,50 @@
+# Quest 2: launch and verify
+
+This is a browser WebXR game. Open it in **Meta Quest Browser**; there is no Android APK to sideload. Dependencies, test tools, Chromium and Android Platform Tools are installed locally on this Mac.
+
+## Play locally over USB
+
+1. Enable **Developer Mode** for the Quest in the Meta Horizon app. Connect the headset to this Mac with a USB data cable. Put on the headset and accept **USB debugging** for this computer.
+2. In the project folder, run `npm start` and keep it running.
+3. In a second terminal in the same folder, run `npm run quest:usb`. It checks for a Quest and forwards the headset's port 8080 to this Mac. `npm run quest:check` only checks the connection.
+4. In **Meta Quest Browser**, open **http://localhost:8080**. Choose **Colossus → Enter Practice → Continue → Enter VR**, then accept the VR permission.
+5. Hold both Touch controllers. Left stick moves; right stick turns 30 degrees; **A** calibrates your standing height. Move your hands to strike.
+6. For multiplayer, create a room as Colossus instead of practice. On this Mac open **http://localhost:8080**, select Raider and join that room code. Other laptops can use the Mac's LAN address on the same Wi-Fi. Everyone must reach this same running server.
+
+Keep the cable attached during this local test. For untethered play use a trusted HTTPS deployment as described in the README. Plain `http://192.168…` on the headset does not provide a secure WebXR origin; forwarded `localhost` does. This setup follows [Meta's official USB/browser workflow](https://developers.meta.com/horizon/documentation/web/browser-remote-debugging/).
+
+If no device appears, check Developer Mode, the cable and the headset's USB debugging prompt. `unauthorized` means approval is still needed inside the headset. The helper prints the command for removing its USB port forwarding afterward. The installed tool is `.tools/platform-tools/adb`; fresh machines can obtain it from [Google](https://developer.android.com/tools/releases/platform-tools).
+
+## What passed locally
+
+- 44 automated Node tests, including real server physics and multiplayer.
+- Real Chromium rendering, mouse capture and keyboard movement.
+- Meta IWER's Quest 2 profile: stereo VR, Touch mapping, movement, snap turns, calibration, controller loss/recovery, suspension, recentering and repeated entry/exit.
+- Eight-player server collapse benchmark: maximum 5.46 ms per simulation step on this Mac, within the 16.67 ms budget.
+- Dependency audit: zero reported vulnerabilities.
+
+The startup physics import, VR cleanup, menu layering, tracking-loss handling and recenter contact behavior were repaired. VR always disables shadow rendering, uses the existing 0.85 framebuffer scale/foveation settings, and requests 72 Hz when supported. The VR HUD now shows observed frame callbacks per second alongside the requested refresh rate and network ping.
+
+## Physical headset acceptance — still required
+
+No headset was detected during this validation. Emulated 72 Hz is a requested setting, not a measurement of physical Quest 2 performance.
+
+- Enter and exit VR three times. Confirm both eyes render, height/scale feel correct, hands match their controllers and menus remain accessible after exit.
+- Test each stick, A calibration and head rotation. Recenter and recover controller tracking without an unintended strike or movement.
+- Swing at a building and a raider. Confirm a laptop in the same room sees the same hand movement, destruction and ragdoll. Confirm haptics work if supported.
+- Remove/re-wear the headset, open/close the system menu, and disconnect/rejoin the room. Confirm controls stop during tracking loss and resume correctly.
+- Run one, four, then eight raiders through repeated collapses for at least 15 minutes. Record the VR HUD FPS/ping and inspect frame timing with [Chrome remote debugging](https://developers.meta.com/horizon/documentation/web/browser-remote-debugging/). Verify sustained performance and comfort; the Mac's CPU benchmark does not measure the headset GPU.
+
+Raw reports and screenshots are in `artifacts/`; detailed boundaries are in [VALIDATION.md](VALIDATION.md).
+
+## Repeat the software checks
+
+```sh
+npm ci
+npm run test:all
+npm run check
+npm run bench
+HEADED=1 npm run test:browser
+```
+
+The browser test starts/stops its own test server and uses a separate browser profile. On a fresh Mac, download its browser first with `PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx playwright install chromium`. The visible mode allows real pointer capture; no mouse, network or physics mocks are used in the browser test. The smaller Node XR tests intentionally use fake XR frames for error-path regressions.
