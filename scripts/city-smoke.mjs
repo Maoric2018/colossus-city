@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import path from 'node:path';
 process.env.PLAYWRIGHT_BROWSERS_PATH??=path.resolve('.cache/ms-playwright');
-const {chromium}=await import('playwright'),port=19000+Math.floor(Math.random()*900),url=`http://localhost:${port}`,errors=[];
+const {chromium}=await import('playwright'),port=19000+Math.floor(Math.random()*900),url=`http://127.0.0.1:${port}`,errors=[];
 const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:String(port)},stdio:'ignore'});
 let browser;await mkdir('artifacts',{recursive:true});
 try{
@@ -39,7 +39,7 @@ try{
   camera.position.set(-50,12,90);camera.lookAt(-66,3,70);renderer.render(scene,camera);
   return {buildings:city.env.buildings.length,bays:city.cells.length,componentTypes:kit.batches.size,attached,count,settled,persists,reset,lateJoin,finalPose,failedAssets:window.__COLOSSUS.assetStatus.failed};
  });
- assert.ok(checks.attached&&checks.settled&&checks.persists&&checks.reset&&checks.lateJoin&&checks.finalPose);assert.equal(checks.componentTypes,45);assert.deepEqual(checks.failedAssets,[]);
+ assert.ok(checks.attached&&checks.settled&&checks.persists&&checks.reset&&checks.lateJoin&&checks.finalPose);assert.equal(checks.componentTypes,101);assert.deepEqual(checks.failedAssets,[]);
  await page.screenshot({path:'artifacts/persistent-rubble.png'});assert.deepEqual(errors,[]);
  const report={result:'PASS',checks,stats,artifacts:[...views.map(v=>v[0]+'.png'),'persistent-rubble.png']};await writeFile('artifacts/city-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill('SIGTERM');}

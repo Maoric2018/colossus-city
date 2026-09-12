@@ -16,11 +16,13 @@ export const bodyPose = b => { const p = b.translation(), q = b.rotation(); retu
 // slab, a shared column grid and one wall per side. A floor only splits into per-bay shapes
 // (structure, or one wall side) the first time something in it breaks.
 export function buildCity(room){
- room.buildingBodies = room.env.buildings.map(() => room.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
- room.cellsByBuilding = room.env.buildings.map(() => []); room.floors = room.env.buildings.map(() => []);
- room.buildingBounds = room.env.buildings.map(() => [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
+ room.buildingBodies=[];room.cellsByBuilding=[];room.floors=[];room.buildingBounds=[];room.buildingColumns=[];
  room.collapsed = new Set(); room.pendingFailures = new Map(); room.dirtyBuildings = new Set(); room.skinEvents = []; room.lastCreak = new Map();
- for(const c of room.cells){
+ addBuildings(room,room.cells,room.env.buildings.map((_,i)=>i));
+}
+export function addBuildings(room,cells,indices){
+ for(const i of indices){room.buildingBodies[i]=room.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());room.cellsByBuilding[i]=[];room.floors[i]=[];room.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];room.buildingColumns[i]={merged:true,handles:[]};}
+ for(const c of cells){
   c.skin = initialSkin(c); c.lastHit = -100; c.entity = 0; c.lastHitBy = 0; c.handles = []; c.wallHandles = [[], [], [], []]; c.structureHandles = []; c.roofHandles = [];
   room.cellsByBuilding[c.building].push(c); room.cellMap.set(c.id, c);
   const b = room.buildingBounds[c.building];
@@ -28,12 +30,12 @@ export function buildCity(room){
   const floors = room.floors[c.building]; if(!floors[c.floor]) floors[c.floor] = {building:c.building, floor:c.floor, cells:[], structureMerged:false, wallsMerged:[false, false, false, false], structure:[], walls:[[], [], [], []]};
   floors[c.floor].cells.push(c);
  }
- for(const c of room.cells) for(const a of roofColliders(c)) c.roofHandles.push(staticCollider(room, room.buildingBodies[c.building], [c.p[0]+a[0],c.p[1]+a[1],c.p[2]+a[2],...a.slice(3)], {cell:c.id}));
- room.buildingColumns=room.env.buildings.map(()=>({merged:true,handles:[]}));
- for(const floors of room.floors) for(const f of floors) if(f) mergeFloor(room, f);
+ for(const c of cells) for(const a of roofColliders(c)) c.roofHandles.push(staticCollider(room, room.buildingBodies[c.building], [c.p[0]+a[0],c.p[1]+a[1],c.p[2]+a[2],...a.slice(3)], {cell:c.id}));
+ for(const i of indices) for(const f of room.floors[i]) if(f) mergeFloor(room, f);
  // Intact columns are continuous vertical runs. Split a building's runs only when its
  // first structural bay fails; this keeps the dense undamaged city cheap to simulate.
- room.floors.forEach((floors,bi)=>{
+ indices.forEach(bi=>{
+  const floors=room.floors[bi];
   const runs=new Map();
   for(const f of floors)for(const a of floorColumns(f)){
    const key=`${a[0].toFixed(3)}:${a[2].toFixed(3)}`,lo=a[1]-a[4],hi=a[1]+a[4];
@@ -101,6 +103,15 @@ function refreshStaticColliders(room, c, sides){
  if(c.entity || room.detached.has(c.id)) return;
  const f = floorOf(room, c);
  for(let side = 0; side < 4; side++){ if(!(sides & sideBit(side)) || !c.walls[side]) continue; unmergeWall(room, f, side); removeHandles(room, c.wallHandles[side]); attachWall(room, c, side); }
+}
+// Streaming restores exact accumulated damage without applying a second hit.
+export function restoreSkin(room,c,skin){const changed=c.skin.glass!==skin.glass||c.skin.facade!==skin.facade;Object.assign(c.skin,skin);if(changed)refreshStaticColliders(room,c,ALL_SIDES);room.handWorld?.setSkin(c.id,c.skin);}
+export function restoreDebris(room,meta){
+ const body=room.world.createRigidBody((meta.settled?RAPIER.RigidBodyDesc.fixed():RAPIER.RigidBodyDesc.dynamic()).setTranslation(...meta.p).setRotation({x:meta.q[0],y:meta.q[1],z:meta.q[2],w:meta.q[3]}));
+ const e={...meta,body,born:room.time,radius:0,building:room.cellMap.get(meta.cells[0]).building};
+ for(const id of e.cells){const c=room.cellMap.get(id);c.entity=e.id;attachCellColliders(room,c,body,sub(vec(c.p),vec(e.origin)));e.radius=Math.max(e.radius,dist(vec(c.p),vec(e.origin))+c.size[0]*.7);if(meta.settled)room.handWorld.setDebris(id,plus(rotate(minus(c.p,e.origin),meta.q),meta.p),meta.q);}
+ if(!meta.settled){body.setLinearDamping(.4);body.setAngularDamping(1.1);body.enableCcd(true);body.setLinvel(vec(meta.velocity||[0,0,0]),true);body.setAngvel(vec(meta.angular||[0,0,0]),true);}
+ (meta.settled?room.settled:room.debris).set(e.id,e);return e;
 }
 // Map a collider tag back to a bay. Merged floor shapes resolve to the nearest intact bay to `point`.
 export function resolveCell(room, tag, point){

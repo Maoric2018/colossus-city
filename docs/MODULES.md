@@ -12,8 +12,8 @@ shared/            pure, dependency-free logic imported by BOTH server and brows
   protocol.js      binary snapshot codec (COL5). Bump MAGIC when the layout changes.
   flight.js        raider flight model (flightStep) used by the server AND client prediction
   environment.js   facade: the active district + re-exports of shared/city/*
-  city/components.js  45 modeled part types and per-bay placement rules
-  city/layout.js   district data: towers (tiers, material, spire, water tower), roads, spawns
+  city/components.js  101 modeled part types and per-bay placement rules
+  city/layout.js   Midtown + seeded infinite blocks, 16 families and stable coordinate IDs
   city/materials.js material table: glass/facade/frame HP, safety factor, tint, haptics
   city/cells.js    generateCells (bays, walls, stacks), cellColliders (skin-aware), initialSkin
   city/structure.js unsupportedCells (graph), structuralLoads / overloadedCells (load model)
@@ -21,6 +21,7 @@ shared/            pure, dependency-free logic imported by BOTH server and brows
 server/            authoritative simulation (Node + Rapier). Nothing here renders.
   index.js         HTTP static hosting, WebSocket upgrade, rate limits, tick loop, snapshots
   room.js          one match: world creation, membership, input routing, step order, snapshot
+  streaming.js     moving physics neighborhoods, sparse damage archives, reload and ray preload
   boss.js          giant locomotion (VR pose / desktop / AI), hand sweeps, torso shove, combos
   cars.js          dynamic vehicles, impact damage, explosions, wreck and sleep replication
   players.js       raider spawn/lifecycle, per-tick input, practice drones
@@ -46,10 +47,13 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
                    spatial queries (rayDistance, overlapBox, cellsAlongSegment)
   world/cars.js    instanced imported cars and crushed wrecks, moving query boxes, smoke
   world/buildings.js instanced bays: frame + per-material facade/glass batches, roof caps
+  world/components.js shared nearby detail batches; bay/skin attachment and stereo visibility
+  world/streaming.js detailed block cache, distant silhouettes, replicated damage and rubble
+  world/stream-ground.js continuous pavement/road markings using downloaded textures
   world/ground.js  avenues/streets/sidewalks/plaza/spawn pads/lamps/water/bridges
   world/textures.js procedural brick/stone/concrete/glass facade maps
   world/rubble.js  cosmetic instanced bricks/shards (client only, bounded per tier)
-  district.js      downloaded dressing: HDR sky, skyline ring, roof props, spires
+  district.js      downloaded HDR lighting and roof props/spires shared by generated blocks
   avatars.js       giant (mech armour), raiders, ragdoll parts
   effects.js       sprite particle pools and tracers
   audio.js         procedural Web Audio synth (no audio files)

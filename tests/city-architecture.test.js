@@ -14,12 +14,12 @@ test('dense blocks preserve clear roads, alleys, plaza and disjoint building foo
  }
  assert.equal(perBlock.size,24);assert.ok([...perBlock.values()].every(n=>n>=6));
 });
-test('every building uses 30+ distinct modeled component types on both quality kits',()=>{
+test('every building uses 75+ distinct modeled component types on both quality kits',()=>{
  const used=new Set();for(const interiors of [true,false])for(let b=0;b<city.buildings.length;b++){
   const parts=cells.filter(c=>c.building===b).flatMap(c=>componentPlacements(c,{interiors}));for(const p of parts){used.add(p.type);assert.ok(COMPONENTS[p.type]);}
-  assert.ok(new Set(parts.map(p=>p.type)).size>=30,city.buildings[b].name);
+  assert.ok(new Set(parts.map(p=>p.type)).size>=75,city.buildings[b].name);
  }
- assert.equal(used.size,45);
+ assert.equal(used.size,Object.keys(COMPONENTS).length);
  for(const spec of Object.values(COMPONENTS))for(const p of spec.parts){assert.ok(p.s.every(n=>n>0&&Number.isFinite(n)));assert.ok([...p.p,...p.r].every(Number.isFinite));}
 });
 test('landmark silhouettes and component kits are distinct and stay structurally supported',()=>{

@@ -13,6 +13,13 @@ export function newPlayer(room, id, name, bot){
 export function spawn(room, p, at){
  if(p.body) removeBody(room, p.body);
  const spawnPoint = at || vec(room.env.spawns[(p.id - 1) % room.env.spawns.length]);
+ if(!at&&room.env.infinite&&Math.hypot(room.boss.x,room.boss.z)>160){
+  // Keep distant respawns near the fight, on an intersection rather than inside
+  // whichever procedural building happens to occupy the old relative offset.
+  spawnPoint.x=Math.round((room.boss.x+spawnPoint.x*.35-35)/70)*70+35;
+  spawnPoint.z=Math.round((room.boss.z+spawnPoint.z*.35-35)/70)*70+35;
+ }
+ room.stream?.ensureAround(spawnPoint.x,spawnPoint.z);
  p.body = room.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(spawnPoint.x, Math.max(1.2, spawnPoint.y), spawnPoint.z).lockRotations().setLinearDamping(.12).setCcdEnabled(true));
  const co = room.world.createCollider(RAPIER.ColliderDesc.capsule(.8, .34).setMass(70).setFriction(.05).setRestitution(0).setCollisionGroups(group(G.PLAYER, G.WORLD | G.DEBRIS)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), p.body);
  room.colliderTags.set(co.handle, {player:p.id});
@@ -31,14 +38,14 @@ export function updatePlayer(room, p){
  if(p.rag){
   const r = room.rags.get(p.rag), at = r?.parts[0].body.translation() || v(0, 2, 60);
   if(p.hp <= 0 && room.time >= p.deadUntil){ spawn(room, p); return; }
-  if(p.hp > 0 && room.time >= p.recoverAt){ const hp = p.hp, bound = room.env.half - 8; removeRag(room, p.rag); spawn(room, p, v(clamp(at.x, -bound, bound), clamp(at.y, 1.2, C.MAX_ALTITUDE - 5), clamp(at.z, -bound, bound))); p.hp = hp; return; }
+  if(p.hp > 0 && room.time >= p.recoverAt){ const hp = p.hp, bound = room.env.infinite ? Infinity : room.env.half - 8; removeRag(room, p.rag); spawn(room, p, v(clamp(at.x, -bound, bound), clamp(at.y, 1.2, C.MAX_ALTITUDE - 5), clamp(at.z, -bound, bound))); p.hp = hp; return; }
   return;
  }
  if(!p.body) return;
  if(p.bot) driveBot(room, p);
  const i = room.time - p.lastInput > .45 ? noInput() : p.input;
  const at = p.body.translation();
- if(at.y < -8 || Math.abs(at.x) > C.KILL_HALF || Math.abs(at.z) > C.KILL_HALF){ knockdown(room, p, v(0, 4, 0), 200); return; }
+ if(at.y < -8 || (!room.env.infinite && (Math.abs(at.x) > C.KILL_HALF || Math.abs(at.z) > C.KILL_HALF))){ knockdown(room, p, v(0, 4, 0), 200); return; }
  fly(room, p, i);
  if(i.fire && room.time - p.lastShot > C.FIRE_INTERVAL){ p.lastShot = room.time; shoot(room, p); }
  if(i.heavy > p.lastHeavySeq){

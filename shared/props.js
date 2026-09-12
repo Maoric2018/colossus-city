@@ -9,13 +9,13 @@ export function carPlacements(env){
  cars.forEach((name,type)=>{for(let i=type;i<42;i+=cars.length){const along=(i%14)*10-66,road=[-37,0,37][Math.floor(i/14)],swap=i%2;if([-37,0,37].some(n=>Math.abs(along-n)<8))continue;const asset='car-kit/'+name,scale=(type>2?4.8:3.9)/propBounds[asset][2],size=propBounds[asset].map(v=>v*scale);out.push({id:'car-'+i,kind:'car',asset,scale,size,position:[swap?along:road+3.6,.13,swap?road-3.6:along],yaw:swap?Math.PI/2:Math.PI,boxes:[[0,size[1]/2,0,size[0]/2,size[1]/2,size[2]/2]]});}});return out;
 }
 export function roofProp(c){
- if(c.roofAsset){const [asset,height]=c.roofAsset,scale=height/propBounds[asset][1],size=propBounds[asset].map(v=>v*scale);return {asset,height,scale,size,yaw:c.building*Math.PI/2};}
+ if(c.roofAsset){const [asset,height]=c.roofAsset,scale=height/propBounds[asset][1],size=propBounds[asset].map(v=>v*scale);return {asset,height,scale,size,yaw:(c.roofYaw??c.building)*Math.PI/2};}
  if(!c.roof||!c.hasRoofProps)return null;const [asset,height]=ROOF_ASSETS[(c.ix+c.iz*2+c.building)%4],scale=height/propBounds[asset][1],size=propBounds[asset].map(v=>v*scale);
- return {asset,height,scale,size,yaw:c.building*Math.PI/2};
+ return {asset,height,scale,size,yaw:(c.roofYaw??c.building)*Math.PI/2};
 }
 export function roofColliders(c){
  const spire=c.spire?[[0,c.size[1]/2+c.spire/2,0,.9,c.spire/2,.9]]:[];
- const p=roofProp(c);if(!p)return spire;const [w,h,d]=p.size,swap=c.building%2,base=c.size[1]/2+(c.roofAsset?.04:.02);
+ const p=roofProp(c);if(!p)return spire;const [w,h,d]=p.size,swap=(c.roofYaw??c.building)%2,base=c.size[1]/2+(c.roofAsset?.04:.02);
  // Quarter-turn roof placements allow exact axis-aligned bounds in bay space.
  return [...spire,[0,base+h/2,0,(swap?d:w)/2,h/2,(swap?w:d)/2]];
 }
@@ -45,7 +45,7 @@ function midtownProps(env){
   const w=b.tiers[0].nx*b.bay,d=b.tiers[0].nz*b.bay;add('walk-'+i,'pavement',[b.x,.09,b.z],[(w+4)/2,.09,(d+4)/2]);
   for(const side of [-1,1])add(`sign-${i}-${side}`,'sign',[b.x,1.4,b.z+side*(d/2+.3)],[Math.min(14,w)*.42,.45,.04]);
  }
- for(const side of [-1,1]){
+ if(!env.infinite)for(const side of [-1,1]){
   const z=side*(env.half+22);add('bridge-'+side,'bridge',[0,3.4,z],[450,.4,4]);
   for(const x of [-300,-180,-60,60,180,300]){for(const dz of [-3.5,3.5])add(`post-${side}-${x}-${dz}`,'bridge',[x,17,z+dz],[.8,17,.8]);add(`cap-${side}-${x}`,'bridge',[x,33,z],[.8,.5,4.25]);}
   for(let x=-420;x<420;x+=8){const y=6+22*Math.cos(x*Math.PI/120)**2;for(const dz of [-3.5,3.5])add(`cable-${side}-${x}-${dz}`,'bridge',[x,(y+4)/2,z+dz],[.06,Math.max(.1,y-4)/2,.06]);}

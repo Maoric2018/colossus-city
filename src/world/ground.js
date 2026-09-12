@@ -35,6 +35,7 @@ export function buildGround(root, env, tier, textures){
  const lamps = [], bulbs = [];
  for(const x of avenues) for(let z = -half + 8; z <= half - 8; z += 24) for(const side of [-1, 1]){ const lx = x + side * (avenueWidth / 2 + .8); lamps.push([new T.CylinderGeometry(.07, .1, 6, 5), [lx, 3, z]], [new T.BoxGeometry(1.6, .1, .1), [lx - side * .7, 6.1, z]]); bulbs.push([new T.BoxGeometry(.8, .05, .3), [lx - side * 1.2, 6.03, z]]); }
  mesh(mergeParts(lamps), dark, root).castShadow = false; mesh(mergeParts(bulbs), new T.MeshBasicMaterial({color:0xffd998, toneMapped:false}), root).castShadow = false;
+ if(env.infinite)return {update(){}};
  // Water beyond the island, a shore ring and two harbour bridges.
  const ocean = new T.Mesh(new T.PlaneGeometry(2800, 2800, 1, 1), surface(tier, {color:0x286a78, roughness:.26, metalness:.5})); ocean.rotation.x = -Math.PI / 2; ocean.position.y = -.45; root.add(ocean);
  const waterTime = {value:0};

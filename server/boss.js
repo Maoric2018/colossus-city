@@ -18,7 +18,7 @@ export function updateBoss(room){
  const b = room.boss, prevL = {...b.left}, prevR = {...b.right}, before = v(b.x, 0, b.z), rawPrevious = {left:b.rawLeft || prevL, right:b.rawRight || prevR},previousHead={...b.head};
  b.walkContacts=[];b.pushing=false;
  b.stagger = Math.max(0, b.stagger - C.TICK * .55);
- const slow = (1 - b.stagger * .6), bound = C.GIANT_BOUND;
+ const slow = (1 - b.stagger * .6), bound = room.env.infinite ? Infinity : C.GIANT_BOUND;
  if(room.bossClient && room.time - b.lastPose < .4 && !b.desktop){
   const d = rotateYaw(v(b.moveX || 0, 0, b.moveZ || 0), b.yaw), step = mul(len(d) > 1 ? norm(d) : d, C.GIANT_SPEED * C.TICK * slow);
   walkBoss(room, clamp(b.x + step.x, -bound, bound), clamp(b.z + step.z, -bound, bound));

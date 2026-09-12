@@ -19,6 +19,7 @@ export function shoot(room, p, heavy = false){
   const t = raySphere(origin, direction, center, radius); if(t < distance){ distance = t; damage = (heavy ? C.HEAVY_DAMAGE : C.SHOT_DAMAGE) * mult; weak = mult > 1; }
  }
  for(const side of ['left','right']){const t=handRay(arr(origin),arr(direction),arr(b[side]),b[side+'Quaternion'],distance);if(t<distance){distance=t;damage=(heavy?C.HEAVY_DAMAGE:C.SHOT_DAMAGE)*.55;weak=false;}}
+ room.stream?.ensureRay(origin,add(origin,mul(direction,distance)));
  const obstruction = room.world.castRayAndGetNormal(new RAPIER.Ray(origin, direction), distance, true, undefined, group(G.PLAYER, G.WORLD | G.DEBRIS));
  let structure = false;
  if(obstruction){

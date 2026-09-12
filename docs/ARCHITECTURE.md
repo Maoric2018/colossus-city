@@ -40,7 +40,7 @@ severity but is not anti-cheat: a client can fabricate plausible poses.
 steps. Round resets send a fresh welcome before the reset event; clients clear interpolation
 history and instances. Remote interpolation targets ~100 ms behind the newest state.
 
-Step order per tick: giant (locomotion, hand sweeps, torso shove) → raiders (flight, rifle,
+Step order per tick: physics block streaming → giant (locomotion, hand sweeps, torso shove) → raiders (flight, rifle,
 breach) → missiles → `world.step` → collision events (debris↔raider knockdowns, debris↔bay
 damage, secondary fracture, crumble) → debris lifecycle → due structural
 failures → new failure scheduling for dirty buildings → batched skin events → ragdoll expiry →
@@ -70,6 +70,8 @@ power, whether its frame failed), `creak` (a building has overloaded columns), `
 `car-state` and `car-explode` (both carry `id`, `prop`, `p`, `q`, `wreck`, `sleeping`, `removed`
 and remaining `burn` seconds). Welcome packets carry cleared cells, damaged skins, live and
 settled chunks, ragdolls, missiles, cars and the roster so late joiners see the same city.
+
+`block-load` and `block-unload` carry `key`, `x`, `z`, building `indices`, damaged `skins`, `clearedCells` and debris `entities`. Welcome `blocks` includes active generated blocks and archived damaged blocks. These events use JSON; streamed cell IDs can exceed 32 bits. The COL5 binary body-ID fields and snapshot layout are unchanged.
 
 `server/cars.js` owns 37 CCD dynamic vehicle bodies in the reserved `0x40000000` ID range. Shared
 `cars.js` supplies intact and crushed box dimensions for physics, camera and prediction.
@@ -101,9 +103,19 @@ The giant walks at 13 m/s; normal raider flight is 11 m/s. Shared `giant-rig.js`
 
 Raiders start in first person. V or the pause-menu button selects the 6.8 m shoulder camera (8.2 m while soaring). Hold either Shift to soar; release both, pause or lose focus to hover. The live pilot and physical ragdoll both clone the same armored eleven-bone skinned mesh. `shared/raider-pose.js` composes joint rotations around the original shoulder, elbow, hip and knee anchors: forward head/weapon arm, balancing arm, alternating leg corrections and a knee tuck during flight transitions. Elapsed-time blending gives the same transition duration at different frame rates; the shared match clock drives the loop without extra packets. The locally predicted soaring flag starts the transition immediately. Rifle and flight pack attach to their moving bones, with vectoring nozzle groups and attached jet glows. Knockdowns use the same pose function to initialize the existing physics bodies and joints. Blue laser core/glow/pulse meshes and surface effects use authoritative hitscan endpoints.
 
+## Continuous city generation
+
+The original five-by-five Midtown grid remains the home district. Beyond it, `generateBlock(x,z,seed)` produces eight buildings per 70 m block from 16 architectural families. Signed coordinates are zigzag encoded, Cantor paired and assigned a 4,096-cell range above 1,000,000; cell IDs therefore stay independent of load order. Original Midtown cell IDs remain unchanged. Tier footprints retain continuous vertical support. The generator and roof-equipment selection are shared by browser and server.
+
+`server/streaming.js` keeps a three-by-three physical neighborhood around every giant, raider/ragdoll and missile, in addition to the permanent home district. New outer blocks load one per tick; spawning preloads its immediate neighborhood synchronously, and long rifle rays preload the blocks they cross. Players can separate. The old horizontal flight/giant bounds are disabled for this map, and distant respawns follow the giant. Existing altitude and tracking-reach validation remain in force.
+
+Unloading releases fixed structures, ground, hand-query entries and debris bodies, and recycles building array slots. The sparse round journal stores exact structural/facade HP, skin masks, detached IDs, collapsed-building state, pending failure delays, body poses and velocities. Pristine blocks need no archive. Offscreen physics pauses; loading recreates the same damage and resumes movement and pending failures. An owner block stays active when one of its thrown pieces is within 100 m of a player. Damaged history grows with destruction until round reset; it is not saved across server restarts.
+
+The client independently keeps up to nine detailed generated blocks around the viewing camera and a bounded ring of inexpensive, windowed silhouettes through the fog. State arriving for an unloaded view is retained and applied when approached. Shared architectural batches span all detailed views. Hand contact queries use 35 m spatial buckets and query child views, avoiding a scan of every bay for each sweep.
+
 ## Structural destruction
 
-The district (`shared/city/layout.js`) is a grid of avenues and streets with 169 buildings built
+The home district (`shared/city/layout.js`) is a grid of avenues and streets with 169 buildings built
 from **tiers** on one integer bay grid (setbacks keep support continuity). Every bay is a hollow
 storey: slab + four corner columns + exterior skins. 5,452 bays. Intact floors share slabs and exterior walls on one fixed body per building. Columns are merged into vertical runs until the first structural failure in their building; only then are those runs split by floor. Only affected floors/wall sides split into per-bay collision shapes when damaged. Roof equipment and street props retain separate solid proxies; falling debris uses one coarse box per bay plus roof equipment.
 
@@ -135,7 +147,7 @@ fatigue, rebar or arbitrary cracks; bays are rigid compounds; no self-collision 
 
 Quality tiers (`src/render/quality.js`) are chosen from the GPU string once: `quest`, `low`
 (integrated GPUs), `medium`, `high`. Lower tiers use Lambert shading for opaque surfaces,
-no normal maps, no shadows, no bloom, pixel ratio 1, a low-poly skyline ring and smaller
+no normal maps, no shadows, no bloom, pixel ratio 1, inexpensive distant silhouettes and smaller
 particle/rubble pools; `Q` toggles cinematic extras. Adaptive resolution lowers the pixel ratio
 when the frame-time EMA exceeds 20 ms and raises it back below 12.5 ms (never in XR; hidden tabs
 are ignored). `?quality=low|medium|high|quest` forces a tier for profiling.
@@ -143,7 +155,9 @@ are ignored). `?quality=low|medium|high|quest` forces a tier for profiling.
 The towers render as instanced batches regardless of city size: one frame batch (slab + open
 prism columns), one facade batch per masonry material, one glass batch per material, one roof
 batch, plus roof props and spires attached to their bays. Broken layers get a zero matrix.
-The 45-type architectural kit uses reusable instanced geometry. Detail is selected within 58 m on Quest, 95 m on performance tier and 180 m on higher tiers; landmark-specific ribs and crowns remain visible at distance. Nearby assemblies retain their skin masks and moving-bay transforms. Building names share one atlas and draw batch. No extra dynamic body is created for each ornament. See `CITY_COMPONENTS.md`.
+The 101-type architectural kit uses one shared set of reusable instanced geometry across loaded blocks. Detail is selected within 64 m on Quest, 85 m on performance tier and 115 m on higher tiers; landmark-specific ribs and crowns extend to 230 m. Core batches compact visible instances without changing logical bay poses. Visibility uses the union of both XR eye frustums; desktop shadow rendering retains nearby offscreen casters. Nearby assemblies retain their skin masks and moving-bay transforms. Building names share one atlas and draw batch. No extra dynamic body is created for each ornament. See `CITY_COMPONENTS.md`.
+
+Linear fog covers 105–230 m on Quest and 140–340 m on desktop. The moving sky uses the same horizon color and output color space as full fog, hiding the terrain and silhouette cutoff. A world-space road shader repeats the street grid over a moving plane using downloaded asphalt/concrete textures. Nearby roof equipment reuses the existing downloaded models and rides destructible bays. Generated blocks replace the old decorative skyline ring and harbor boundary.
 
 XR uses the tier's framebuffer scale (0.8 on Quest) and foveation; the camera is never shaken
 (haptics and a camera-locked red vignette carry damage instead). Do not mistake desktop FPS for

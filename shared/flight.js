@@ -30,9 +30,6 @@ export function flightStep(p, pos, vel, i, time){
  const a = 1 - Math.exp(-C.TICK * (p.soaring ? 4.5 : 6)), av = air || pos.y > 2 ? .12 : 0;
  const velocity = dodging ? mul(p.dodgeDirection, C.DODGE_SPEED)
   : v(vel.x + (desired.x - vel.x) * a, vel.y + (desired.y - vel.y) * (p.soaring ? a : av), vel.z + (desired.z - vel.z) * a);
- // The district is square: a soft push back inside its edges, never toward the centre.
- if(Math.abs(pos.x) > C.ARENA_HALF) velocity.x -= (pos.x - Math.sign(pos.x) * C.ARENA_HALF) * .5;
- if(Math.abs(pos.z) > C.ARENA_HALF) velocity.z -= (pos.z - Math.sign(pos.z) * C.ARENA_HALF) * .5;
  if(pos.y > C.MAX_ALTITUDE) velocity.y = Math.min(velocity.y, -4);
  // Midtown towers reach 120 m: a full tank of hover thrust must climb most of one.
  const burn = p.soaring ? -(boosted ? .14 : .065) : boosted ? -.14 : air ? -C.ASCEND_BURN : (pos.y < 2 ? .48 : .16);

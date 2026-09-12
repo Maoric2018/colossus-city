@@ -50,7 +50,63 @@ export const COMPONENTS=Object.freeze({
  empireSetback:kit('Empire setback terrace cornice','stone',[box([1,.055,.14],[0,.52,-.46]),box([1,.05,.095],[0,.57,-.46]),box([1,.035,.06],[0,.61,-.46])]),
  empireCrown:kit('Empire stepped metal crown','silver',[box([.74,.1,.1],[0,.05,-.53]),box([.57,.1,.1],[0,.15,-.53]),box([.4,.1,.1],[0,.25,-.53]),box([.23,.16,.1],[0,.38,-.53])]),
  empireObservation:kit('Empire observation deck balustrade','bronze',rail(.81,-.49)),
- empireMast:kit('Empire mast buttresses','silver',[-1,1].flatMap(x=>[-1,1].map(z=>box([.075,.45,.075],[x*.22,.7,z*.22],[z*.17,0,-x*.17]))))
+ empireMast:kit('Empire mast buttresses','silver',[-1,1].flatMap(x=>[-1,1].map(z=>box([.075,.45,.075],[x*.22,.7,z*.22],[z*.17,0,-x*.17])))),
+ windowRecess:kit('Deep window reveal','stone',[box([.035,.67,.095],[-.34,0,-.49]),box([.035,.67,.095],[.34,0,-.49]),box([.71,.035,.095],[0,.34,-.49])]),
+ casement:kit('Operable casement frame','steel',[-1,1].flatMap(s=>[box([.018,.55,.035],[s*.16,0,-.56]),box([.31,.018,.035],[s*.16,.275,-.56]),box([.31,.018,.035],[s*.16,-.275,-.56])])),
+ windowHood:kit('Window hood and brackets','stone',[box([.82,.035,.14],[0,.36,-.54]),...[-.29,.29].map(x=>box([.055,.1,.06],[x,.3,-.54]))]),
+ arch:kit('Segmental masonry arch','stone',Array.from({length:7},(_,i)=>box([.12,.065,.09],[Math.sin((i-3)*.3)*.38,.19+Math.cos((i-3)*.3)*.2,-.54],[0,0,-(i-3)*.18]))),
+ keystone:kit('Projecting arch keystone','stone',[box([.095,.13,.12],[0,.39,-.55])]),
+ jamb:kit('Layered entrance jamb','stone',[-.3,.3].flatMap(x=>[box([.045,.75,.08],[x,-.065,-.54]),box([.02,.78,.055],[x*1.17,-.05,-.53])])),
+ doorPanel:kit('Panelled entrance door','bronze',[box([.24,.62,.025],[-.16,-.1,-.54]),...[-.24,0,.19].map(y=>box([.18,.14,.025],[-.16,y,-.56]))]),
+ kickPlate:kit('Brass door kickplate','bronze',[box([.24,.1,.03],[-.16,-.35,-.57])]),
+ doorCloser:kit('Door closer and link','steel',[box([.12,.035,.04],[-.16,.25,-.55]),box([.14,.012,.014],[-.13,.28,-.59],[0,.45,0])]),
+ intercom:kit('Entry intercom and buttons','steel',[box([.065,.12,.035],[.01,-.04,-.55]),...[-.065,-.03,.005].map(y=>box([.012,.008,.01],[.025,y,-.574]))]),
+ mailSlot:kit('Door letterbox','bronze',[box([.12,.025,.02],[-.16,-.13,-.585])]),
+ threshold:kit('Entrance stone threshold','stone',[box([.67,.05,.2],[0,-.44,-.52])]),
+ shopSign:kit('Framed storefront signboard','bronze',[box([.79,.16,.05],[0,.22,-.55]),box([.83,.018,.07],[0,.31,-.55]),box([.83,.018,.07],[0,.13,-.55])]),
+ displayShelf:kit('Shop display shelving','bronze',[-.29,-.02,.2].map(y=>box([.38,.018,.1],[.2,y,-.42]))),
+ awningStripes:kit('Striped canvas awning ribs','stone',Array.from({length:6},(_,i)=>box([.03,.025,.23],[-.37+i*.148,.39,-.51],[-.08,0,0]))),
+ wallLantern:kit('Caged wall lantern','bronze',[box([.055,.14,.045],[.42,.14,-.565]),box([.09,.018,.08],[.42,.22,-.565]),box([.09,.018,.08],[.42,.06,-.565]),box([.02,.09,.06],[.42,.22,-.525])]),
+ securityGrille:kit('Window security grille','steel',[-.24,-.12,0,.12,.24].map(x=>box([.012,.48,.023],[x,0,-.58]))),
+ acUnit:kit('Window AC compressor','steel',[box([.23,.15,.16],[.2,-.23,-.57]),...[-.275,-.24,-.205].map(y=>box([.21,.012,.017],[.2,y,-.66]))]),
+ radiator:kit('Cast iron interior radiator','steel',Array.from({length:6},(_,i)=>box([.025,.19,.055],[-.16+i*.065,-.31,-.36]))),
+ frieze:kit('Decorative facade frieze','stone',[box([.98,.08,.065],[0,.39,-.54]),...[-.35,0,.35].map(x=>box([.07,.06,.025],[x,.39,-.583],[0,0,.785]))]),
+ dripEdge:kit('Metal flashing drip edge','silver',[box([.94,.013,.12],[0,-.37,-.53]),box([.94,.025,.014],[0,-.385,-.59])]),
+ expansionJoint:kit('Facade expansion joint','steel',[box([.012,.85,.028],[.38,0,-.528])]),
+ panelBolts:kit('Exposed cladding fixings','silver',[-.36,.36].flatMap(x=>[-.32,.32].map(y=>box([.024,.025,.035],[x,y,-.55])))),
+ downspout:kit('Rainwater downpipe and collars','steel',[box([.035,.94,.04],[-.45,0,-.555]),...[-.3,.05,.35].map(y=>box([.06,.022,.06],[-.45,y,-.555]))]),
+ gutter:kit('Roof drainage gutter','steel',[box([1,.025,.11],[0,.53,-.53]),box([1,.06,.015],[0,.56,-.585])]),
+ soffit:kit('Roof eave soffit panels','stone',[box([.98,.025,.17],[0,.465,-.49]),...[-.35,0,.35].map(x=>box([.035,.055,.16],[x,.44,-.49]))]),
+ corbel:kit('Carved cornice corbels','stone',[-.36,0,.36].flatMap(x=>[box([.065,.1,.09],[x,.38,-.54]),box([.085,.04,.13],[x,.45,-.54])])),
+ ceilingLight:kit('Suspended interior light','silver',[box([.32,.025,.09],[0,.32,.05]),box([.012,.1,.014],[-.12,.38,.05]),box([.012,.1,.014],[.12,.38,.05])]),
+ sprinkler:kit('Sprinkler main and drop','steel',[box([.7,.018,.022],[0,.32,.28]),box([.018,.08,.018],[.12,.28,.28]),box([.045,.012,.045],[.12,.235,.28])]),
+ cableTray:kit('Perforated cable tray','steel',[box([.08,.025,.8],[.32,.32,0]),...[-.3,0,.3].map(z=>box([.12,.012,.025],[.32,.34,z]))]),
+ partition:kit('Office partition and header','concrete',[box([.045,.63,.35],[.36,-.12,.04]),box([.045,.05,.6],[.36,.22,.05])]),
+ desk:kit('Office workstation','bronze',[box([.27,.025,.13],[-.2,-.19,.25]),...[-.3,-.1].map(x=>box([.018,.24,.018],[x,-.32,.25]))]),
+ serviceDoor:kit('Fire-rated service door','steel',[box([.025,.67,.26],[.12,-.08,.13]),box([.02,.018,.14],[.095,-.09,.13])]),
+ exitSign:kit('Emergency exit fixture','silver',[box([.025,.07,.16],[.095,.29,.13])]),
+ stairStringer:kit('Stair side stringers','steel',[-.33,-.07].map(x=>box([.017,1.07,.034],[x,-.035,.015],[-.625,0,0]))),
+ conduit:kit('Electrical conduits and junction','steel',[box([.02,.72,.02],[.4,0,.38]),box([.075,.065,.04],[.4,-.15,.38])]),
+ roofHatch:kit('Roof access hatch and hinges','steel',[box([.25,.055,.27],[-.18,.55,-.08]),box([.028,.025,.29],[-.28,.59,-.08])]),
+ ductFan:kit('Roof extractor fan and cage','steel',[box([.21,.12,.21],[.05,.59,.18]),...[-1,1].map(s=>box([.21,.012,.04],[.05,.66,.18],[0,s*.785,0]))]),
+ roofWalkway:kit('Roof maintenance walkway','steel',[box([.11,.017,.68],[-.38,.54,0]),...[-.24,0,.24].map(z=>box([.16,.025,.02],[-.38,.56,z]))]),
+ solarRack:kit('Tilted solar support rack','steel',[box([.3,.024,.25],[.22,.61,.1],[-.25,0,0]),...[-.12,.12].map(x=>box([.022,.13,.02],[.22+x,.565,.1]))]),
+ utilityTank:kit('Expansion tank and feed pipe','silver',[box([.12,.2,.14],[-.05,.65,-.3]),box([.024,.12,.024],[-.05,.53,-.3])]),
+ lightningRod:kit('Lightning conductor and bracket','silver',[box([.012,.4,.014],[.43,.72,.42]),box([.1,.012,.014],[.4,.58,.42])]),
+ chimneyCap:kit('Chimney rain hood','stone',[box([.2,.03,.2],[.25,.85,.22]),...[-1,1].map(s=>box([.012,.06,.012],[.25+s*.065,.81,.22]))]),
+ planter:kit('Roof terrace planter','stone',[box([.36,.11,.13],[0,.57,-.3]),box([.39,.022,.16],[0,.635,-.3])]),
+ louverScreen:kit('Rooftop equipment screen','steel',Array.from({length:5},(_,i)=>box([.52,.017,.027],[0,.55+i*.055,.4]))),
+ bayWindow:kit('Projecting bay-window frame','bronze',[box([.48,.04,.16],[0,-.32,-.6]),...[-.24,0,.24].map(x=>box([.022,.64,.05],[x,0,-.68])),box([.48,.04,.16],[0,.32,-.6])]),
+ frenchDoor:kit('Full-height balcony doors','bronze',[-.24,0,.24].map(x=>box([.019,.81,.035],[x,-.025,-.55]))),
+ sunshade:kit('Horizontal brise soleil','silver',[-.26,0,.26].map(y=>box([.86,.024,.22],[0,y,-.55],[-.16,0,0]))),
+ verticalFin:kit('Vertical solar fins','silver',[-.35,0,.35].map(x=>box([.028,.86,.21],[x,0,-.53]))),
+ gothicArch:kit('Pointed Gothic window tracery','stone',[-1,1].flatMap(s=>[box([.035,.43,.08],[s*.25,-.06,-.55]),box([.035,.36,.08],[s*.13,.23,-.55],[0,0,s*.68])])),
+ copperRoof:kit('Copper mansard roof edge','bronze',[box([.95,.06,.28],[0,.6,-.36],[.5,0,0]),box([1,.045,.07],[0,.51,-.51])]),
+ sawtooth:kit('Industrial sawtooth rooflight','steel',[-1,1].flatMap(s=>[box([.38,.025,.28],[s*.23,.61,0],[0,0,.4]),box([.025,.18,.25],[s*.23+.17,.6,0])])),
+ decoChevron:kit('Art Deco chevron panel','bronze',[-1,1].map(s=>box([.035,.29,.055],[s*.09,.07,-.55],[0,0,s*.6]))),
+ castIronCapital:kit('Cast iron column capital','bronze',[-.43,.43].flatMap(x=>[box([.12,.08,.065],[x,.34,-.55]),box([.16,.022,.09],[x,.395,-.55])])),
+ arcade:kit('Ground-floor arcade springing','stone',[-1,1].flatMap(s=>[box([.1,.59,.13],[s*.42,-.15,-.54]),box([.18,.075,.14],[s*.36,.2,-.54])])),
+ terraceGlass:kit('Terrace glass balustrade posts','silver',[-.38,-.19,0,.19,.38].map(x=>box([.014,.25,.035],[x,.66,-.49])))
 });
 export function componentPlacements(c,{interiors=true}={}){
  const out=[],put=(type,side=-1,layer='frame')=>out.push({type,side,layer});
@@ -81,7 +137,21 @@ export function componentPlacements(c,{interiors=true}={}){
    }
   }
  }
+ // Close-range service, facade and roof assemblies add depth without more physics bodies.
+ if(core&&(interiors||c.ground))for(const t of ['ceilingLight','sprinkler','cableTray','partition','desk','serviceDoor','exitSign','stairStringer','conduit'])put(t);
+ for(let side=0;side<4;side++)if(c.walls[side]){
+  const layer=c.material==='glass'?'glass':'facade';
+  if(interiors||c.floor<3||c.roof)for(const t of ['windowRecess','casement','windowHood','radiator','dripEdge','expansionJoint','panelBolts','downspout'])put(t,side,layer);
+  if(c.ground)for(const t of ['jamb','doorPanel','kickPlate','doorCloser','intercom','mailSlot','threshold','shopSign','displayShelf','awningStripes','wallLantern','securityGrille','arcade'])put(t,side,layer);
+  if(c.floor===1)for(const t of ['acUnit','frieze','bayWindow','frenchDoor'])put(t,side,layer);
+  if(c.roof)for(const t of ['gutter','soffit','corbel','terraceGlass'])put(t,side);
+  const styleParts={brownstone:['arch','keystone'],tenement:['arch','keystone'],warehouse:['castIronCapital'],castiron:['castIronCapital','arch'],beauxarts:['arch','keystone'],deco:['decoChevron'],curtain:['verticalFin','sunshade'],terraced:['sunshade'],brutalist:['verticalFin'],hotel:['arch','keystone'],apartment:['sunshade'],industrial:['castIronCapital'],market:['arch','keystone'],gothic:['gothicArch'],copper:['decoChevron'],modern:['verticalFin']};
+  if(interiors||c.floor<3||c.roof)for(const t of styleParts[c.architecture]||[])put(t,side,layer);
+  if(c.roof&&['copper','beauxarts','hotel'].includes(c.architecture))put('copperRoof',side);
+ }
  if(c.roof){
+  for(const t of ['roofHatch','ductFan','roofWalkway','solarRack','utilityTank','lightningRod','chimneyCap','planter','louverScreen'])put(t);
+  if(['industrial','warehouse','market'].includes(c.architecture))put('sawtooth');
   if(c.architecture==='wtc')put('wtcHatTruss');
   for(const t of ['chimney','duct','skylight','roofVent'])put(t);
   if(c.architecture==='empire'&&c.spire)put('empireMast');

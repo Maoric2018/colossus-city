@@ -26,7 +26,7 @@ export function updateMissiles(room){
   const obstruction = room.world.castRay(new RAPIER.Ray(m.p, direction), travel, true, undefined, group(G.WORLD, G.WORLD | G.DEBRIS | G.PLAYER));
   if(obstruction){ distance = obstruction.timeOfImpact ?? obstruction.toi; hit = true; }
   m.p = add(m.p, mul(direction, distance));
-  if(m.p.y < 0 || Math.hypot(m.p.x, m.p.z) > room.env.half + 40) hit = true;
+  if(m.p.y < 0 || (!room.env.infinite && Math.hypot(m.p.x, m.p.z) > room.env.half + 40)) hit = true;
   if(!hit){if(room.tick%3===0){m.time=room.time;room.event({type:'missile-pose',id,p:arr(m.p),direction:m.direction,time:room.time});}continue;}
   room.missiles.delete(id); room.event({type:'detonate', id, p:arr(m.p)});blastCars(room,m.p,C.MISSILE_RADIUS);
   for(const p of room.players.values()) if(p.body && room.time >= p.invulnerable){

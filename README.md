@@ -1,5 +1,5 @@
 # COLOSSUS CITY
-### One giant. Eight jetpack raiders. A dense city that comes apart.
+### One giant. Eight jetpack raiders. An endless city that comes apart.
 
 Asymmetric multiplayer prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders a Manhattan-style district; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
@@ -90,7 +90,11 @@ Soaring animates the existing armored pilot: the helmet looks forward, the weapo
 
 ### Midtown
 
-The district (`shared/city/layout.js`) is a 320 m grid with **169 destructible buildings and 5,452 structural bays**. Every occupied block has at least six addresses, with taller cores, storefront infill, alleys and open avenues. Custom twin towers and an Empire State–style tower use dedicated architectural parts. The 45-type kit includes steel framing, stairs, elevator doors, storefronts, fire escapes, balconies, cornices and roof services. Each building uses at least 30 types, joined into structural bays for simulation. Existing downloaded textures, roof equipment, cars and skyline models remain in use. Raiders spawn on the outer avenues; the giant starts on the plaza.
+The original **169 buildings and 5,452 structural bays** form the center of a continuously generated city. Travel in any horizontal direction to discover more 70 m blocks, each with eight buildings, courtyards, alleys and connected streets. Sixteen building families vary footprints, heights, setbacks and facade details: brownstones, tenements, warehouses, cast-iron storefronts, Beaux-Arts, Art Deco, curtain-wall offices, terraces, brutalist buildings, hotels, apartments, factories, markets, Gothic buildings, copper-roofed buildings and modern offices. The custom twin towers and Empire State–style tower remain in Midtown.
+
+The **101-type architectural kit** supplies at least **75 distinct component types per building**: detailed entrances and windows, stairs, fire escapes, interior services, ornamental masonry, balconies, roof machinery and family-specific parts. Downloaded photographic textures and roof models are reused. Fine geometry is concentrated nearby; simpler distant buildings blend into matching horizon fog (105–230 m on Quest, 140–340 m on desktop).
+
+Nearby blocks have full destruction and collision. Distant blocks unload, retaining a sparse record of damage, broken skins and rubble for the current round. Returning players and late spectators see the same destruction. Offscreen physics pauses and resumes when the block reloads; round reset starts a fresh city. Raiders who die far from the start respawn near the giant.
 
 ### Layered destruction with integrity
 
@@ -104,7 +108,7 @@ Robot missiles gently correct toward visible raiders inside a 22° forward cone,
 
 The 37 street cars have independent physics bodies. Gentle hand pushes move them; hard punches, full-speed footsteps, crashes after a shove and missile blasts make them explode. Each of the six vehicle models has its own crushed wreck with downloaded torn doors, bumpers, tires and engine parts. Fire and smoke fade; the solid wreck remains movable until the round resets. Moving cars, final resting poses and wreck state are shared with all players and late spectators. These explosions do not damage the colossus.
 
-This is a game structural model, not engineering analysis: no bending moments, fatigue, rebar or arbitrary cracks; bays are rigid compounds; the skyline ring is decoration.
+This is a game structural model, not engineering analysis: no bending moments, fatigue, rebar or arbitrary cracks; bays are rigid compounds. Distant silhouettes become detailed, destructible buildings as you approach.
 
 ### Game feel
 
@@ -114,7 +118,7 @@ Client-side prediction runs the shared flight model locally against the held inp
 
 Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders and 37 cars; a maximal snapshot for this map is 9,256 bytes. Parked and sleeping cars send no repeated poses.
 
-Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1, low-poly skyline), `medium`, `high`. Adaptive resolution lowers the pixel ratio under sustained load. Towers render as a handful of instanced batches regardless of size (~120 draw calls in play on `low`). `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
+Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1), `medium`, `high`. Adaptive resolution lowers the desktop pixel ratio under sustained load. All nearby blocks share the architectural detail batches; core geometry outside both headset views is removed from submitted instances. Render and physics neighborhoods follow players, while fog covers the distant cutoff. `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
 
 ```sh
 npm run check          # Syntax and local import existence, no packages needed
@@ -125,6 +129,7 @@ npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three
 npm run test:all       # All Node tests
 npm run test:giant     # Rendered hand anatomy and real Midtown contact in Quest emulation
 npm run test:city
+npm run test:streaming # Generated blocks, stereo visibility, return-trip rubble and Quest travel
 npm run test:cars      # Moving cars, crushed models, explosions, collision queries and late joins
 npm run test:visual    # Imported art, roof movement, props and lasers
 npm run test:ragdoll   # Matching pilot/ragdoll skin and physics

@@ -1,5 +1,20 @@
 # Validation record and acceptance gates
 
+## Infinite city and expanded architecture — September 12, 2026
+
+- **102 Node tests and 96 JavaScript modules: PASS.** New coverage checks deterministic positive/negative block coordinates, disjoint cell IDs and building footprints, all 16 families, at least 75 component types per building, exact HP/skin/debris restoration, bounded pristine travel, separated players, distant VR poses and real giant/raider movement across the former boundary.
+- **Generated-city browser check: PASS.** Distant views retain at most nine detailed generated blocks and fewer than 220 cached preview blocks. The global kit has 101 geometry types. Returning to a damaged block restores the same settled bay pose, eight skin fragments and its hand-collision proxy; stale snapshots cannot move it. Screenshots: `artifacts/infinite-city.png`, `infinite-street.png`, `infinite-distant.png`.
+- **Visibility and emulated Quest travel: PASS.** Core instances use both eye frustums. Traveling north beyond the former boundary loads generated blocks with 105–230 m headset fog. Visibility compaction reduced the sampled travel scene from 3.85 million to about 1.53 million submitted stereo triangles. This is a rendering workload count on a Mac, not physical Quest FPS. Report: `artifacts/streaming-report.json`.
+- **Existing browser regressions: PASS.** Multiplayer controls, first/third-person views, WebRTC spectator video, reconnect/fallback and repeated XR entry/exit pass without browser errors. The sampled home scene submitted 1.31 million stereo triangles. Focused landmark/attachment, persistent fragment and Quest arm/body-view checks also pass. The local harness uses direct ICE and IPv4 loopback; cross-device Wi-Fi and headset encoding remain unmeasured.
+
+| Server scenario (8 raiders, 900 ticks) | Mean ms | p95 ms | Max ms |
+| --- | ---: | ---: | ---: |
+| Intact city | 3.56 | 3.87 | 4.44 |
+| Six staged collapses and repeated ragdolls | 8.38 | 10.13 | 32.75 |
+| Active giant hand contact | 4.07 | 5.42 | 7.73 |
+
+These are final-run server CPU timings on an Apple M5 Pro. Collapse spikes exceed the 16.67 ms tick budget; an earlier run reached 52.53 ms. New outer physics blocks are built one per tick to spread construction work, but physical Quest frame times and worst-case eight-player streaming still require a device demo. Distant physics pauses and resumes on return. Only damaged-block history grows with travel, and it is cleared each round; no city state is saved across server restarts.
+
 ## Colossus look-down visibility — September 12, 2026
 
 - **97 Node tests and 91 JavaScript modules: PASS.** The local torso/leg material copies preserve shared hand materials and other avatars. Fade timing matches at 30 and 144 fps; looking up restores opacity.
@@ -83,4 +98,4 @@ As before: shaped ~100 ms RTT, jitter, loss and stalls; watch prediction correct
 
 ## Known limits
 
-Game structural model, not engineering analysis; rigid compounds; decorative skyline; simplified giant collision; no rewind hit validation, accounts, persistence or horizontal scaling. Live video targets 640 × 400 at 30 desktop / 24 headset frames per second. Cross-device Wi-Fi, remote ICE/TURN paths and headset encoding cost still need a demo-device test.
+Game structural model, not engineering analysis; rigid compounds; distant silhouette LOD; simplified giant collision; no rewind hit validation, accounts, persistence across restarts or horizontal scaling. Live video targets 640 × 400 at 30 desktop / 24 headset frames per second. Cross-device Wi-Fi, remote ICE/TURN paths and headset encoding cost still need a demo-device test.

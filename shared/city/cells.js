@@ -5,8 +5,9 @@ import {roofColliders} from '../props.js';
 import {MATERIALS, ALL_SIDES, sideBit, wallSolid} from './materials.js';
 export function generateCells(env){
  const cells = [];
- let id = 1;
- env.buildings.forEach((b, bi) => {
+ let id = (env.cellBase || 0) + 1;
+ env.buildings.forEach((b, localIndex) => {
+  const bi=b.index??localIndex;
   const ids = new Map(), totalFloors = b.tiers.reduce((s, t) => s + t.floors, 0);
   const base = b.tiers[0], originX = b.x - (base.nx - 1) / 2 * b.bay, originZ = b.z - (base.nz - 1) / 2 * b.bay;
   let floor = 0;
@@ -14,7 +15,7 @@ export function generateCells(env){
    for(let f = 0; f < t.floors; f++, floor++)
     for(let z = 0; z < t.nz; z++) for(let x = 0; x < t.nx; x++){
      const ix = t.ix + x, iz = t.iz + z;
-     const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, architecture:b.architecture || 'urban', variant:b.variant || 0, buildingFloors:totalFloors, ground:floor === 0,
+     const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, architecture:b.architecture || 'urban', variant:b.variant || 0, roofYaw:env.cellBase?b.variant%4:undefined, buildingFloors:totalFloors, ground:floor === 0,
       p:[originX + ix * b.bay, .15 + floor * b.story + b.story / 2, originZ + iz * b.bay],
       size:[b.bay, b.story, b.bay], walls:[false, false, false, false], neighbors:[], below:0, above:0, lateral:[],
       roof:false, stackAbove:0, frameScale:C.BUILDING_STRENGTH * (b.strength || 1) * (1 + .7 * (1 - floor / Math.max(1, totalFloors - 1)))};
@@ -32,7 +33,7 @@ export function generateCells(env){
    c.roof = !c.above;
   }
   const assets=[['city-kit-industrial/water-tower',3.2],['space-kit/satelliteDish_detailed',2.6],['city-kit-industrial/detail-tank',1.3],['city-kit-industrial/solar-panel-flat',.3]];
-  for(const c of mine) if(c.roof){const type=(c.ix+c.iz*2+c.building+c.tier)%5;if(b.waterTower && c.ix===0 && c.iz===0)c.roofAsset=assets[0];else if(!b.spire && type>=1 && type<=3)c.roofAsset=assets[type];}
+  for(const c of mine) if(c.roof){const type=(c.ix+c.iz*2+(env.cellBase?localIndex:c.building)+c.tier)%5;if(b.waterTower && c.ix===0 && c.iz===0)c.roofAsset=assets[0];else if(!b.spire && type>=1 && type<=3)c.roofAsset=assets[type];}
   if(b.spire){const top=mine.filter(c=>c.roof).sort((a,b)=>b.p[1]-a.p[1])[0];if(top)top.spire=b.spire;}
   for(const c of mine){ let n = 0, up = c.above; while(up){ n++; up = byId.get(up).above; } c.stackAbove = n; }
  });

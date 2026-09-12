@@ -1,6 +1,7 @@
 // One authoritative match: a Rapier world, its players, the giant and the destructible city.
 // Room orchestrates; the mechanics live in boss.js, players.js, combat.js, destruction.js
 // and abilities.js so they can be changed and tested independently.
+import {CityStreaming} from './streaming.js';
 import {GIANT, handQuaternion, identity} from '../shared/giant-rig.js';
 import {HandWorld} from '../shared/hand-world.js';
 import {buildCars,carMeta,updateCars,crashCar,carSnapshots} from './cars.js';
@@ -21,11 +22,12 @@ const G = C.COLLISION;
 
 export class Room {
  constructor(code, {practice = false, environment = city} = {}){
-  this.code = code; this.env = environment; this.practice = practice; this.clients = new Map(); this.players = new Map();
+  this.code = code; this.baseEnvironment=environment; this.env = environment; this.practice = practice; this.clients = new Map(); this.players = new Map();
   this.nextPlayer = 1; this.nextRag = 10000; this.tick = 0; this.time = 0; this.round = 1; this.emptySince = Date.now(); this.bossClient = null;
   this.initWorld();
  }
  initWorld(){
+  this.stream=null;this.env={...this.baseEnvironment,buildings:[...this.baseEnvironment.buildings]};
   // Old body wrappers refer to the old WASM sets, not to the next world.
   for(const p of this.players.values()){ p.body = null; p.rag = null; }
   this.world?.free(); this.queue?.free();
@@ -55,6 +57,7 @@ export class Room {
   for(const p of this.players.values()){ p.kills = 0; p.damage = 0; p.score = 0; spawn(this, p); }
   // Rays cast before the first step must already see the city.
   this.world.updateSceneQueries();
+  if(this.env.infinite)this.stream=new CityStreaming(this);
  }
  // ---- membership ----
  attach(ws, role, name){
@@ -80,6 +83,7 @@ export class Room {
  roster(){ return [...this.clients.values()].map(c => ({id:c.id, name:c.name, role:c.role})).concat([...this.players.values()].filter(p => p.bot).map(p => ({id:p.id, name:p.name, role:'bot'}))); }
  welcome(client){
   return {type:'welcome', id:client.id, viewKey:client.viewKey, role:client.role, room:this.code, practice:this.practice, environment:this.env.id, round:this.round, host:this.hostId(),
+   blocks:this.stream?.welcome()||[],
    cars:[...this.cars.values()].map(c=>carMeta(this,c)),
    missiles:[...this.missiles.values()].map(m => ({...m, time:this.time, p:arr(m.p)})),
    clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity) && !this.settled.has(c.entity)).map(c => c.id),
@@ -95,7 +99,7 @@ export class Room {
   }
   if(m.type === 'pose' && client.role === 'boss'){
    if(m.tracking === false){ this.boss.desktop = false; this.boss.lastPose = -100; this.boss.moveX = 0; this.boss.moveZ = 0; return; }
-   if(!finiteVector(m.head) || !finiteVector(m.left) || !finiteVector(m.right) || !Number.isFinite(m.yaw)) return;
+   if(!finiteVector(m.head,3,1e7) || !finiteVector(m.left,3,1e7) || !finiteVector(m.right,3,1e7) || !Number.isFinite(m.yaw)) return;
    const b = this.boss, head = vec(m.head), l = vec(m.left), r = vec(m.right);
    if(head.y < 5 || head.y > 38 || Math.hypot(head.x - b.x, head.z - b.z) > 18 || dist(head, l) > 64 || dist(head, r) > 64) return;
    // Session entry, recentering and recovered tracking are teleports, not swings.
@@ -122,6 +126,7 @@ export class Room {
   if(this.phase){ this.world.step(this.queue); this.queue.drainCollisionEvents(() => {}); updateCars(this); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
   // Wait for at least one raider. An AI giant fills an empty boss seat; it is not a second authority.
   if(this.players.size) this.remaining = Math.max(0, C.MATCH_SECONDS - (this.time - this.startTime)); else this.startTime = this.time;
+  this.stream?.update();
   updateBoss(this);
   for(const p of this.players.values()) updatePlayer(this, p);
   for(const e of this.debris.values()) e.preImpactSpeed = len(e.body.linvel());

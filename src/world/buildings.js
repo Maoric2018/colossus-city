@@ -9,41 +9,44 @@ import {MATERIALS, sideBit} from '../../shared/city/materials.js';
 import {surface, glassMaterial} from '../render/quality.js';
 import {facadeMaps, roofTexture} from './textures.js';
 const temp = new T.Object3D(), matrix = new T.Matrix4(), local = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0);
+const sphere=new T.Sphere(),projection=new T.Matrix4(),eyePosition=new T.Vector3();
+const white=new T.Color(0xffffff),wtcGlass=new T.Color(0x718087);
 const skinKey=c=>c.architecture==='empire'?'empire':c.material;
 const wallLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .5, 0, -Math.cos(a) * .5), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 // Masonry window panes sit just outside the facade box (which spans ±.011 around the wall plane).
 const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .514, 0, -Math.cos(a) * .514), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 function colored(geometry, color){ const c = new T.Color(color), n = geometry.attributes.position.count, colors = new Float32Array(n * 3); for(let i = 0; i < n; i++) c.toArray(colors, i * 3); geometry.setAttribute('color', new T.BufferAttribute(colors, 3)); return geometry; }
 export class Buildings {
- constructor(root, cells, tier, {concrete}){
+ constructor(root, cells, tier, {concrete,resources=null,components=null}){
   this.root = root; this.cells = cells; this.tier = tier; this.entries = new Map(); this.dirty = new Set(); this.batches = [];
   // Columns are open-ended prisms (no caps): 8 triangles each instead of 12, times 2,500 bays.
   const column = () => new T.CylinderGeometry(.039, .039, .925, 4, 1, true).rotateY(Math.PI / 4);
-  const frameGeometry = mergeParts([
+  const frameGeometry = resources?.frame.geometry || mergeParts([
    [colored(new T.BoxGeometry(1, .075, 1), 0xcfcac0), [0, .462, 0]],
    ...[-1, 1].flatMap(x => [-1, 1].map(z => [colored(column(), 0x2e363c), [x * .472, -.012, z * .472]]))
   ]);
-  this.frame = this.batch(frameGeometry, surface(tier, {map:concrete, vertexColors:true, roughness:.85}), cells.length);
-  this.empireFrame=this.batch(frameGeometry,surface(tier,{color:0xe2ded1,roughness:.8}),cells.filter(c=>c.architecture==='empire').length);
-  const roofGeometry = mergeParts([[new T.BoxGeometry(1, .05, .04), [0, .525, -.48]], [new T.BoxGeometry(1, .05, .04), [0, .525, .48]], [new T.BoxGeometry(.04, .05, 1), [-.48, .525, 0]], [new T.BoxGeometry(.04, .05, 1), [.48, .525, 0]], [new T.BoxGeometry(.96, .012, .96), [0, .505, 0]]]);
-  this.roof = this.batch(roofGeometry, surface(tier, {map:roofTexture(), color:0x8a8884, roughness:1}), cells.filter(c => c.roof).length);
+  this.frame = this.batch(frameGeometry, resources?.frame.material || surface(tier, {map:concrete, vertexColors:true, roughness:.85}), cells.length);
+  this.empireFrame=this.batch(frameGeometry,resources?.empireFrame.material||surface(tier,{color:0xe2ded1,roughness:.8}),cells.filter(c=>c.architecture==='empire').length);
+  const roofGeometry = resources?.roof.geometry || mergeParts([[new T.BoxGeometry(1, .05, .04), [0, .525, -.48]], [new T.BoxGeometry(1, .05, .04), [0, .525, .48]], [new T.BoxGeometry(.04, .05, 1), [-.48, .525, 0]], [new T.BoxGeometry(.04, .05, 1), [.48, .525, 0]], [new T.BoxGeometry(.96, .012, .96), [0, .505, 0]]]);
+  this.roof = this.batch(roofGeometry, resources?.roof.material || surface(tier, {map:roofTexture(), color:0x8a8884, roughness:1}), cells.filter(c => c.roof).length);
   this.facade = {}; this.glass = {}; this.wallCount = {}; this.paneCount = {};
   const size = tier.textureSize;
   for(const name of [...Object.keys(MATERIALS),'empire']){
    const walls = cells.reduce((s, c) => s + (skinKey(c) === name ? c.walls.filter(Boolean).length : 0), 0); if(!walls) continue;
-   const maps = facadeMaps(name, size), m = MATERIALS[name==='empire'?'stone':name];
+   const maps = resources?.glass[name]?null:facadeMaps(name, size), m = MATERIALS[name==='empire'?'stone':name];
    this.wallCount[name] = 0; this.paneCount[name] = 0;
-   if(m.facadeHP > 0) this.facade[name] = this.batch(new T.BoxGeometry(1, .925, .022), surface(tier, {map:maps.map, color:name==='empire'?0xf7f4ee:m.tint, roughness:.9}), walls);
-   this.glass[name] = this.batch(new T.PlaneGeometry(1, .925), glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * .45, color:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02}), walls);
+   if(m.facadeHP > 0) this.facade[name] = this.batch(resources?.facade[name]?.geometry||new T.BoxGeometry(1, .925, .022), resources?.facade[name]?.material||surface(tier, {map:maps.map, color:name==='empire'?0xf7f4ee:m.tint, roughness:.9}), walls);
+   this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * .45, color:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02}), walls);
    this.glass[name].castShadow = false;
   }
   let roofIndex = 0,empireIndex=0;
   cells.forEach((c, i) => {
    const e = {index:i, empireIndex:c.architecture==='empire'?empireIndex++:-1, walls:[], size:new T.Vector3(...c.size), roofIndex:c.roof ? roofIndex++ : -1, glassMask:0, facadeMask:0, hidden:false, p:new T.Vector3(...c.p), q:new T.Quaternion()};
+   e.tint=new T.Color().setHSL(((c.variant%29)-14)*.001+.08,.06+(c.variant%5)*.015,.79+(c.variant%7)*.025);
    c.walls.forEach((exterior, side) => { if(exterior) e.walls.push({side, index:this.wallCount[skinKey(c)]++}); });
    this.entries.set(c.id, e);
   });
-  this.components=new Components(this,cells,tier,concrete);
+  this.components=components||new Components(this,cells,tier,concrete);if(components)components.register(this,cells);
   for(const c of cells) this.setCell(c.id, null, null, false);
  }
  batch(geometry, material, count){
@@ -56,21 +59,53 @@ export class Buildings {
   const e = this.entries.get(id); if(!e) return;
   const c = this.cells[e.index];
   if(p) e.p.copy(p); if(q) e.q.copy(q); e.hidden = hidden;
+  this.writeCore(c,e);
+  this.components?.setCell(c,e);
+ }
+ // Compact only render slots. Cell identities, collision geometry and attachments
+ // retain their world transforms even while a bay is behind the headset.
+ select(camera,far=Infinity,shadows=this.tier.shadows){
+  const eyes=camera.cameras?.length?camera.cameras:[camera];
+  this.frustums||=[];
+  eyes.forEach((eye,i)=>{const f=this.frustums[i]||=new T.Frustum();f.setFromProjectionMatrix(projection.multiplyMatrices(eye.projectionMatrix,eye.matrixWorldInverse));for(const plane of f.planes)plane.constant+=2;});
+  eyePosition.setFromMatrixPosition(eyes[0].matrixWorld);let changed=!this.packed;
+  for(const c of this.cells){
+   const e=this.entries.get(c.id);sphere.center.copy(e.p);sphere.radius=Math.hypot(...(c.queryHalf||c.size.map(v=>v/2)))+1;
+   const near=e.p.distanceToSquared(eyePosition)<(far+sphere.radius)**2;
+   e.inView=near&&eyes.some((_,i)=>this.frustums[i].intersectsSphere(sphere));
+   // Desktop shadow maps also need the nearby buildings behind the camera.
+   const rendered=!e.hidden&&near&&(shadows||e.inView);
+   if(rendered!==e.rendered){e.rendered=rendered;changed=true;}
+  }
+  if(!changed)return;this.packed=true;
+  let frame=0,empire=0,roof=0;const walls={};
+  for(const c of this.cells){
+   const e=this.entries.get(c.id),visible=e.rendered,name=skinKey(c);
+   e.frameIndex=visible&&c.architecture!=='empire'?frame++:-1;
+   e.empireIndex=visible&&c.architecture==='empire'?empire++:-1;
+   e.roofIndex=visible&&c.roof?roof++:-1;
+   for(const wall of e.walls){wall.index=visible?(walls[name]||0):-1;if(visible)walls[name]=wall.index+1;}
+   if(visible)this.writeCore(c,e);
+  }
+  this.frame.count=frame;this.empireFrame.count=empire;this.roof.count=roof;
+  for(const name of Object.keys(this.glass)){this.glass[name].count=walls[name]||0;if(this.facade[name])this.facade[name].count=walls[name]||0;}
+ }
+ writeCore(c,e){
   temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.copy(e.size); temp.updateMatrix();
-  const m = hidden ? zero : temp.matrix;
-  this.frame.setMatrixAt(e.index, e.empireIndex>=0?zero:m); this.dirty.add(this.frame);
+  const hidden=e.hidden,m = hidden ? zero : temp.matrix,frameIndex=e.frameIndex??e.index;
+  if(frameIndex>=0){this.frame.setColorAt(frameIndex,e.tint);this.frame.setMatrixAt(frameIndex, e.empireIndex>=0?zero:m); this.dirty.add(this.frame);}
   if(e.empireIndex>=0){this.empireFrame.setMatrixAt(e.empireIndex,m);this.dirty.add(this.empireFrame);}
   if(e.roofIndex >= 0){ this.roof.setMatrixAt(e.roofIndex, m); this.dirty.add(this.roof); }
-  this.components?.setCell(c,e);
   const facade = this.facade[skinKey(c)], glass = this.glass[skinKey(c)];
   for(const w of e.walls){
+   if(w.index<0)continue;
    const bit = sideBit(w.side);
-   if(glass && c.architecture==='wtc')glass.setColorAt(w.index,new T.Color(0x718087));
-   if(facade){ matrix.multiplyMatrices(m, wallLocal[w.side]); facade.setMatrixAt(w.index, (hidden || !(e.facadeMask & bit)) ? zero : matrix); this.dirty.add(facade); }
+   if(glass)glass.setColorAt(w.index,c.architecture==='wtc'?wtcGlass:white);
+   if(facade){ facade.setColorAt(w.index,e.tint);matrix.multiplyMatrices(m, wallLocal[w.side]); facade.setMatrixAt(w.index, (hidden || !(e.facadeMask & bit)) ? zero : matrix); this.dirty.add(facade); }
    if(glass){ matrix.multiplyMatrices(m, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
   }
  }
- commit(){ for(const b of this.dirty) b.instanceMatrix.needsUpdate = true; this.dirty.clear(); }
+ commit(){ for(const b of this.dirty){b.instanceMatrix.needsUpdate = true;if(b.instanceColor)b.instanceColor.needsUpdate=true;} this.dirty.clear(); }
  // Current transform of a bay (shared object, do not mutate).
  pose(id){ return this.entries.get(id); }
 }

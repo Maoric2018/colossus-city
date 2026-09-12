@@ -44,7 +44,7 @@ const input = new Input(canvas, {
  onScoreboard(show){ if(state.playing && !state.current?.phase) hud.setScoreboardVisible(show); }
 });
 const xr = new XRControl(renderer, camera, rig, net, {onEnter(){ document.exitPointerLock?.(); document.body.classList.add('xr-active'); hud.hideOverlay(); input.reset(); }, onExit(){ document.body.classList.remove('xr-active'); if(state.playing) hud.showOverlay('VR SESSION ENDED', 'Re-enter VR or use desktop giant controls.', {renderer, net}); }});
-xr.localImpact = (a, b, speed, side) => { const hit = resolveHand(a, b, xr.local?.[side + 'Quaternion'] || [0,0,0,1], cityView.handWorld).contacts.find(hit => hit.cell); if(!hit) return false; const c = cityView.byId.get(hit.cell); fx.impact(hit.point, Math.min(1, speed / 30) * .5, c.material); xr.hapticMaterial(c.material, .2); return true; };
+xr.localImpact = (a, b, speed, side) => { const hit = resolveHand(a, b, xr.local?.[side + 'Quaternion'] || [0,0,0,1], cityView.handWorld).contacts.find(hit => hit.cell); if(!hit) return false; const c = cityView.getCell(hit.cell); fx.impact(hit.point, Math.min(1, speed / 30) * .5, c.material); xr.hapticMaterial(c.material, .2); return true; };
 const views = new SpectatorViews(renderer, scene, camera, {getState:() => state.current, getRole:() => state.role, getPlayerId:() => net.id, getMode:() => state.role === 'boss' ? 'Desktop giant' : state.firstPerson ? 'Desktop first person' : 'Desktop third person', getPaused:() => state.paused, getTracking:() => !xr.trackingStopped, players, giant, xr});
 const listenerPosition = () => [camera.matrixWorld.elements[12], camera.matrixWorld.elements[13], camera.matrixWorld.elements[14]];
 const handleEvent = makeEventHandler({city:cityView, fx, audio, hud, shake, xr, missiles, flightFX, giant, addRag, rags, listenerPosition});
@@ -77,7 +77,7 @@ async function start(create = false, practice = false, spectator = false){
 function onMessage(m){
  if(m.type === 'welcome'){
   state.welcome = m; state.role = m.role; state.localId = m.id; views.connect(m); missiles.reset(); for(const missile of m.missiles || []) missiles.add(missile);
-  state.current = null; state.previousPhase = 0; xr.resetPose(); cityView.reset(); for(const r of rags.values()) r.dispose(); rags.clear(); for(const p of players.values()) p.dispose(); players.clear();
+  state.current = null; state.previousPhase = 0; xr.resetPose(); cityView.reset();for(const block of m.blocks||[])cityView.stream?.state(block); for(const r of rags.values()) r.dispose(); rags.clear(); for(const p of players.values()) p.dispose(); players.clear();
   for(const car of m.cars||[])cityView.cars.setState(car);cityView.hideCells(m.clearedCells || []); for(const s of m.skins || []) cityView.setSkin(s[0], s[1], s[2], false); for(const e of m.entities) cityView.addDebris(e); for(const r of m.rags) addRag(r); cityView.commit();
   $('room-label').textContent = `ROOM / ${m.room}`; $('connection-label').textContent = m.practice ? 'PRACTICE / SERVER ONLINE' : 'SERVER CONNECTED';
   const spawn = city.spawns[(m.id - 1) % city.spawns.length]; input.yaw = state.role === 'raider' ? (spawn[3] ?? Math.atan2(spawn[0], spawn[2])) : 0; input.pitch = 0; cameraRig.reset(spawn); prediction.reset(null); lastReconciled = -1; hud.lastHP = 100; $('scoreboard').classList.add('hidden'); return;
