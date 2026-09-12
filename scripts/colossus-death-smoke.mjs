@@ -18,7 +18,7 @@ async function install(page,welcome){
  await page.goto(url+'/?quality=quest');await page.waitForFunction(()=>window.COLOSSUS_ART_READY);
  await page.evaluate(async({welcome,alive})=>{
   const c=window.__COLOSSUS,{state}=await import('/src/app/state.js');c.views.connect=()=>{};c.net.send=()=>true;c.net.id=welcome.id;c.net.role=welcome.role;c.net.onMessage(welcome);
-  state.playing=true;state.paused=false;document.body.classList.add('playing');for(const id of ['lobby','scene-caption','overlay'])document.getElementById(id).classList.add('hidden');document.getElementById('hud').classList.remove('hidden');
+  state.playing=true;state.paused=false;document.body.classList.add('playing');for(const id of ['lobby','overlay'])document.getElementById(id).classList.add('hidden');document.getElementById('hud').classList.remove('hidden');
   window.replaySnapshot=alive;c.net.latest=alive;c.net.sample=()=>window.replaySnapshot;c.camera.position.set(28,24,-44);window.deathSounds=[];c.audio.play=(kind)=>deathSounds.push(kind);
  },{welcome,alive});
 }

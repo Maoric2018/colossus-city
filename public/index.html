@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#09171d"><title>COLOSSUS / City Under Siege</title>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#09171d"><title>Colossus</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23c5ff72' d='M8 8h20v12H20v24h8v12H8zm28 0h20v48H36V44h8V20h-8z'/%3E%3C/svg%3E"><link rel="stylesheet" href="/src/style.css">
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script></head>
 <body>
@@ -9,34 +9,30 @@
 <header id="brand"><b class="brand-mark">[ C ]</b><span>COLOSSUS<span class="brand-sub">CITY UNDER SIEGE</span></span></header>
 <div id="status"><i></i><span id="connection-label">SYSTEM READY</span></div>
 <main id="lobby">
- <div class="eyebrow"><span class="line"></span>ASYMMETRIC MULTIPLAYER / WEBXR</div>
- <h1>THE CITY.<br>THE GIANT.<br><em>THE REST OF US.</em></h1>
- <p class="intro">One colossal threat. A squad of jetpack raiders. An endless city of glass, brick and steel.<br>Nothing here is built to last.</p>
  <div class="role-picker">
-  <button class="role active" data-role="raider"><span>01 / LAPTOP</span><strong>RAIDER <b>↗</b></strong><small>Fly. Dodge. Attack its core.</small></button>
-  <button class="role" data-role="boss"><span>02 / QUEST 2</span><strong>COLOSSUS <b>✦</b></strong><small>Your hands. Their skyline.</small></button>
+  <button class="role active" data-role="raider"><span>01 / LAPTOP</span><strong>DEFENDER <b>↗</b></strong></button>
+  <button class="role" data-role="boss"><span>02 / VR OR DESKTOP</span><strong>COLOSSUS <b>✦</b></strong></button>
+  <button class="role" data-role="spectator"><span>03 / ANY DEVICE</span><strong>SPECTATOR <b>◎</b></strong></button>
  </div>
  <details id="vr-settings"><summary>QUEST CONTROLS</summary><label>Smooth turn speed <output id="turn-value">90°/s</output><input id="turn-speed" type="range" min="30" max="180" step="15" value="90"></label><label>Hand reach <output id="reach-value">1× giant scale</output><input id="hand-reach" type="range" min="0.5" max="1.5" step="0.1" value="1"></label><small>A half-metre reach moves about 7 metres in the city at normal scale. A on the right controller calibrates height.</small></details>
- <div class="form-row"><input id="name" maxlength="20" placeholder="YOUR CALLSIGN" aria-label="Callsign"><input id="room-input" maxlength="6" placeholder="ROOM CODE" aria-label="Room code"></div>
- <div class="actions"><button id="create" class="primary">CREATE ROOM <span>↗</span></button><button id="join" class="secondary">JOIN ROOM</button></div>
- <div class="lobby-bottom"><button id="practice">ENTER PRACTICE <span>→</span></button><button id="spectate">SPECTATE</button><span>1 GIANT · UP TO 8 RAIDERS</span></div>
- <p id="notice" role="status">Loading city renderer…</p>
+ <div class="form-row"><input id="room-input" maxlength="6" placeholder="ROOM CODE" aria-label="Room code"><button id="join" class="secondary">JOIN</button></div>
+ <div class="actions"><button id="create" class="primary">CREATE NEW ROOM <span>↗</span></button></div>
+ <p id="notice" role="status"></p>
 </main>
-<div id="scene-caption"><span>MIDTOWN / ENDLESS CITY</span><small>STRUCTURAL INTEGRITY: <b id="lobby-integrity">100%</b></small></div>
 <section id="hud" class="hidden">
  <div id="boss-health"><div><span id="boss-caption">COLOSSUS / CORE INTEGRITY</span><strong id="boss-percent">100%</strong></div><div class="bar"><i id="boss-fill"></i></div></div>
  <div id="round-info"><strong id="timer">04:00</strong><span id="room-label"></span><button id="copy-link">COPY INVITE ↗</button></div>
  <div id="aim"><i></i><i></i><b></b></div><div id="hit-marker">×</div><div id="charge"><i></i></div>
  <div id="telemetry"><div><span>VITALS</span><b id="hp">100</b></div><div class="fuel"><span>THRUST</span><div class="bar"><i id="fuel-fill"></i></div></div><div><span>ALTITUDE</span><b id="altitude">00<span>m</span></b></div></div>
- <div id="score"><span>COLLATERAL</span><strong id="destruction">0%</strong><span>TOWERS DOWN <b id="towers">0</b> · RAIDERS DOWN <b id="kills">0</b></span></div>
- <div id="flight-status" class="hidden"><b id="flight-mode">HOVER</b><span id="speed-readout">0 m/s</span><span id="dodge-readout">DODGE READY · E</span><span id="heavy-readout">BREACH READY · HOLD RIGHT CLICK</span><small id="score-readout">SCORE 0</small></div><button id="open-spectator">LIVE VIEWS ↗</button><div id="capture-status" class="hidden">GAME VIEW SHARED WITH ROOM SPECTATORS</div><div id="controls"></div><div id="toast"></div><div id="roster"></div>
+ <div id="score"><span>COLLATERAL</span><strong id="destruction">0%</strong><span>TOWERS DOWN <b id="towers">0</b> · DEFENDERS DOWN <b id="kills">0</b></span></div>
+ <div id="flight-status" class="hidden"><b id="flight-mode">HOVER</b><span id="speed-readout">0 m/s</span><span id="dodge-readout">DODGE READY · E</span><span id="heavy-readout">BREACH READY · HOLD RIGHT CLICK</span><small id="score-readout">SCORE 0</small></div><button id="open-spectator">LIVE VIEWS ↗</button><div id="capture-status" class="hidden">GAME VIEW SHARED WITH ROOM SPECTATORS</div><details id="controls-panel"><summary>CONTROLS · H</summary><div id="controls"></div></details><div id="toast"></div><div id="roster"></div>
  <button id="vr-button" class="primary hidden">ENTER VR ↗</button><button id="menu-button">ESC / MENU</button>
  <div id="performance"></div>
 </section>
-<div id="overlay" class="hidden"><div><span class="eyebrow" id="overlay-kicker">CONNECTION ESTABLISHED</span><h2 id="overlay-title">READY TO DROP?</h2><p id="overlay-text">Click to capture your mouse. Escape releases it.</p><button id="camera-toggle" class="hidden">SWITCH TO THIRD PERSON · V</button><button class="primary" id="resume">DEPLOY ↗</button><button class="secondary" id="restart">NEW ROUND</button><button id="menu-spectator" class="secondary">LIVE VIEWS ↗</button><button id="leave">LEAVE ROOM</button></div></div>
+<div id="overlay" class="hidden"><div><h2 id="overlay-title">READY TO DROP?</h2><p id="overlay-text">Click to capture your mouse. Escape releases it.</p><button id="camera-toggle" class="secondary hidden">SWITCH TO THIRD PERSON · V</button><button class="primary" id="resume">DEPLOY ↗</button><button class="secondary" id="restart">NEW ROUND</button><button id="menu-spectator" class="secondary">LIVE VIEWS ↗</button><button id="leave">LEAVE ROOM</button></div></div>
 <table id="scoreboard" class="hidden"></table>
 <div id="round-transition" class="hidden" role="status" aria-live="polite"><span id="round-transition-detail"></span><strong id="round-transition-title"></strong></div>
-<section id="spectator-panel" class="hidden" aria-label="Live spectator views"><div class="spectator-toolbar"><div><span class="eyebrow">ROOM OBSERVATORY</span><h2>EVERY PILOT. EVERY ANGLE.</h2><p>Live video · select a screen to enlarge</p></div><div><button id="spectator-free" class="secondary">FREE CAMERA</button><button id="spectator-leave" class="secondary">LEAVE ROOM</button></div></div><div id="spectator-grid"></div></section>
+<section id="spectator-panel" class="hidden" aria-label="Live spectator views"><div class="spectator-toolbar"><div><span class="eyebrow">ROOM OBSERVATORY</span><h2>EVERY DEFENDER. EVERY ANGLE.</h2><p>Live video · select a screen to enlarge</p></div><button id="spectator-room" title="Click to copy"><span>ROOM CODE</span><b id="spectator-room-code">——————</b></button><div><button id="spectator-free" class="secondary">FREE CAMERA</button><button id="spectator-leave" class="secondary">LEAVE ROOM</button></div></div><div id="spectator-grid"></div></section>
 <div id="loading-error" class="hidden"></div>
 <script type="module" src="/src/main.js"></script>
 <script>window.addEventListener('error',function(e){if(e.message&&/module|resolve|fetch|import/i.test(e.message))document.getElementById('notice').textContent='Renderer failed to load. Run npm install, then npm start, and open http://localhost:8080.';});setTimeout(function(){if(!window.COLOSSUS_READY)document.getElementById('notice').textContent='Still loading? Install dependencies with npm install and start the included server. Opening this HTML directly is not supported.';},15000);</script>

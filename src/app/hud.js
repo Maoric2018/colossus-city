@@ -14,12 +14,13 @@ export class HUD {
  showOverlay(title = 'READY TO DROP?', text = 'Click to capture your mouse. Escape releases it.', {renderer, net} = {}){
   if(renderer?.xr.isPresenting) return; state.paused = true; $('overlay-title').textContent = title; $('overlay-text').textContent = text; $('overlay').classList.remove('hidden');
   $('camera-toggle').classList.toggle('hidden', state.role !== 'raider'); $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V';
+  for(const id of ['menu-spectator', 'open-spectator']) $(id).classList.toggle('hidden', state.role !== 'spectator');
   $('resume').textContent = state.role === 'boss' ? 'DESKTOP CONTROLS ↗' : 'DEPLOY ↗'; $('restart').classList.toggle('hidden', !state.current?.phase || net?.id !== state.welcome?.host);
  }
  hideOverlay(){ state.paused = false; $('overlay').classList.add('hidden'); }
  scoreboard(players, winner){
   const rows = players.slice().sort((a, b) => b.score - a.score).map(p => `<tr><td>${p.bot ? '◇' : '›'} ${escapeText(p.name)}${p.id === state.localId ? ' / YOU' : ''}</td><td>${p.kills}</td><td>${p.damage}</td><td>${p.score}</td></tr>`).join('');
-  $('scoreboard').innerHTML = `<caption>${winner === 'giant' ? 'THE COLOSSUS SURVIVES' : 'THE GIANT HAS FALLEN'} · RAIDER SQUAD</caption><tr><th>PILOT</th><th>DOWN</th><th>DMG</th><th>SCORE</th></tr>${rows}`;
+  $('scoreboard').innerHTML = `<caption>${winner === 'giant' ? 'THE COLOSSUS SURVIVES' : 'THE COLOSSUS HAS FALLEN'} · DEFENDER SQUAD</caption><tr><th>PILOT</th><th>DOWN</th><th>DMG</th><th>SCORE</th></tr>${rows}`;
   $('scoreboard').classList.remove('hidden');
  }
  setScoreboardVisible(visible){ if(!visible){ $('scoreboard').classList.add('hidden'); return; } const s = state.current; if(!s) return; this.scoreboard(s.players.map(p => ({id:p.id, name:state.welcome?.roster?.find(r => r.id === p.id)?.name || `PILOT ${p.id}`, bot:!!(p.flags & F.BOT), kills:0, damage:Math.round(p.score), score:Math.round(p.score)})), null); }

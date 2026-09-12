@@ -17,7 +17,7 @@ const errors=[],checks=[],poses=[];let videoMeasurements;
 try{
  for(let i=0;i<100;i++){if(await fetch(`${url}/healthz`).then(r=>r.ok).catch(()=>false))break;if(i===99)throw Error(serverLog);await delay(100);}
  browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader','--host-resolver-rules=MAP localhost 127.0.0.1','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
- async function pageFor(context){
+ async function pageFor(context,query=''){
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -25,14 +25,25 @@ try{
   page.on('requestfailed',r=>errors.push(`${r.failure()?.errorText} ${r.url()}`));
   page.on('websocket',ws=>ws.on('framesent',({payload})=>{if(typeof payload==='string'){const m=JSON.parse(payload);if(m.type==='pose')poses.push(m);}}));
   page.setDefaultTimeout(20000);
-  await page.goto(url);await page.waitForFunction(()=>window.COLOSSUS_READY===true);await page.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
+  await page.goto(url+query);await page.waitForFunction(()=>window.COLOSSUS_READY===true);await page.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
   assert.deepEqual(await page.evaluate(()=>window.__COLOSSUS.assetStatus.failed),[],'Downloaded art must load without failures');
   return page;
  }
  const desktop=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:2});
  const raider=await pageFor(desktop);
- await raider.locator('#name').fill('SCOUT');await raider.locator('#create').click();await raider.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ assert.equal(await raider.locator('#lobby h1, #lobby .intro, #name, #practice, #scene-caption').count(),0);
+ assert.equal(await raider.locator('#lobby [data-role]').count(),3);
+ assert.ok(await raider.locator('#status').isHidden());
+ await raider.screenshot({path:'artifacts/ui-lobby.png'});
+ await raider.locator('#create').click();await raider.waitForFunction(()=>window.__COLOSSUS.state!==null);
  const room=await raider.evaluate(()=>window.__COLOSSUS.net.room);
+ assert.equal(await raider.locator('#overlay-kicker').count(),0);
+ for(const id of ['brand','status','capture-status','performance','menu-spectator','open-spectator'])assert.ok(await raider.locator('#'+id).isHidden(),id+' should stay out of the player UI');
+ assert.equal(await raider.locator('#controls-panel').evaluate(e=>e.open),false);
+ await raider.keyboard.press('KeyH');assert.equal(await raider.locator('#controls-panel').evaluate(e=>e.open),true);
+ await raider.keyboard.press('KeyH');assert.equal(await raider.locator('#controls-panel').evaluate(e=>e.open),false);
+ await raider.screenshot({path:'artifacts/ui-deploy.png'});
+ checks.push('Simplified lobby, quiet player HUD and H-toggle controls work with generated callsigns');
  assert.equal(await raider.evaluate(()=>window.__COLOSSUS.firstPerson),true,'Raiders start in first person');
  await raider.keyboard.press('KeyV');assert.equal(await raider.evaluate(()=>window.__COLOSSUS.firstPerson),false);
  await raider.locator('#camera-toggle').click();assert.equal(await raider.evaluate(()=>window.__COLOSSUS.firstPerson),true);
@@ -64,7 +75,7 @@ try{
  await headset.addInitScript({content:iwer+`\nwindow.questDevice=new IWER.XRDevice(IWER.metaQuest2,{stereoEnabled:true});questDevice.installRuntime({forceInstall:true});questDevice.position.set(0,1.7,0);questDevice.controllers.left.position.set(-.4,1.2,-.3);questDevice.controllers.right.position.set(.4,1.2,-.3);`});
  const quest=await pageFor(headset);
  assert.equal(await quest.locator('[data-role="boss"]').getAttribute('class'),'role active');
- await quest.locator('#name').fill('COLOSSUS');await quest.locator('#room-input').fill(room);await quest.locator('#join').click();
+ await quest.locator('#room-input').fill(room);await quest.locator('#join').click();
  await quest.waitForFunction(()=>window.__COLOSSUS.state!==null);
  await quest.locator('#resume').click();await quest.locator('#vr-button').click();
  await quest.waitForFunction(()=>window.__COLOSSUS.renderer.xr.isPresenting);
@@ -85,14 +96,15 @@ try{
  await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('trigger',1));
  await quest.waitForFunction(()=>window.__COLOSSUS.missiles.active.size>0);await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('trigger',0));
  await quest.screenshot({path:'artifacts/quest-missile.png'});checks.push('Touch trigger launches a replicated, rendered missile');
- const second=await pageFor(desktop);await second.locator('#name').fill('STRIKER');await second.locator('#room-input').fill(room);await second.locator('#join').click();await second.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ const second=await pageFor(desktop);await second.locator('#room-input').fill(room);await second.locator('#join').click();await second.waitForFunction(()=>window.__COLOSSUS.state!==null);
  for(const page of [raider,quest,second])await page.waitForFunction(()=>window.__COLOSSUS.net.latest.bossMaxHP===5200);
  await raider.waitForFunction(()=>document.getElementById('boss-caption').textContent.includes('5,200'));
  const scaledBar=await raider.locator('#boss-fill').evaluate(e=>parseFloat(e.style.width));assert.ok(scaledBar>0&&scaledBar<=100);
  checks.push('Two raiders scale the colossus to 5,200 HP on all clients; the desktop health bar stays within 100%');
- const observerPromise=desktop.waitForEvent('page');await raider.bringToFront();await raider.keyboard.press('Escape');await raider.locator('#menu-spectator').click();const observer=await observerPromise;observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
+ await raider.bringToFront();await raider.keyboard.press('Escape');const observer=await desktop.newPage();await observer.goto(`${url}/?spectator=1&room=${room}`);observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
  await observer.waitForFunction(()=>window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.frames>=2&&c.transport==='video'&&c.video.videoWidth===640));
  assert.ok(await observer.evaluate(()=>[...window.__COLOSSUS.views.cards.values()].some(c=>c.mode==='Headset left eye')));
+ assert.equal(await observer.locator('#spectator-room-code').textContent(),room);
  await observer.screenshot({path:'artifacts/spectator-panel.png'});
  await quest.screenshot({path:'artifacts/quest2-while-watched.png'});
  const mirrorStats=await quest.evaluate(()=>({active:window.__COLOSSUS.views.active,eyes:window.__COLOSSUS.renderer.xr.getCamera().cameras.length,enabled:window.__COLOSSUS.renderer.xr.enabled}));assert.equal(mirrorStats.active,true);assert.equal(mirrorStats.eyes,2);assert.equal(mirrorStats.enabled,true);
@@ -155,8 +167,8 @@ try{
  assert.equal(await quest.evaluate(()=>window.__COLOSSUS.camera.fov),desktopFov);
  assert.equal(await quest.evaluate(()=>window.__COLOSSUS.rig.scale.y),1);
  checks.push('Exit and re-enter immersive VR in the same room');
- const practice=await pageFor(desktop);await practice.locator('[data-role="boss"]').click();await practice.locator('#practice').click();await practice.waitForFunction(()=>window.__COLOSSUS.state?.players.length===3);
- const practiceRoom=await practice.evaluate(()=>window.__COLOSSUS.net.room),botObserver=await pageFor(desktop);await botObserver.locator('#room-input').fill(practiceRoom);await botObserver.locator('#spectate').click();
+ const practice=await pageFor(desktop,'/?role=boss&practice=1');await practice.waitForFunction(()=>window.__COLOSSUS.state?.players.length===3);
+ const practiceRoom=await practice.evaluate(()=>window.__COLOSSUS.net.room),botObserver=await pageFor(desktop);await botObserver.locator('#room-input').fill(practiceRoom);await botObserver.locator('[data-role="spectator"]').click();await botObserver.locator('#join').click();
  await botObserver.waitForFunction(()=>{const cards=[...window.__COLOSSUS.views.cards.values()];return cards.length===4&&cards.every(c=>c.role==='bot'?c.frames>=2:c.transport==='video'&&c.video.videoWidth===640)&&cards.filter(c=>c.role==='bot').length===3;});
  await botObserver.screenshot({path:'artifacts/spectator-practice.png'});checks.push('Practice panel shows all three simulated drone cameras and the live desktop giant');
  assert.deepEqual(errors,[]);

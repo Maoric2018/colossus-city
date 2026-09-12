@@ -27,23 +27,22 @@ export class RoundEnding {
   if(this.defeated)this.death.update(this.elapsed,{local:this.renderer.xr.isPresenting});
   const title=this.defeated?(this.elapsed<ROUND_END.breakApart?'CORE FAILURE':'COLOSSUS DESTROYED'):'COLOSSUS SURVIVES';
   $('round-transition-title').textContent=title;
-  $('round-transition-detail').textContent=this.defeated?(this.elapsed<ROUND_END.breakApart?'REACTOR UNSTABLE':'RAIDERS WIN'):'TIME EXPIRED';
+  $('round-transition-detail').textContent=this.defeated?(this.elapsed<ROUND_END.breakApart?'REACTOR UNSTABLE':'DEFENDERS WIN'):'TIME EXPIRED';
   if(this.elapsed>=(this.defeated?ROUND_END.results:1.4)&&!this.revealed){
    this.revealed=true;$('round-transition').classList.add('settled');
    this.audio.play((this.result.winner==='giant')===(state.role==='boss')?'win':'lose');
    this.hud.scoreboard(this.result.players,this.result.winner);
    if(!this.renderer.xr.isPresenting&&state.role!=='spectator'){
     document.exitPointerLock?.();this.hud.showOverlay(title+'.','',{renderer:this.renderer,net:this.net});
-    $('overlay-kicker').textContent='ROUND COMPLETE';$('resume').textContent='WATCH AFTERMATH ↗';
+    $('resume').textContent='WATCH AFTERMATH ↗';
     $('camera-toggle').classList.add('hidden');$('overlay-text').after($('scoreboard'));
    }
   }
-  if(this.revealed){const text=`${s.kills} raiders down. ${Math.round(s.damage)}% city damage. New round in ${Math.max(0,Math.ceil(ROUND_END.restart-this.elapsed))} seconds.`;if($('overlay-text').textContent!==text)$('overlay-text').textContent=text;}
+  if(this.revealed){const text=`${s.kills} defenders down. ${Math.round(s.damage)}% city damage. New round in ${Math.max(0,Math.ceil(ROUND_END.restart-this.elapsed))} seconds.`;if($('overlay-text').textContent!==text)$('overlay-text').textContent=text;}
  }
  reset(){
   this.death.reset();this.result=null;this.elapsed=0;this.revealed=false;this.xr.roundEnding=null;
   document.body.classList.remove('round-ending');$('round-transition').classList.add('hidden');$('round-transition').classList.remove('settled');
   if($('scoreboard').parentElement!==document.body)document.body.append($('scoreboard'));$('scoreboard').classList.add('hidden');
-  $('overlay-kicker').textContent='CONNECTION ESTABLISHED';
  }
 }

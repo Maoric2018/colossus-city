@@ -18,3 +18,46 @@
 #flight-status{gap:4px}#flight-status #score-readout{color:var(--acid);font-size:9px}
 #round-transition{position:fixed;left:50%;top:17%;transform:translateX(-50%);z-index:10;pointer-events:none;text-align:center;width:min(700px,90vw);color:#fff2de;text-shadow:0 3px 25px #000,0 0 40px #ff722477;animation:round-arrival .65s ease-out}#round-transition span{display:block;font:11px monospace;letter-spacing:5px;color:#ffb36b;margin-bottom:12px}#round-transition strong{font-size:clamp(26px,4vw,54px);font-weight:900;letter-spacing:2px}#round-transition.settled{top:12%;transition:top .8s,opacity .8s;opacity:.85}#round-transition.settled strong{font-size:clamp(22px,2.5vw,34px)}.round-ending #aim,.round-ending #flight-status,.round-ending #charge{display:none!important}.xr-active #round-transition{display:none!important}@keyframes round-arrival{from{opacity:0;filter:blur(6px);transform:translate(-50%,10px)}to{opacity:1;filter:blur(0);transform:translate(-50%,0)}}
 .round-ending #overlay{background:#07151c44;backdrop-filter:blur(3px)}.round-ending #overlay>div{width:min(580px,87vw);max-height:80vh;overflow:auto}.round-ending #overlay #scoreboard{position:static;transform:none;width:100%;min-width:0;margin:20px 0 10px;font-size:11px}.round-ending #overlay #scoreboard caption{font-size:10px;letter-spacing:1px;padding:12px}.round-ending #overlay #scoreboard th,.round-ending #overlay #scoreboard td{padding:9px 10px}.round-ending #overlay:not(.hidden)~#round-transition.settled{opacity:0}.xr-active #scoreboard{display:none!important}
+
+/* --- Lobby and spectator theme. Scoped to the landing page and the spectator
+   panel: the city, the Colossus and the in-game HUD keep their own palette. --- */
+#lobby,#spectator-panel{--acid:#d9c18d;--line:#d9c18d33}
+#brand .brand-mark{color:#d9c18d;letter-spacing:-2px}
+#brand .brand-sub{color:#a8a08c}
+body:not(.playing) #status{display:none}
+#lobby .intro{color:#b9b5a4}
+#lobby .role{background:#16211c8f}
+#lobby .role.active,#lobby .role:hover{background:#26332596}
+#lobby .role strong{font-size:17px}
+#lobby .role-picker{gap:8px}
+#lobby .form-row{margin:15px 0 10px}
+#room-input{flex:1;text-align:center;letter-spacing:5px;font-size:13px}
+#lobby .form-row .secondary{flex:0 0 104px}
+#lobby .primary{background:#d9c18d;color:#20261c;border-color:#d9c18d}
+#lobby .primary:hover{background:#ecd9ad}
+#spectator-panel{background:#0b1410f2}
+#spectator-panel .view-card{border-color:#d9c18d33;background:#16211c}
+/* The room code has to be readable across a room and copyable in one click. */
+#spectator-room{display:flex;flex-direction:column;align-items:center;gap:4px;background:#16211ccc;border:1px solid #d9c18d59;padding:10px 26px;transition:border-color .2s,background .2s}
+#spectator-room:hover{border-color:#d9c18d;background:#26332596}
+#spectator-room span{font:9px monospace;letter-spacing:3px;color:#a8a08c}
+#spectator-room b{font:700 clamp(30px,4.4vw,52px)/1 monospace;letter-spacing:9px;color:#d9c18d;text-indent:9px}
+#spectator-room.copied span{color:#d9c18d}
+#spectator-room.copied span::after{content:' \2713 COPIED'}
+@media(max-width:900px){#spectator-room{padding:8px 14px}#spectator-room b{letter-spacing:5px;text-indent:5px}}
+/* In-game HUD: keep the timer and room code, fold the control list into a
+   panel that starts minimized, and drop the branding while playing. */
+body.playing #brand,body.playing #status,body.playing #capture-status,body.playing #performance{display:none}
+#controls-panel{position:fixed;left:30px;bottom:24px;max-width:330px;background:#0b1410d9;border:1px solid #d9c18d33}
+#controls-panel summary{font:9px monospace;letter-spacing:2px;color:#d9c18d;padding:8px 12px;cursor:pointer;list-style:none}
+#controls-panel summary::-webkit-details-marker{display:none}
+#controls-panel summary::before{content:'\25B8 ';display:inline-block}
+#controls-panel[open] summary::before{content:'\25BE '}
+#controls-panel[open]{background:#0b1410f2}
+#controls{position:static;padding:0 12px 11px;line-height:1.75;max-width:none}
+/* The join modal follows the lobby palette. */
+#overlay{--acid:#d9c18d;--line:#d9c18d33}
+#overlay>div{background:#0b1410f2;border-color:#d9c18d33}
+#overlay .primary{background:#d9c18d;color:#20261c;border-color:#d9c18d}
+#overlay .primary:hover{background:#ecd9ad}
+#overlay h2{letter-spacing:-1px}
