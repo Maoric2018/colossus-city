@@ -25,6 +25,7 @@ export function breachBuildings(room,p,input,velocity){
 export function breachHooks(room){return {
  filterContactPair(a,b){
   const ta=room.colliderTags.get(a),tb=room.colliderTags.get(b),player=ta?.player??tb?.player,cell=ta?.cell??tb?.cell;
+  if((ta?.hand||tb?.hand)&&cell!=null&&(room.boss.breakGrace.get(cell)||0)>room.time)return null;
   if(player!=null&&cell!=null&&(room.players.get(player)?.breachCells?.get(cell)||0)>room.time)return null;
   return RAPIER.SolverFlags.COMPUTE_IMPULSE;
  },

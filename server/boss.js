@@ -7,15 +7,16 @@ import {v, add, sub, mul, len, norm, dist, arr, vec, clamp, rotateYaw, segmentDi
 import {strikeCars,pushCarsWithBody} from './cars.js';
 import {launchMissile} from './abilities.js';
 import {knockdown} from './combat.js';
-import {damageCell, breakCells, buildingsAlong} from './destruction.js';
-import {sideBit} from '../shared/city/materials.js';
+import {damageCell, buildingsAlong} from './destruction.js';
+import {breakHandPath} from './hand-destruction.js';
 import {noInput} from './players.js';
 export function initialBoss(){
- return {x:0, z:0, yaw:0, head:v(0, 23.8, 0), left:v(-5.6, 16, -4), right:v(5.6, 16, -4), lastPose:-100, input:noInput(), lastInput:-100, missileReady:0, stagger:0, combo:0, comboAt:-10, stepDistance:0, leftQuaternion:[...identity], rightQuaternion:[...identity], pressed:{}, strikes:{left:new Map(),right:new Map()}};
+ return {x:0, z:0, yaw:0, head:v(0, 23.8, 0), left:v(-5.6, 16, -4), right:v(5.6, 16, -4), lastPose:-100, input:noInput(), lastInput:-100, missileReady:0, stagger:0, combo:0, comboAt:-10, stepDistance:0, leftQuaternion:[...identity], rightQuaternion:[...identity], breakGrace:new Map()};
 }
 export function updateBoss(room){
  const b = room.boss, prevL = {...b.left}, prevR = {...b.right}, before = v(b.x, 0, b.z), rawPrevious = {left:b.rawLeft || prevL, right:b.rawRight || prevR},previousHead={...b.head};
  b.walkContacts=[];b.pushing=false;
+ for(const [id,until] of b.breakGrace)if(until<=room.time)b.breakGrace.delete(id);
  b.stagger = Math.max(0, b.stagger - C.TICK * .55);
  const slow = (1 - b.stagger * .6), bound = room.env.infinite ? Infinity : C.GIANT_BOUND;
  if(room.bossClient && room.time - b.lastPose < .4 && !b.desktop){
@@ -59,9 +60,11 @@ export function updateBoss(room){
    const previousRaw=rawPrevious[key],rawPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(previousRaw,b.head),b.turnDelta)):previousRaw;
    const displacement=sub(raw,rawPrev),physical=sub(sub(raw,b.head),rotateYaw(sub(previousRaw,previousHead),b.turnDelta||0)),speed=Math.min(C.MAX_HAND_SPEED,len(physical)/poseDt);
    b[idx?'rawRight':'rawLeft']=raw;
-   if(b.resetPose||!canAttack){b.pressed[key]=false;hand.setTranslation(raw,true);hand.setRotation(q,true);hand.setNextKinematicTranslation(raw);hand.setNextKinematicRotation(q);continue;}
+   if(b.resetPose||!canAttack){hand.setTranslation(raw,true);hand.setRotation(q,true);hand.setNextKinematicTranslation(raw);hand.setNextKinematicRotation(q);continue;}
    const collisionPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(prev,b.head),b.turnDelta)):prev;
-   const contact=resolveHand(arr(prev),arr(raw),rotation,room.handWorld);b[key]=vec(contact.position);
+   const attacking=!b.desktop||b.input.fire||b.input.up>0;
+   const contact=attacking?breakHandPath(room,arr(prev),arr(raw),rotation,arr(mul(physical,1/poseDt))):resolveHand(arr(prev),arr(raw),rotation,room.handWorld);b[key]=vec(contact.position);
+   if(contact.detached)registerCombo(room,contact.detached);
    if(!b.desktop&&Math.abs(b.turnDelta||0)>.001)hand.setTranslation(speed>.2?collisionPrev:b[key],true);
    hand.setNextKinematicTranslation(b[key]);hand.setNextKinematicRotation(q);
    const stoppedDisplacement=sub(b[key],collisionPrev);
@@ -71,22 +74,7 @@ export function updateBoss(room){
     const hit=p.body.collider(0).castShape(v(),new RAPIER.Cuboid(...GIANT.handHalf),collisionPrev,q,stoppedDisplacement,0,1,true);
     if(hit){const direction=speed>3?norm(displacement):norm(sub(p.body.translation(),b[key]));const kick=add(mul(direction,clamp(speed*.65,8,35)),v(0,6,0));knockdown(room,p,kick,25+speed*1.15,-1);}else if(speed>9&&segmentDistance(p.body.translation(),collisionPrev,b[key])<C.HAND_RADIUS+3.4&&room.time-p.closeCallAt>2.5&&!p.bot){p.closeCallAt=room.time;p.fuel=Math.min(1,p.fuel+.18);room.event({type:'closecall',player:p.id,p:arr(p.body.translation())});}
    }
-   const blocked=contact.contacts.length>0;
-   if(!blocked)b.pressed[key]=false;else if(speed>.2)b.pressed[key]=true;
-   if(contact.contacts.length&&b.pressed[key]&&speed>.75&&(!b.desktop||b.input.fire||b.input.up>0)){
-    const hit=[],touched=new Set(),strikes=b.strikes[key];
-    for(const point of [...contact.contacts].sort((a,c)=>dist(vec(a.point),b[key])-dist(vec(c.point),b[key]))){
-     const c=room.cellMap.get(point.cell),inward=-(physical.x*point.normal[0]+physical.y*point.normal[1]+physical.z*point.normal[2])/poseDt;
-     if(!c||touched.has(c.id)||room.detached.has(c.id)||inward<=.75||room.time-(strikes.get(c.id)??-100)<C.HAND_CONTACT_INTERVAL)continue;
-     touched.add(c.id);strikes.set(c.id,room.time);c.lastHit=room.time;
-     const sides=point.side==null?0:sideBit(point.side),impactSpeed=Math.min(C.MAX_HAND_SPEED,inward);
-     if(damageCell(room,c,8+impactSpeed*2.1,sides,0,point))hit.push(c.id);
-     room.event({type:'strike',cell:c.id,side:point.side,normal:point.normal,p:point.point,power:Math.max(.15,Math.min(1,impactSpeed/30)),material:c.material,broke:c.skin.hp<=0});
-     if(touched.size>=5)break;
-    }
-    for(const [id,at] of strikes)if(room.time-at>1)strikes.delete(id);
-    if(hit.length){breakCells(room,hit,mul(norm(displacement),Math.min(16,Math.max(2,speed*.28))),{at:b[key]});registerCombo(room,hit.length);}
-   }
+
   }
  // A walking body chips a single contacted bay; it cannot grind its frame to failure.
  const moved = dist(v(b.x, 0, b.z), before) / C.TICK;

@@ -2,6 +2,7 @@
 // (who is carrying more than their columns can bear). Both are pure functions of the static
 // cell table and mutable damage state, so server tests and tools can call them directly.
 import {MATERIALS} from './materials.js';
+import {C} from '../config.js';
 // Return intact cells whose paths to all ground anchors were severed.
 export function unsupportedCells(cells, detached){
  const byId = new Map(cells.map(c => [c.id, c])), supported = new Set(), todo = [];
@@ -12,14 +13,14 @@ export function unsupportedCells(cells, detached){
 // Design capacity of one bay: it was built to carry its own stack with a material safety
 // factor; structural damage (hpRatio) erodes that capacity.
 export function capacity(c, hpRatio = 1){
- return (c.stackAbove + 1) * MATERIALS[c.material].safety * Math.max(0, hpRatio);
+ return (c.stackAbove + 1) * MATERIALS[c.material].safety * C.BUILDING_COHESION * Math.max(0, hpRatio);
 }
 // Load redistribution for one building. Weight flows down each stack; a bay whose support
 // below is gone hangs from lateral neighbours (beam action) up to `span` bays away, splitting
 // its load among the nearest still-supported bays on the same floor.
 // Returns Map(cellId -> {carried, capacity}) for intact cells; cells past the span or with no
 // lateral path are reported with capacity 0 (they must fail).
-export function structuralLoads(cells, detached, hpRatio = () => 1, span = 3){
+export function structuralLoads(cells, detached, hpRatio = () => 1, span = C.BUILDING_BRIDGE_SPAN){
  const byId = new Map(cells.map(c => [c.id, c])), result = new Map();
  const intact = id => id && !detached.has(id);
  const floors = new Map();

@@ -30,13 +30,15 @@ test('severing a complete floor releases precisely the upper storeys', () => {
  const removed = new Set(building(0).filter(c => c.floor === 2).map(c => c.id)); const result = unsupportedCells(cells, removed);
  assert.equal(result.length, building(0).filter(c => c.floor > 2).length); assert.ok(result.every(id => byId.get(id).floor > 2));
 });
-test('load model: three lost foundation bays hold, four overload their neighbours, damage erodes capacity', () => {
+test('cohesive frame bridges local holes; near-total foundation loss still overloads it', () => {
  const tower = building(1), ground = tower.filter(c => c.ground); assert.equal(ground.length, 9);
  assert.equal(overloadedCells(tower, new Set([ground[0].id])).length, 0);
  assert.equal(overloadedCells(tower, new Set(ground.slice(0,3).map(c=>c.id))).length,0);
- assert.ok(overloadedCells(tower, new Set(ground.slice(0,4).map(c=>c.id))).length >= 2);
+ assert.equal(overloadedCells(tower,new Set(ground.slice(0,4).map(c=>c.id))).length,0);
+ assert.equal(overloadedCells(tower,new Set(ground.slice(0,7).map(c=>c.id))).length,0);
+ assert.ok(overloadedCells(tower,new Set(ground.slice(0,8).map(c=>c.id))).length>=1);
  const loads = structuralLoads(tower, new Set()); const centre = loads.get(ground[4].id); near(centre.carried, 30); assert.ok(centre.capacity > centre.carried);
- assert.ok(overloadedCells(tower, new Set(), c => c.id === ground[4].id ? .3 : 1).includes(ground[4].id));
+ assert.ok(overloadedCells(tower, new Set(), c => c.id === ground[4].id ? .1 : 1).includes(ground[4].id));
 });
 test('hanging bays beyond the beam span must fail', () => {
  const walkup = building(5), removed = new Set(walkup.filter(c => c.ground && c.ix < 4).map(c => c.id));

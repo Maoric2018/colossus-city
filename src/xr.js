@@ -18,7 +18,7 @@ export class XRControl {
  }
  async supported(){ try{ return !!(window.isSecureContext && navigator.xr && await navigator.xr.isSessionSupported('immersive-vr')); }catch{ return false; } }
  setSettings({turnDegrees = 90, reachGain = 1} = {}){ this.turnSpeed = clamp(Number(turnDegrees) || 90, 30, 180) * Math.PI / 180; const gain = clamp(Number(reachGain) || 1, .5, 1.5); if(gain !== this.reachGain) this.resetPose(); this.reachGain = gain; }
- resetPose(){ this.poseReset = true; }
+ resetPose(){ this.poseReset = true; this.handBreakAfter=performance.now()+250; }
  stopTracking(){
   this.resetPose(); this.lastUpdate = null; this.pendingTurn = 0; this.calibrateLatch = false;
   if(!this.trackingStopped) this.trackingStopped = this.net.send({type:'pose', tracking:false}) === true;
@@ -89,6 +89,10 @@ export class XRControl {
   const rot = viewer.transform.orientation; q.set(rot.x, rot.y, rot.z, rot.w); q.premultiply(new T.Quaternion().setFromAxisAngle(axis, this.turn)); euler.setFromQuaternion(q, 'YXZ');
   const previous = this.local;
   const local = {...(snapshot || {}), head, headLookDown:2*(q.y*q.z-q.w*q.x), bossYaw:euler.y, bossX:this.rig.position.x, bossZ:this.rig.position.z, left:poses.left ? hand(poses.left) : (this.local?.left || [head[0] - 5, head[1] - 7, head[2] - 4]), right:poses.right ? hand(poses.right) : (this.local?.right || [head[0] + 5, head[1] - 7, head[2] - 4])}; local.leftQuaternion = handQ('left'); local.rightQuaternion = handQ('right'); local.resetHands = this.poseReset; this.local = local;
+  local.handVelocity={left:[0,0,0],right:[0,0,0]};
+  if(previous&&dt>0&&poses.left&&poses.right&&!this.poseReset&&!latest?.phase&&now>=this.handBreakAfter&&Math.abs(turnInput)<=.18){
+   for(const side of ['left','right'])local.handVelocity[side]=local[side].map((n,k)=>(n-head[k]-previous[side][k]+previous.head[k])/dt);
+  }
   // Local pre-impact feedback hides the round trip: dust and a haptic tick the moment a tracked
   // hand crosses an intact bay. The server still decides all damage.
   if(previous && dt > 0 && this.localImpact && poses.left && poses.right && !this.poseReset && Math.abs(turnInput) <= .18) for(const [i, side] of ['left', 'right'].entries()){

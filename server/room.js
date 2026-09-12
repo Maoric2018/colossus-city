@@ -56,7 +56,7 @@ export class Room {
   }
   this.handBodies = ['left', 'right'].map(side => {
    const p = this.boss[side], body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(p.x, p.y, p.z));
-   this.world.createCollider(RAPIER.ColliderDesc.cuboid(...GIANT.handHalf).setFriction(.4).setCollisionGroups(group(G.GIANT, G.DEBRIS | G.RAGDOLL)), body); return body;
+   const co=this.world.createCollider(RAPIER.ColliderDesc.cuboid(...GIANT.handHalf).setFriction(.4).setCollisionGroups(group(G.GIANT, G.DEBRIS | G.RAGDOLL)).setActiveHooks(RAPIER.ActiveHooks.FILTER_CONTACT_PAIRS),body);this.colliderTags.set(co.handle,{hand:side});return body;
   });
   for(const p of this.players.values()){ p.kills = 0; p.damage = 0; p.score = 0; spawn(this, p); }
   // Rays cast before the first step must already see the city.

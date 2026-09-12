@@ -36,8 +36,12 @@ test('real tracked giant swing strikes a car and standing inside one after recen
  }finally{r.dispose();}
  const f=giantFixture();try{f.pose.right=arr(f.car.body.translation());f.r.input(f.client,{...f.pose,reset:true});f.r.step();for(let i=0;i<35;i++){f.r.input(f.client,f.pose);f.r.step();}assert.equal(f.car.wreck,false);assert.equal(f.car.hp,C.CAR_HP);}finally{f.r.dispose();}
 });
-test('a wall stops a giant punch before it can hit a car behind it',()=>{
+test('a hand crushes a building wall and continues into the car behind it',()=>{
  const prop=carPlacements(city)[0],environment={...city,buildings:[{name:'SHIELD',x:prop.position[0],z:prop.position[2]+5,material:'concrete',bay:3,story:4,tiers:[{nx:1,nz:1,floors:2,ix:0,iz:0}]}]};
+ const {r,car,client,pose,at}=giantFixture(environment);try{pose.right=[at.x,2,at.z-5];r.input(client,pose);r.step();assert.equal(r.boss.right.z,pose.right[2]);assert.ok(r.detached.size>0);assert.equal(car.wreck,true);}finally{r.dispose();}
+});
+test('solid scenery still stops a punch before it can hit a car behind it',()=>{
+ const prop=carPlacements(city)[0],environment={...city,buildings:[],props:[{position:[prop.position[0],2,prop.position[2]+5],collider:{half:[4,2,.25]}}]};
  const {r,car,client,pose,at}=giantFixture(environment);try{pose.right=[at.x,2,at.z-5];r.input(client,pose);r.step();assert.ok(r.boss.right.z>at.z+6);assert.equal(car.wreck,false);assert.equal(car.hp,C.CAR_HP);}finally{r.dispose();}
 });
 test('giant walking shoves and destroys cars underfoot; missiles can also destroy them',()=>{

@@ -68,11 +68,11 @@ test('30 Hz and 60 Hz tracked poses give the same impact energy for the same han
  }finally{r.dispose();}}
  assert.equal(damage.length,2);assert.ok(Math.abs(damage[0]-damage[1])<1e-6,JSON.stringify(damage));
 });
-test('both hands can chip one facade in the same tick without sharing a hit cooldown',()=>{
+test('both hands can open opposite faces of one bay in the same tick',()=>{
  const {r,client,pose,c}=tracked();try{
-  pose.left[2]=pose.right[2]=-14.5;r.input(client,{...pose,reset:true});r.step();for(let i=0;i<15;i++){r.input(client,pose);r.step();}r.drainEvents();
-  pose.left[2]-=.1;pose.right[2]-=.1;r.input(client,pose);r.step();
-  const strikes=r.drainEvents().filter(e=>e.type==='strike'&&e.cell===c.id);assert.equal(strikes.length,2);assert.equal(c.skin.hp,c.skin.maxHp);assert.ok(c.skin.facadeHp[2]<30);
+  pose.left[2]=-14.5;pose.right[2]=-25.5;r.input(client,{...pose,reset:true});r.step();for(let i=0;i<15;i++){r.input(client,pose);r.step();}r.drainEvents();
+  pose.left[2]-=.1;pose.right[2]+=.1;r.input(client,pose);r.step();
+  const strikes=r.drainEvents().filter(e=>e.type==='strike'&&e.cell===c.id);assert.equal(strikes.length,2);assert.equal(c.skin.hp,c.skin.maxHp);assert.equal(c.skin.facade&5,0);assert.equal(r.boss.left.z,pose.left[2]);assert.equal(r.boss.right.z,pose.right[2]);
  }finally{r.dispose();}
 });
 test('moving sideways along a wall does not turn tangential speed into a punch',()=>{
@@ -105,7 +105,7 @@ test('destroyed frames retry after the body budget frees up',()=>{
 });
 test('a bay no longer collapses from an obsolete overload after its upper load falls away',()=>{
  const r=room();try{
-  const c=r.cells[0];c.skin.hp=c.skin.maxHp*.2;r.dirtyBuildings.add(0);scheduleFailures(r);assert.ok(r.pendingFailures.has(c.id));
+  const c=r.cells[0];c.skin.hp=c.skin.maxHp*.06;r.dirtyBuildings.add(0);scheduleFailures(r);assert.ok(r.pendingFailures.has(c.id));
   r.breakCells(r.cells.filter(c=>!c.ground).map(c=>c.id));scheduleFailures(r);assert.equal(r.pendingFailures.has(c.id),false);r.time=2;processFailures(r);assert.equal(r.detached.has(c.id),false);
  }finally{r.dispose();}
 });

@@ -5,6 +5,7 @@ import {raiderPose} from '../shared/raider-pose.js';
 import {armElbow} from './arm-rig.js';
 import {SelfBodyVisibility} from './giant-visibility.js';
 import {GIANT,handQuaternion,resolveHand} from '../shared/giant-rig.js';
+import {resolveBreakableHand,handSurfaceKey} from '../shared/hand-break.js';
 import {loadModel,bakedModel} from './assets.js';
 import {TEAM_COLORS} from '../shared/config.js';
 import {rounded,mesh,glow,coloredGeometry,up} from './art.js';
@@ -84,7 +85,17 @@ export class GiantView{
   const chest=head.clone().add(new T.Vector3(0,-GIANT.chestDrop,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
   [-1,1].forEach((sign,i)=>{
    const arm=this.arms[i],side=i?'right':'left',rotation=handQuaternion(s[side+'Quaternion'],s.bossYaw||0),target=s[side];
-   const contact=collisionWorld&&!s.resetHands?resolveHand(arm.lastHand||target,target,rotation,collisionWorld):{position:target,contacts:[]};
+   const now=performance.now(),claims=arm.breakClaims??=new Map();
+   for(const [key,until] of claims)if(until<=now)claims.delete(key);
+   if(s.resetHands||!collisionWorld)claims.clear();
+   let contact={position:target,contacts:[]};
+   if(collisionWorld&&!s.resetHands){
+    const from=arm.lastHand||target;
+    contact=s.handVelocity?resolveBreakableHand(from,target,rotation,collisionWorld,s.handVelocity[side],hit=>{
+     claims.set(handSurfaceKey(hit),now+200);return true;
+    },new Set(claims.keys())):resolveHand(from,target,rotation,collisionWorld);
+   }
+   if(contact.broken?.length)contact.contacts.push(...contact.broken);
    const hand=new T.Vector3(...contact.position);arm.lastHand=contact.position;arm.contacts=contact.contacts;
    arm.fist.position.copy(hand);arm.fist.quaternion.fromArray(rotation);
    // A controller tracks the palm. The forearm attaches behind it at the wrist,

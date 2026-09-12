@@ -49,14 +49,14 @@ test('layered skins: windows pop first, the facade shields the frame, then the b
   r.step(); r.step(); assert.ok(r.drainEvents().some(e => e.type === 'skin'));
  }finally{ r.dispose(); }
 });
-test('overloaded columns fail after a short delay and cascade into a progressive collapse', () => {
+test('severe foundation loss still cascades after the longer cohesion delay', () => {
  const r = room(); try{
   const tower = r.cells.filter(c => c.building === 1), ground = tower.filter(c => c.ground);
-  r.breakCells(ground.slice(0,4).map(c=>c.id), v(0, 0, 0));
+  r.breakCells(ground.slice(0,8).map(c=>c.id), v(0, 0, 0));
   r.step(); assert.ok(r.pendingFailures.size > 0, 'remaining base bays are scheduled to fail');
   assert.ok(r.drainEvents().some(e => e.type === 'creak'));
   ticks(r, Math.ceil((C.COLLAPSE_DELAY + C.COLLAPSE_JITTER) / C.TICK) + 2);
-  assert.ok(r.detached.size > 4, 'the cascade detached more than the hit bays');
+  assert.ok(r.detached.size > 8, 'the cascade detached more than the hit bays');
   ticks(r, 240); assert.ok(r.debris.size <= C.MAX_ACTIVE_CHUNKS);
  }finally{ r.dispose(); }
 });
