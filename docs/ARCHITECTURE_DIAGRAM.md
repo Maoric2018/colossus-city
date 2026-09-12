@@ -1,86 +1,68 @@
-# Colossus City — architecture diagrams
+# Colossus City — architecture
 
-Three views of the same system: the stack it runs on, how a building actually comes apart, and
-what happens inside one authoritative tick. GitHub renders these natively.
-
-## 1. Tech stack
-
-One slide's worth: every technology the game runs on and how they connect. No individual files —
-for those see [MODULES.md](MODULES.md).
+One slide: every technology the game runs on, and how they connect. Detail views are in the
+appendix; the file-by-file map is in [MODULES.md](MODULES.md).
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111111","primaryBorderColor":"#111111","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","lineColor":"#111111","textColor":"#111111","clusterBkg":"#ffffff","clusterBorder":"#b8b8b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":48,"rankSpacing":56,"htmlLabels":true,"curve":"basis"}} }%%
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111111","primaryBorderColor":"#111111","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","lineColor":"#111111","textColor":"#111111","clusterBkg":"#ffffff","clusterBorder":"#b8b8b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":26,"rankSpacing":70,"htmlLabels":true,"curve":"basis"}} }%%
 flowchart LR
 
 subgraph D["CLIENTS"]
   direction TB
-  Q["<b>Meta Quest 2</b><br/>Quest Browser<br/>the colossus"]
-  L["<b>Laptop</b><br/>Chrome, Edge, Safari<br/>raider, giant, spectator"]
-  P["<b>Phone / tablet</b><br/>mobile browser<br/>touch raider"]
+  Q["<b>Meta Quest 2</b><br/>the colossus"]
+  L["<b>Laptop</b><br/>raider · giant · spectator"]
+  P["<b>Phone</b><br/>touch raider"]
 end
 
-subgraph C["BROWSER RUNTIME"]
+subgraph C["BROWSER"]
   direction TB
-  THREE["<b>Three.js r180</b><br/>WebGL 2, instanced meshes,<br/>quality tiers, adaptive resolution"]
-  XR["<b>WebXR Device API</b><br/>immersive-vr, local-floor,<br/>Touch controllers, haptics"]
-  IN["<b>Pointer + touch input</b><br/>pointer lock, Pointer Events,<br/>client-side prediction"]
-  AUD["<b>Web Audio API</b><br/>procedural synthesis,<br/>no audio files"]
-  DOM["<b>Canvas 2D + DOM/CSS</b><br/>HUD, procedural facade textures"]
-  ESM["<b>ES modules + importmap</b><br/>no bundler, no build step"]
+  THREE["<b>Three.js</b><br/>WebGL 2 · instancing"]
+  XR["<b>WebXR</b><br/>stereo · controllers · haptics"]
+  IN["<b>Pointer + Touch</b><br/>client-side prediction"]
+  AUD["<b>Web Audio</b><br/>procedural"]
+  DOM["<b>Canvas 2D + DOM</b><br/>HUD · textures"]
+  ESM["<b>ES modules</b><br/>no build step"]
 end
 
-subgraph S["SHARED CONTRACT"]
+subgraph S["CONTRACT"]
   direction TB
-  SM["<b>Shared ES modules</b><br/>one flight model, one city<br/>definition, one config"]
-  PR["<b>COL3 binary protocol</b><br/>float32 transforms, 20 Hz"]
-  WSC["<b>WebSocket</b><br/>reliable JSON events<br/>+ binary snapshots, 30 Hz input"]
-  VID["<b>Live view channel</b><br/>encoded video, JPEG fallback"]
+  SM["<b>shared/</b><br/>flight model · city · config"]
+  WSC["<b>WebSocket</b><br/>events + snapshots"]
+  PR["<b>COL3 binary</b><br/>float32 transforms"]
+  VID["<b>Live video</b><br/>spectator feeds"]
 end
 
-subgraph SV["AUTHORITATIVE SERVER"]
+subgraph SV["SERVER"]
   direction TB
-  NODE["<b>Node.js 22</b><br/>single process, one room registry,<br/>60 Hz fixed-step accumulator"]
-  WSS["<b>ws</b><br/>WebSocket server, per-room fan-out,<br/>rate limits, origin policy"]
-  RAP["<b>Rapier3D 0.17 (WASM)</b><br/>rigid bodies, CCD, joints,<br/>merged static colliders"]
-  SIM["<b>Room simulation</b><br/>movement, tracked-hand contact,<br/>structural collapse, ragdolls"]
+  NODE["<b>Node.js 22</b><br/>60 Hz fixed step"]
+  WSS["<b>ws</b><br/>per-room fan-out"]
+  SIM["<b>Room sim</b><br/>authoritative"]
+  DES["<b>Destruction</b><br/>skins · loads · collapse"]
+  RAP["<b>Rapier3D</b><br/>WASM physics"]
 end
 
 subgraph PL["PLATFORM"]
   direction TB
-  FLY["<b>Docker + Fly.io</b><br/>exactly one machine,<br/>rooms live in process"]
-  AST["<b>Static assets</b><br/>GLB from Kenney and Quaternius,<br/>HDR from Poly Haven, all CC0"]
-  TST["<b>node:test + Playwright</b><br/>real Rapier, Meta IWER<br/>Quest 2 emulation"]
+  FLY["<b>Docker + Fly.io</b><br/>one machine"]
+  AST["<b>CC0 assets</b><br/>GLB · HDR"]
+  TST["<b>Playwright + IWER</b><br/>real physics · fake headset"]
 end
 
 Q --> XR
 L --> IN
 P --> IN
-XR --> THREE
-IN --> THREE
-ESM --> THREE
-AUD --> DOM
-THREE --> DOM
-
-IN -->|"input + pose"| WSC
-SM -->|"one model, both sides"| IN
+IN -->|"30 Hz"| WSC
+WSC -->|"20 Hz"| THREE
+SM --> IN
 PR --> WSC
-WSC -->|"snapshots + events"| THREE
-VID --- DOM
-
 WSC <--> WSS
 SM --> SIM
 VID <--> NODE
-WSS --> NODE
-NODE --> SIM
-SIM <--> RAP
-
-FLY --> NODE
-AST --> THREE
-TST -.-> SIM
-
+NODE --> FLY
+SIM -.-> TST
 ```
 
-## 2. How a tower comes down
+## Appendix A — how a tower comes down
 
 Four stages. Damage peels the skins before it ever reaches structure, and structure fails on a
 load model rather than on hit points alone — which is why collapses read as progressive.
@@ -131,7 +113,7 @@ DOMINO -->|"cascades back in"| SRC
 
 ```
 
-## 3. One authoritative tick
+## Appendix B — one authoritative tick
 
 The server owns everything. The client only predicts its own raider, using the same flight
 model, and reconciles on the next snapshot.
@@ -173,13 +155,13 @@ sequenceDiagram
 
 - **Clients** — one codebase serves all three. The role and the input scheme are decided at
   runtime from the device, not at build time.
-- **Browser runtime** — platform APIs plus Three.js. No bundler and no build step: the browser
+- **Browser** — platform APIs plus Three.js. No bundler and no build step: the browser
   loads ES modules through an importmap, which is why a fresh checkout runs on `npm start` alone.
-- **Shared contract** — the load-bearing idea. `shared/` is pure logic with no Three.js, Rapier,
+- **Contract** — the load-bearing idea. `shared/` is pure logic with no Three.js, Rapier,
   DOM or Node in it, imported unchanged by both sides; that is why the client can predict flight
   exactly and why the server never has to trust a client. Beside it sits the wire: reliable JSON
   for events, a versioned binary snapshot for transforms.
-- **Authoritative server** — nothing in the client decides damage, position or structural failure.
+- **Server** — nothing in the client decides damage, position or structural failure.
 - **Platform** — hosting, CC0 art, and the test rigs that run real physics and an emulated Quest 2.
 
 See [MODULES.md](MODULES.md) for the file-by-file map and the rules for changing each layer,
