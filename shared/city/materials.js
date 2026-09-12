@@ -3,10 +3,10 @@
 // glassHP/facadeHP are the impact energies that break a layer; frameHP is the structural
 // hit budget of one bay at the roof (lower floors scale up via frameScale in cells.js).
 export const MATERIALS = Object.freeze({
- glass:    {label:'CURTAIN WALL', glassHP:8,  facadeHP:0,  frameHP:80,  safety:1.7, shards:'glass',    haptic:.35, tint:0x8fc9e6, lit:.55},
- concrete: {label:'CONCRETE',     glassHP:6,  facadeHP:55, frameHP:95,  safety:1.5, shards:'concrete', haptic:.6,  tint:0xb9b6ad, lit:.4},
- stone:    {label:'LIMESTONE',    glassHP:6,  facadeHP:75, frameHP:110, safety:1.4, shards:'stone',    haptic:.7,  tint:0xd8cdb4, lit:.35},
- brick:    {label:'BRICK',        glassHP:5,  facadeHP:40, frameHP:65,  safety:1.3, shards:'brick',    haptic:.5,  tint:0x9c5a48, lit:.45}
+ glass:    {label:'CURTAIN WALL', glassHP:8,  facadeHP:0,  frameHP:80,  safety:2.5, shards:'glass',    haptic:.35, tint:0x8fc9e6, lit:.55},
+ concrete: {label:'CONCRETE',     glassHP:6,  facadeHP:55, frameHP:95,  safety:2.3, shards:'concrete', haptic:.6,  tint:0xb9b6ad, lit:.4},
+ stone:    {label:'LIMESTONE',    glassHP:6,  facadeHP:75, frameHP:110, safety:2.4, shards:'stone',    haptic:.7,  tint:0xd8cdb4, lit:.35},
+ brick:    {label:'BRICK',        glassHP:5,  facadeHP:40, frameHP:65,  safety:2.1, shards:'brick',    haptic:.5,  tint:0x9c5a48, lit:.45}
 });
 export const MATERIAL_NAMES = Object.keys(MATERIALS);
 export const SIDES = ['n','e','s','w'];

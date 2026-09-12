@@ -50,11 +50,11 @@ end-of-round check.
 
 Control messages are JSON: join, input, pose, restart, ping. Entity and gameplay events are
 reliable JSON on the same ordered socket. Transforms use the versioned little-endian binary
-snapshot **COL4** (`shared/protocol.js`):
+snapshot **COL5** (`shared/protocol.js`):
 
 | Component | Bytes |
 | --- | ---: |
-| Header, boss state, stagger, towers down, wrist quaternions | 132 |
+| Header, boss state, stagger, blocked walking, towers down, wrist quaternions | 136 |
 | One raider (incl. `seq`, breach cooldown, score) | 64 |
 | One chunk or ragdoll body | 32 |
 
@@ -86,15 +86,15 @@ After eight seconds without usable video, the viewer requests a per-publisher JP
 
 ## Giant and raider embodiment
 
-The giant walks at 13 m/s; normal raider flight is 11 m/s. Shared `giant-rig.js` dimensions drive the hand meshes, oriented collision sweeps and laser hitboxes. Wrist quaternions survive pose input, the COL4 snapshot and normalized interpolation. Raw tracked displacement (compensated for artificial yaw) controls strike energy; a contact blocks visible hands immediately and continued physical pressure damages the contacted layers. Entry/recenter/tracking recovery retain their no-attack grace period. The wrist offset attaches the forearm behind the palm; rigid upper/lower armor keeps fixed proportions.
+The giant walks at 13 m/s; normal raider flight is 11 m/s. Shared `giant-rig.js` dimensions drive the hand meshes, oriented collision sweeps and laser hitboxes. Wrist quaternions survive pose input, the COL5 snapshot and normalized interpolation. Raw tracked displacement (relative to the head, compensated for artificial yaw) controls strike energy; a contact blocks visible hands immediately and deliberate physical hand movement damages the contacted layers; holding still does no continuing damage. Entry/recenter/tracking recovery retain their no-attack grace period. The wrist offset attaches the forearm behind the palm; rigid upper/lower armor keeps fixed proportions.
 
 Raiders start in first person. V or the pause-menu button selects the 6.8 m shoulder camera (8.2 m while soaring). Hold either Shift to soar; release both, pause or lose focus to hover. The same armored pilot geometry and named eleven-bone skeleton drive the physical ragdoll, including prone knockdown pose, rifle and flight pack. Blue laser core/glow/pulse meshes and surface effects use authoritative hitscan endpoints.
 
 ## Structural destruction
 
-The district (`shared/city/layout.js`) is a grid of avenues and streets with 24 towers built
+The district (`shared/city/layout.js`) is a grid of avenues and streets with 169 buildings built
 from **tiers** on one integer bay grid (setbacks keep support continuity). Every bay is a hollow
-storey: slab + four corner columns + exterior skins. 2,543 bays. Intact floors share slabs, a column grid and exterior walls on one fixed body per building. Only affected floors/wall sides split into per-bay collision shapes when damaged. Roof equipment and street props retain separate solid proxies; falling debris uses one coarse box per bay plus roof equipment.
+storey: slab + four corner columns + exterior skins. 5,452 bays. Intact floors share slabs and exterior walls on one fixed body per building. Columns are merged into vertical runs until the first structural failure in their building; only then are those runs split by floor. Only affected floors/wall sides split into per-bay collision shapes when damaged. Roof equipment and street props retain separate solid proxies; falling debris uses one coarse box per bay plus roof equipment.
 
 Each exterior wall has up to two **skin layers** over the frame, by material
 (`shared/city/materials.js`): a *curtain wall* is all glass on a steel frame; *brick*, *stone*
@@ -102,24 +102,21 @@ and *concrete* have windows plus a facade. `damageCell(energy, sides)` pops glas
 then cracks the facade (which shields the frame while it stands), then reduces the frame's
 structural HP. Lower storeys have stronger frames (`frameScale`). A broken solid layer becomes an
 **opening**: its collider is removed, raiders and missiles pass through, and the client hides that
-instance and throws shards/bricks.
+instance, animates dust and retains two deterministic skin fragments per destroyed layer until round reset. The latter are visual pieces; structural wreckage retains Rapier collision.
 
 **Integrity** has two parts. Graph support (`unsupportedCells`): bays with no path to a
 foundation. Load (`structuralLoads`): weight flows down each stack; a bay whose support below is
 gone hangs from lateral neighbours up to three bays away, splitting its load among the nearest
 supported bays; capacity is `(stack + 1) × material safety × frameHP ratio`, so damaged columns
 carry less. Overloaded bays are scheduled to fail after `COLLAPSE_DELAY` (+ jitter) with a
-`creak`, which makes cascades read as progressive collapse. A failed column is **crushed into
-rubble** immediately (never a body that could keep propping the storeys above).
+`creak`, which makes cascades read as progressive collapse. A failed column becomes a modeled debris body and can temporarily prop up adjacent fallen structure.
 
 Detachment: kicked bays fly as single chunks; a severed section becomes **one rigid island per
 building** (floors when small) so towers topple and pancake. Islands receive an angular velocity
 about the far edge of whatever still stands beneath them (`topple`). On a hard landing an island
-splits into floor bands, bands into bays, and a lone bay that lands hard **crumbles** (body freed,
-cosmetic rubble on clients). Falling chunks damage bays they hit (domino collapses) and hurt the
+splits into floor bands, bands into bays, and a lone bay that lands hard gains damping and emits impact effects without disappearing. Once asleep after two seconds, debris becomes a fixed body, leaves the active snapshot list, and sends its final `settled` pose. Welcome state includes settled entities; clients ignore stale interpolated poses for them. Falling chunks damage bays they hit (domino collapses) and hurt the
 giant when they land on its head or core (`DEBRIS_GIANT_DAMAGE`, capped), which staggers it and
-exposes the core (+60 % rifle/breach damage while staggered). The giant's torso shoves through
-bays it walks into and is slowed by them.
+exposes the core (+60 % rifle/breach damage while staggered). The giant slides along intact bays at torso height. Walking chips one contacted bay every 0.7 seconds, capped at 5% frame wear, and cannot demolish its way through. The COL5 blocked flag stops desktop camera dead reckoning at walls.
 
 Budgets: 144 chunk bodies (coarse per-building islands under pressure, deferred breaks at the
 cap), eight ragdolls. Limits: graph/load are still a game model, not FEA — no bending moments,
@@ -137,7 +134,7 @@ are ignored). `?quality=low|medium|high|quest` forces a tier for profiling.
 The towers render as instanced batches regardless of city size: one frame batch (slab + open
 prism columns), one facade batch per masonry material, one glass batch per material, one roof
 batch, plus roof props and spires attached to their bays. Broken layers get a zero matrix.
-Debris posing, snapshot sampling, rubble and HUD updates avoid per-frame allocation.
+The 45-type architectural kit uses reusable instanced geometry. Detail is selected within 58 m on Quest, 95 m on performance tier and 180 m on higher tiers; landmark-specific ribs and crowns remain visible at distance. Nearby assemblies retain their skin masks and moving-bay transforms. Building names share one atlas and draw batch. No extra dynamic body is created for each ornament. See `CITY_COMPONENTS.md`.
 
 XR uses the tier's framebuffer scale (0.8 on Quest) and foveation; the camera is never shaken
 (haptics and a camera-locked red vignette carry damage instead). Do not mistake desktop FPS for

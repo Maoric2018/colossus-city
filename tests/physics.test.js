@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {Room, physicsReady} from '../server/room.js';
 import {v, len, vec} from '../shared/math.js';
 import {C} from '../shared/config.js';
+import {settleDebris,updateDebris} from '../server/destruction.js';
 import {ALL_SIDES} from '../shared/city/materials.js';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 await physicsReady;
@@ -18,7 +19,7 @@ test('an intact city uses merged floor colliders and splits a floor only where i
   const intact = r.world.colliders.len(), dressing = r.props.reduce((n,p)=>n+p.boxes.length,0) + r.cells.reduce((n,c)=>n+c.roofHandles.length,0); assert.ok(intact - dressing < 7000, `intact structure has ${intact - dressing} colliders, plus ${dressing} solid props`);
   const c = r.cells.find(c => c.building === 1 && c.floor === 3 && c.ix === 1 && c.iz === 1);
   r.breakCells([c.id], v(2, 0, 0)); const after = r.world.colliders.len();
-  assert.ok(after > intact && after < intact + 80, 'only that floor split into per-bay shapes');
+  assert.ok(after > intact && after < intact + 600, 'only the damaged building splits its column runs and the damaged floor splits its slab');
   assert.equal(r.floors[1][3].structureMerged, false); assert.equal(r.floors[1][4].structureMerged, true);
  }finally{ r.dispose(); }
 });
@@ -27,7 +28,8 @@ test('breaking every foundation releases the tower as one falling island and gra
   const tower = r.cells.filter(c => c.building === 0), ids = tower.filter(c => c.ground).map(c => c.id);
   r.breakCells(ids, v(0, 0, 0), {crush:true}); assert.equal(r.detached.size, tower.length);
   const events = r.drainEvents();
-  assert.equal(events.filter(e => e.type === 'crumble').length, ids.length, 'crushed columns become rubble, not props');
+  assert.equal(events.filter(e => e.type === 'crumble').length,0);
+  assert.ok(ids.every(id=>events.some(e=>e.type==='debris'&&e.cells.includes(id))),'every failed foundation keeps its modeled pieces');
   assert.ok(events.some(e => e.type === 'towerdown'));
   const island = [...r.debris.values()].find(e => e.cells.length > 12); assert.ok(island, 'severed storeys fall together');
   const before = island.body.translation().y; for(let i = 0; i < 45; i++) r.world.step(); assert.ok(island.body.translation().y < before - .15);
@@ -50,11 +52,11 @@ test('layered skins: windows pop first, the facade shields the frame, then the b
 test('overloaded columns fail after a short delay and cascade into a progressive collapse', () => {
  const r = room(); try{
   const tower = r.cells.filter(c => c.building === 1), ground = tower.filter(c => c.ground);
-  r.breakCells([ground[0].id, ground[1].id, ground[2].id], v(0, 0, 0));
+  r.breakCells(ground.slice(0,4).map(c=>c.id), v(0, 0, 0));
   r.step(); assert.ok(r.pendingFailures.size > 0, 'remaining base bays are scheduled to fail');
   assert.ok(r.drainEvents().some(e => e.type === 'creak'));
   ticks(r, Math.ceil((C.COLLAPSE_DELAY + C.COLLAPSE_JITTER) / C.TICK) + 2);
-  assert.ok(r.detached.size > 3, 'the cascade detached more than the hit bays');
+  assert.ok(r.detached.size > 4, 'the cascade detached more than the hit bays');
   ticks(r, 240); assert.ok(r.debris.size <= C.MAX_ACTIVE_CHUNKS);
  }finally{ r.dispose(); }
 });
@@ -79,7 +81,7 @@ test('secondary fracture splits an island into bands, bands into bays, keeping m
   for(const id of members){ const b = r.debris.get(r.cellMap.get(id).entity); assert.ok(b.cells.length < members.length); assert.ok(Number.isFinite(b.body.linvel().x)); }
   const band = [...r.debris.values()].find(e => e.cells.length > 1 && e.cells.length <= 9); r.splitDebris(band.id);
   for(const id of band.cells) assert.equal(r.debris.get(r.cellMap.get(id).entity).cells.length, 1);
-  const lone = [...r.debris.values()].find(e => e.cells.length === 1); r.crumble(lone.id); assert.equal(r.debris.has(lone.id), false); assert.ok(r.drainEvents().some(e => e.type === 'crumble'));
+  const lone = [...r.debris.values()].find(e => e.cells.length === 1); r.crumble(lone.id); assert.equal(r.debris.has(lone.id),true); assert.ok(lone.fractured);assert.equal(r.drainEvents().some(e=>e.type==='crumble'),false);
  }finally{ r.dispose(); }
 });
 test('destruction budget cannot exceed the configured rigid-body count', () => {
@@ -117,11 +119,24 @@ test('lost XR tracking stops locomotion and collisions; fresh tracking safely re
   r.input(boss, pose); r.step(); assert.ok(r.boss.z < z); assert.equal(r.handBodies[0].collider(0).isEnabled(), false);
  }finally{ r.dispose(); }
 });
-test('the giant shoves through a building it walks into and is slowed by it', () => {
+test('walking stops at a building, chips it slightly and cannot demolish it', () => {
  const r = room(); try{
   const boss = r.attach(socket, 'boss', 'desktop'), b = r.env.buildings[5];
   r.boss.x = b.x; r.boss.z = b.z + 20; let cellsHit = 0;
   for(let i = 0; i < 240; i++){ r.input(boss, {type:'input', yaw:0, pitch:0, x:0, z:-1}); r.step(); cellsHit += r.drainEvents().filter(e => e.type === 'strike').length; }
-  assert.ok(cellsHit > 0, 'the torso damages bays in its path'); assert.ok(r.detached.size > 0);
+  assert.ok(cellsHit > 0,'the torso gives contact feedback');assert.equal(r.detached.size,0);assert.ok(r.boss.pushing);assert.ok(r.cells.every(c=>c.skin.hp>=c.skin.maxHp*.95));const z=r.boss.z;
+  for(let i=0;i<240;i++){r.input(boss,{type:'input',yaw:0,pitch:0,x:0,z:-1});r.step();}assert.ok(Math.abs(r.boss.z-z)<.01);assert.equal(r.detached.size,0);assert.equal(r.snapshot().bossBlocked,1);
  }finally{ r.dispose(); }
+});
+
+test('resting rubble remains collidable, frees active slots and survives late join until reset',()=>{
+ const r=room();try{
+  r.breakCells([r.cells.find(c=>c.building===5&&c.roof).id],v());const e=[...r.debris.values()][0];
+  e.body.setTranslation(v(0,2,20),true);e.body.setLinvel(v(),true);e.body.sleep();const count=r.world.colliders.len();
+  assert.ok(settleDebris(r,e.id));assert.equal(r.debris.has(e.id),false);assert.ok(r.settled.has(e.id));assert.equal(r.world.colliders.len(),count);
+  r.time+=C.CHUNK_LIFETIME+100;updateDebris(r,new Set(),new Set(),new Set());
+  const w=r.welcome({id:99,role:'spectator'});assert.ok(w.entities.some(x=>x.id===e.id&&x.settled));assert.ok(!w.clearedCells.includes(e.cells[0]));assert.ok(e.body.isValid());
+  r.world.updateSceneQueries();const hit=r.world.castRay(new RAPIER.Ray(v(0,8,20),v(0,-1,0)),8,true);assert.equal(r.colliderTags.get(hit.collider.handle).cell,e.cells[0]);assert.ok(r.handWorld.cells.get(e.cells[0]).boxes.length>0);
+  r.initWorld();assert.equal(r.settled.size,0);
+ }finally{r.dispose();}
 });

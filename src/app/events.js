@@ -9,6 +9,7 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
  const vr = () => xr.session;
  return function handle(e){
   switch(e.type){
+   case 'missile-pose': missiles.pose(e); return;
    case 'missile': missiles.add(e); audio.play('missile', {p:e.p}); if(state.role === 'boss') xr.haptic(.25, 60); return;
    case 'detonate': missiles.remove(e.id); fx.impact(e.p, 1.5); audio.play('explosion', {p:e.p}); shake.add(near(e.p, 60) * .6); return;
    case 'dodge': fx.particle(fx.flares, e.p, {life:.25, size:2, color:new T.Color(0x8beaff), growth:2}); if(e.player === state.localId){ flightFX.dodge(); audio.play('dodge'); } return;
@@ -19,6 +20,7 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
     if(state.role === 'boss') xr.hapticMaterial(e.material, e.broke ? 1 : power); else shake.add(near(e.p, 45) * .25);
     return; }
    case 'debris': city.addDebris(e); return;
+   case 'settled': city.addDebris(e); return;
    case 'crumble': city.crumble(e); audio.play(e.material, {p:e.p, power:.9}); fx.impact(e.p, .6, e.material); if(state.role !== 'boss') shake.add(near(e.p, 60) * .22); return;
    case 'creak': audio.play('creak', {p:e.p}); fx.dustRing(e.p, .5); hud.feed(`${state.current ? city.env.buildings[e.building].name : 'STRUCTURE'} · STRUCTURE FAILING`, 'warn'); return;
    case 'towerdown': audio.play('towerdown'); audio.play('collapse', {p:e.p, power:1}); shake.add(state.role === 'boss' ? 0 : .9); hud.feed(`${e.name} IS DOWN`, 'big'); if(state.role === 'boss') xr.haptic(1, 400); return;

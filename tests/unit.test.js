@@ -11,12 +11,12 @@ const near = (a, b, eps = 1e-5) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b
 const base = () => ({tick:19, time:1.25, bossHP:2200, remaining:123, kills:2, head:[0, 23.8, 0], left:[-5, 15, 0], right:[5, 15, 0], bossYaw:.5, bossX:0, bossZ:0, damage:12, phase:0, round:1, players:[], bodies:[]});
 const building = i => cells.filter(c => c.building === i);
 test('map generation is deterministic, unique and every tower is inside the district', () => {
- assert.deepEqual(generateCells(city), cells); assert.equal(byId.size, cells.length); assert.equal(cells.length, 2543); assert.equal(city.buildings.length, 24);
+ assert.deepEqual(generateCells(city), cells); assert.equal(byId.size, cells.length); assert.equal(cells.length, 5452); assert.equal(city.buildings.length, 169);
  for(const b of city.buildings){ const [x0, z0, x1, z1] = buildingFootprint(b); assert.ok(x0 > -city.half && x1 < city.half && z0 > -city.half && z1 < city.half, b.name); assert.ok(Math.hypot(b.x, b.z) > city.plaza + 12, b.name + ' overlaps the plaza'); }
 });
 test('every support edge is reciprocal and inside one building', () => { for(const c of cells) for(const n of c.neighbors){ assert.ok(byId.get(n).neighbors.includes(c.id)); assert.equal(c.building, byId.get(n).building); } });
 test('setback tiers keep vertical continuity and expose ledge roofs', () => {
- const empire = building(0); assert.equal(new Set(empire.map(c => c.tier)).size, 3);
+ const empire = building(0); assert.equal(new Set(empire.map(c => c.tier)).size, 5);
  for(const c of empire) if(!c.ground) assert.ok(c.below, 'a bay above ground must rest on another bay');
  assert.ok(empire.filter(c => c.roof).length > 4);
 });
@@ -30,11 +30,12 @@ test('severing a complete floor releases precisely the upper storeys', () => {
  const removed = new Set(building(0).filter(c => c.floor === 2).map(c => c.id)); const result = unsupportedCells(cells, removed);
  assert.equal(result.length, building(0).filter(c => c.floor > 2).length); assert.ok(result.every(id => byId.get(id).floor > 2));
 });
-test('load model: one lost corner column holds, two adjacent overload the rest, damage erodes capacity', () => {
+test('load model: three lost foundation bays hold, four overload their neighbours, damage erodes capacity', () => {
  const tower = building(1), ground = tower.filter(c => c.ground); assert.equal(ground.length, 9);
  assert.equal(overloadedCells(tower, new Set([ground[0].id])).length, 0);
- assert.ok(overloadedCells(tower, new Set([ground[0].id, ground[1].id])).length >= 2);
- const loads = structuralLoads(tower, new Set()); const centre = loads.get(ground[4].id); near(centre.carried, 34); assert.ok(centre.capacity > centre.carried);
+ assert.equal(overloadedCells(tower, new Set(ground.slice(0,3).map(c=>c.id))).length,0);
+ assert.ok(overloadedCells(tower, new Set(ground.slice(0,4).map(c=>c.id))).length >= 2);
+ const loads = structuralLoads(tower, new Set()); const centre = loads.get(ground[4].id); near(centre.carried, 30); assert.ok(centre.capacity > centre.carried);
  assert.ok(overloadedCells(tower, new Set(), c => c.id === ground[4].id ? .3 : 1).includes(ground[4].id));
 });
 test('hanging bays beyond the beam span must fail', () => {

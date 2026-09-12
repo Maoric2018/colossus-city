@@ -18,7 +18,7 @@ export class CameraRig {
   }else if(state.role === 'boss'){
    // Dead reckoning: the server head lags by interpolation + RTT; lead it by the held input.
    const lead = net.lead + C.INTERPOLATION_MS / 1000, dir = rotateYaw({x:held.x, y:0, z:held.z}, yaw), len = Math.hypot(dir.x, dir.z) || 1;
-   const speed = C.GIANT_SPEED * (1 - (s.bossStagger || 0) * .6);
+   const speed = (s.bossBlocked ? 0 : C.GIANT_SPEED) * (1 - (s.bossStagger || 0) * .6);
    desired.set(s.head[0] + dir.x / len * speed * lead * (len > .1 ? 1 : 0), s.head[1] + 1.8, s.head[2] + dir.z / len * speed * lead * (len > .1 ? 1 : 0) + .3);
    this.pos.lerp(desired, 1 - Math.exp(-dt * 10));
   }else{

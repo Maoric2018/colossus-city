@@ -7,9 +7,10 @@ the public surface of each module stable, and add tests next to the layer you ch
 shared/            pure, dependency-free logic imported by BOTH server and browser
   config.js        every tunable constant (C), collision groups, player flag bits (F)
   math.js          vectors, quaternions, sweeps, input sanitising
-  protocol.js      binary snapshot codec (COL4). Bump MAGIC when the layout changes.
+  protocol.js      binary snapshot codec (COL5). Bump MAGIC when the layout changes.
   flight.js        raider flight model (flightStep) used by the server AND client prediction
   environment.js   facade: the active district + re-exports of shared/city/*
+  city/components.js  45 modeled part types and per-bay placement rules
   city/layout.js   district data: towers (tiers, material, spire, water tower), roads, spawns
   city/materials.js material table: glass/facade/frame HP, safety factor, tint, haptics
   city/cells.js    generateCells (bays, walls, stacks), cellColliders (skin-aware), initialSkin

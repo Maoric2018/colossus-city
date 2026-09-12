@@ -1,5 +1,6 @@
 // A structural cell is one hollow storey bay: slab + four corner columns + exterior skins.
 // Cells form a support graph anchored at foundations. No triangle-mesh physics anywhere.
+import {C} from '../config.js';
 import {roofColliders} from '../props.js';
 import {MATERIALS, ALL_SIDES, sideBit, wallSolid} from './materials.js';
 export function generateCells(env){
@@ -13,10 +14,10 @@ export function generateCells(env){
    for(let f = 0; f < t.floors; f++, floor++)
     for(let z = 0; z < t.nz; z++) for(let x = 0; x < t.nx; x++){
      const ix = t.ix + x, iz = t.iz + z;
-     const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, ground:floor === 0,
+     const cell = {id:id++, building:bi, tier:ti, floor, ix, iz, material:b.material, architecture:b.architecture || 'urban', variant:b.variant || 0, buildingFloors:totalFloors, ground:floor === 0,
       p:[originX + ix * b.bay, .15 + floor * b.story + b.story / 2, originZ + iz * b.bay],
       size:[b.bay, b.story, b.bay], walls:[false, false, false, false], neighbors:[], below:0, above:0, lateral:[],
-      roof:false, stackAbove:0, frameScale:1 + .7 * (1 - floor / Math.max(1, totalFloors - 1))};
+      roof:false, stackAbove:0, frameScale:C.BUILDING_STRENGTH * (b.strength || 1) * (1 + .7 * (1 - floor / Math.max(1, totalFloors - 1)))};
      ids.set(`${ix}:${floor}:${iz}`, cell.id); cells.push(cell);
     }
   });

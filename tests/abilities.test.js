@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Room,physicsReady} from '../server/room.js';
-import {launchMissile,updateMissiles} from '../server/abilities.js';
+import {launchMissile,updateMissiles,steerMissile} from '../server/abilities.js';
 import {C} from '../shared/config.js';
 import {v,arr,add,sub,rotateYaw,len} from '../shared/math.js';
 import {encodeSnapshot,decodeSnapshot} from '../shared/protocol.js';
@@ -28,15 +28,15 @@ test('directional dodge costs fuel, has a cooldown and cannot repeat a held sequ
  p.fuel=0;r.input(c,{type:'input',yaw:0,pitch:0,dodge:2});r.step();assert.equal(r.drainEvents().filter(e=>e.type==='dodge').length,0);
  }finally{r.dispose();}
 });
-test('missiles collide with buildings, explode and detach supported structure',()=>{
- const r=new Room('ABC123');try{r.attach(ws,'boss','giant');r.boss.right=v(0,10,-20);r.world.step();assert.equal(launchMissile(r,'right',v(0,0,-1)),true);assert.equal(launchMissile(r,'right',v(0,0,-1)),false);
- for(let i=0;i<90&&r.missiles.size;i++){r.time+=C.TICK;updateMissiles(r);r.world.step();}assert.equal(r.missiles.size,0);assert.ok(r.detached.size>0);assert.ok(r.drainEvents().some(e=>e.type==='detonate'));
+test('missiles collide with buildings, explode and damage the stronger structure',()=>{
+ const r=new Room('ABC123');try{r.attach(ws,'boss','giant');r.boss.right=v(-12,10,-40);r.world.step();assert.equal(launchMissile(r,'right',v(0,0,-1)),true);assert.equal(launchMissile(r,'right',v(0,0,-1)),false);
+ for(let i=0;i<90&&r.missiles.size;i++){r.time+=C.TICK;updateMissiles(r);r.world.step();}assert.equal(r.missiles.size,0);assert.ok(r.cells.some(c=>c.skin.hp<c.skin.maxHp));assert.ok(r.drainEvents().some(e=>e.type==='detonate'));
  }finally{r.dispose();}
 });
 test('a charged breach shot cracks structure, hurts the giant more and respects its cooldown',()=>{
  const {r,c,p}=raider();try{
   r.spawn(p,v(0,6,-40));p.invulnerable=0;const hp=r.bossHP;
-  // Aim straight at MERIDIAN ONE's south face.
+  // Aim straight at the south twin tower's south face.
   r.input(c,{type:'input',yaw:0,pitch:0,heavy:1});r.step();
   const heavy=r.drainEvents().find(e=>e.type==='heavy');assert.ok(heavy&&heavy.structure,'the bolt hit a bay');assert.ok(p.fuel<1);assert.ok(p.heavyReady>r.time);
   r.input(c,{type:'input',yaw:0,pitch:0,heavy:2});r.step();assert.equal(r.drainEvents().filter(e=>e.type==='heavy').length,0,'cooldown blocks a second bolt');
@@ -54,5 +54,23 @@ test('missiles hit a raider, respect spawn protection and reset with the round',
 test('raider input cannot fire giant missiles; stale tracking cannot keep firing',()=>{
  const {r,c}=raider();try{r.input(c,{type:'input',yaw:0,pitch:0,missile:true});r.step();assert.equal(r.missiles.size,0);
  const boss=r.clients.get(r.bossClient);r.input(boss,{type:'pose',head:[0,23.8,0],left:[-5,16,-4],right:[5,16,-4],yaw:0,fireRight:true,rightAim:[0,1,0],reset:true});r.step();r.input(boss,{type:'pose',head:[0,23.8,0],left:[-5,16,-4],right:[5,16,-4],yaw:0,fireRight:true,rightAim:[0,1,0]});r.step();r.input(boss,{type:'pose',tracking:false});ticks(r,70);assert.equal(r.drainEvents().filter(e=>e.type==='missile').length,1);
+ }finally{r.dispose();}
+});
+
+test('missile homing is gentle, forward-only and ignores protected or occluded players',()=>{
+ const {r,p}=raider();try{
+  r.spawn(p,v(4,20,-22));p.invulnerable=0;p.body.setLinvel(v(),true);r.world.updateSceneQueries();
+  const missile=()=>({p:v(0,20,0),direction:[0,0,-1]});let m=missile(),d=steerMissile(r,m);
+  assert.ok(d.x>0);assert.ok(Math.acos(-d.z)<=C.MISSILE_TURN_RATE*C.TICK+1e-7);assert.ok(Math.abs(len(d)-1)<1e-6);
+  p.invulnerable=r.time+10;m=missile();assert.deepEqual(steerMissile(r,m),v(0,0,-1));p.invulnerable=0;
+  r.spawn(p,v(0,20,20));p.invulnerable=0;r.world.updateSceneQueries();assert.deepEqual(steerMissile(r,missile()),v(0,0,-1));
+  r.spawn(p,v(-8,20,-100));p.invulnerable=0;r.world.updateSceneQueries();m={p:v(-12,20,-44),direction:[0,0,-1]};assert.deepEqual(steerMissile(r,m),v(0,0,-1),'The north tower blocks homing line of sight');
+ }finally{r.dispose();}
+});
+test('guided missile corrections and late-join state use the current position and direction',()=>{
+ const {r,c,p}=raider();try{
+  r.spawn(p,v(5,30,-24));p.invulnerable=0;r.boss.right=v(0,30,0);r.world.updateSceneQueries();launchMissile(r,'right',v(0,0,-1));r.drainEvents();
+  for(let i=0;i<3;i++){r.tick++;r.time+=C.TICK;updateMissiles(r);}const updates=r.drainEvents().filter(e=>e.type==='missile-pose');assert.equal(updates.length,1);assert.ok(updates[0].direction[0]>0);
+  const w=r.welcome(c).missiles[0];assert.deepEqual(w.p,updates[0].p);assert.deepEqual(w.direction,updates[0].direction);assert.equal(w.time,r.time);
  }finally{r.dispose();}
 });

@@ -31,7 +31,7 @@ export class Room {
   this.world = new RAPIER.World(v(0, C.GRAVITY, 0)); this.world.timestep = C.TICK;
   this.world.integrationParameters.numSolverIterations = 5;
   this.queue = new RAPIER.EventQueue(true); this.colliderTags = new Map(); this.cells = generateCells(this.env);
-  this.cellMap = new Map(); this.detached = new Set(); this.debris = new Map(); this.nextDebris = 1000; this.missiles = new Map(); this.nextMissile = 20000; this.rags = new Map(); this.events = [];
+  this.cellMap = new Map(); this.detached = new Set(); this.debris = new Map(); this.settled = new Map(); this.nextDebris = 1000; this.missiles = new Map(); this.nextMissile = 20000; this.rags = new Map(); this.events = [];
   this.phase = 0; this.remaining = C.MATCH_SECONDS; this.bossHP = C.BOSS_HP; this.kills = 0; this.startTime = this.time; this.towersDown = 0; this.destroyedThisRound = 0;
   this.boss = initialBoss();
   this.ground = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -.3, 0));
@@ -78,10 +78,10 @@ export class Room {
  roster(){ return [...this.clients.values()].map(c => ({id:c.id, name:c.name, role:c.role})).concat([...this.players.values()].filter(p => p.bot).map(p => ({id:p.id, name:p.name, role:'bot'}))); }
  welcome(client){
   return {type:'welcome', id:client.id, viewKey:client.viewKey, role:client.role, room:this.code, practice:this.practice, environment:this.env.id, round:this.round, host:this.hostId(),
-   missiles:[...this.missiles.values()].map(m => ({...m, p:arr(m.p)})),
-   clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity)).map(c => c.id),
+   missiles:[...this.missiles.values()].map(m => ({...m, time:this.time, p:arr(m.p)})),
+   clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity) && !this.settled.has(c.entity)).map(c => c.id),
    skins:damagedSkins(this), collapsed:[...this.collapsed],
-   entities:[...this.debris.values()].map(e => debrisMeta(e)), rags:[...this.rags.values()].map(r => ragMeta(r)), roster:this.roster()};
+   entities:[...this.debris.values(), ...this.settled.values()].map(e => debrisMeta(e)), rags:[...this.rags.values()].map(r => ragMeta(r)), roster:this.roster()};
  }
  // ---- input ----
  input(client, m){
@@ -159,7 +159,7 @@ export class Room {
  snapshot(){
   const b = this.boss;
   return {tick:this.tick, time:this.time, bossHP:this.bossHP, remaining:this.remaining, kills:this.kills, head:arr(b.head), left:arr(b.left), right:arr(b.right), bossYaw:b.yaw, bossX:b.x, bossZ:b.z, leftQuaternion:b.leftQuaternion, rightQuaternion:b.rightQuaternion,
-   damage:this.detached.size / this.cells.length * 100, phase:this.phase, round:this.round, bossStagger:b.stagger, towersDown:this.towersDown,
+   damage:this.detached.size / this.cells.length * 100, phase:this.phase, round:this.round, bossStagger:b.stagger, towersDown:this.towersDown, bossBlocked:b.pushing ? 1 : 0,
    players:[...this.players.values()].map(p => { const rb = p.body || this.rags.get(p.rag)?.parts[0].body; return {id:p.id, flags:(p.rag ? F.RAG : 0) | (p.hp <= 0 ? F.DEAD : 0) | (this.time < p.invulnerable ? F.SHIELD : 0) | (p.bot ? F.BOT : 0) | (p.soaring ? F.SOAR : 0) | (this.time < p.dodgeUntil ? F.DODGE : 0), p:rb ? arr(rb.translation()) : [0, -20, 0], v:rb ? arr(rb.linvel()) : [0, 0, 0], yaw:p.input.yaw, hp:p.hp, fuel:p.fuel, seq:p.input.seq, pitch:p.input.pitch, dodgeCooldown:Math.max(0, p.dodgeReady - this.time), heavyCooldown:Math.max(0, p.heavyReady - this.time), score:p.score}; }),
    bodies:[...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
   };

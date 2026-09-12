@@ -1,5 +1,5 @@
 import {cellColliders} from './environment.js';
-import {staticProps} from './props.js';
+import {roofColliders,staticProps} from './props.js';
 import {quatEuler} from './math.js';
 import {box,identity,plus,rotate} from './giant-rig.js';
 // The server and local Quest preview use the same solid map geometry. This is a
@@ -11,7 +11,10 @@ export class HandWorld{
   for(const prop of env.props)if(prop.collider){const rotation=quatEuler(...(prop.rotation||[0,0,0])),q=[rotation.x,rotation.y,rotation.z,rotation.w],scale=prop.scale||1;this.fixed.push(box(plus(prop.position||[0,0,0],rotate((prop.collider.offset||[0,0,0]).map(v=>v*scale),q)),prop.collider.half.map(v=>v*scale),q));}
   for(const c of cells)this.setCell(c.id,c.p,identity);
  }
- setSkin(id,skin){const entry=this.cells.get(id);if(!entry)return;entry.local=cellColliders(entry.cell,skin);const pose=entry.pose;if(pose){entry.pose=null;this.setCell(id,pose.slice(0,3),pose.slice(3));}}
+ setSkin(id,skin){const entry=this.cells.get(id);if(!entry||entry.debris)return;entry.local=cellColliders(entry.cell,skin);const pose=entry.pose;if(pose){entry.pose=null;this.setCell(id,pose.slice(0,3),pose.slice(3));}}
+ setDebris(id,position,rotation){
+  const entry=this.cells.get(id);if(!entry)return;entry.debris=true;entry.local=[[0,0,0,...entry.cell.size.map(v=>v*.48)],...roofColliders(entry.cell)];entry.pose=null;this.setCell(id,position,rotation);
+ }
  setCell(id,position,rotation=identity,hidden=false){
   const entry=this.cells.get(id);if(!entry)return;if(hidden){entry.boxes=[];entry.pose=null;return;}
   const pose=[...position,...rotation];if(entry.pose?.every((v,i)=>v===pose[i]))return;entry.pose=pose;

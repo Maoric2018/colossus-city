@@ -10,6 +10,7 @@ function canvasTexture(size, draw){
 const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
 // Window rectangles for one bay wall in UV space: [x, y, w, h] fractions.
 export const WINDOWS = {
+ empire:[[.13,.15,.16,.71],[.42,.15,.16,.71],[.71,.15,.16,.71]],
  brick:[[.1, .28, .2, .42], [.4, .28, .2, .42], [.7, .28, .2, .42]],
  stone:[[.12, .22, .3, .5], [.58, .22, .3, .5]],
  concrete:[[.06, .3, .88, .36]],
@@ -31,6 +32,9 @@ export function facadeMaps(material, size = 512, seed = 7){
    x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(0, 0, s, s * .06); x.fillRect(0, s * .94, s, s * .06);
    windows(x, s, WINDOWS.brick, rand, 0, '', rgb(28, 32, 38));
    x.fillStyle = rgb(190, 178, 160); for(const [wx, wy, ww, wh] of WINDOWS.brick) x.fillRect((wx - .02) * s, (wy + wh) * s, (ww + .04) * s, s * .02);
+  }else if(material==='empire'){
+   x.fillStyle='#e2dfd2';x.fillRect(0,0,s,s);x.fillStyle='#cbc8bc';for(let i=1;i<7;i++)x.fillRect(0,i*s/7,s,1);
+   windows(x,s,WINDOWS.empire,rand,0,'','#3e4850');x.fillStyle='#959787';for(const [wx,wy,ww,wh] of WINDOWS.empire)x.fillRect(wx*s,(wy+wh)*s,ww*s,s*.015);
   }else if(material === 'stone'){
    x.fillStyle = rgb(206, 194, 168); x.fillRect(0, 0, s, s);
    const rows = 6, cols = 4, bh = s / rows, bw = s / cols;

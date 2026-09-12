@@ -12,6 +12,7 @@ import {rayAABB} from '../../shared/math.js';
 import {Buildings} from './buildings.js';
 import {buildGround} from './ground.js';
 import {Rubble} from './rubble.js';
+import {Fragments} from './fragments.js';
 const skyVertex = `varying vec3 vDir; void main(){vDir=position;vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}`;
 const skyFragment = `varying vec3 vDir;uniform vec3 topColor;uniform vec3 horizon;void main(){vec3 d=normalize(vDir);float h=max(d.y,0.);vec3 c=mix(horizon,topColor,pow(h,.42));vec3 sun=normalize(vec3(-.8,.22,-.65));float s=max(dot(d,sun),0.);c+=vec3(1.,.51,.22)*pow(s,18.)*.37;c+=vec3(1.,.82,.48)*smoothstep(.9986,.9995,s)*2.;gl_FragColor=vec4(c,1.);}`;
 const tp = new T.Vector3(), tq = new T.Quaternion(), tinv = new T.Quaternion(), to = new T.Vector3(), td = new T.Vector3(), tc = new T.Vector3(), th = new T.Vector3(), tPos = new T.Vector3(), tRot = new T.Quaternion();
@@ -30,9 +31,10 @@ export class CityView {
   this.makeSkyAndLights(); this.ground = buildGround(this.root, env, tier, this.textures);
   this.buildings = new Buildings(this.root, this.cells, tier, {concrete:this.texture(t.concrete, 1)});
   this.transforms = this.buildings.entries;
+  scene.onBeforeRender=(_renderer,_scene,camera)=>{this.buildings.components.select(camera);this.buildings.commit();};
   this.batches.push(...this.buildings.batches);
   for(const c of this.cells){ const s = this.skins.get(c.id); this.buildings.setSkin(c.id, s.glass, s.facade); }
-  this.buildings.commit(); this.rubble = new Rubble(scene, tier); this.ready = this.loadCustomAssets();
+  this.buildings.commit(); this.rubble = new Rubble(scene, tier); this.fragments=new Fragments(this.root,this.cells,tier); this.ready = this.loadCustomAssets();
  }
  texture(url, repeat = 1, srgb = true){ const t = this.loader.load(url); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = this.quest ? 2 : 4; if(srgb) t.colorSpace = T.SRGBColorSpace; return t; }
  makeSkyAndLights(){
@@ -50,19 +52,22 @@ export class CityView {
   const c = this.byId.get(id), s = this.skins.get(id); if(!c) return;
   const lostGlass = s.glass & ~glass, lostFacade = s.facade & ~facade;
   s.glass = glass; s.facade = facade; this.buildings.setSkin(id, glass, facade); this.colliderCache.set(id, cellColliders(c, s)); this.handWorld.setSkin(id,s);
-  if(!fx || (!lostGlass && !lostFacade)) return;
+  if(!lostGlass && !lostFacade) return;
   const e = this.buildings.pose(id);
   for(let side = 0; side < 4; side++){
    const bit = sideBit(side); if(!(lostGlass & bit) && !(lostFacade & bit)) continue;
    const a = side * Math.PI / 2, p = [e.p.x + Math.sin(a) * c.size[0] * .5, e.p.y, e.p.z - Math.cos(a) * c.size[2] * .5], out = [Math.sin(a) * 3, 0, -Math.cos(a) * 3];
+   if(lostGlass & bit)this.fragments.add(c,side,'glass',e,fx);
+   if(lostFacade & bit)this.fragments.add(c,side,'facade',e,fx);
+   if(!fx)continue;
    if(lostGlass & bit) this.rubble.burst('glass', p, this.quest ? 8 : 14, {velocity:out, spread:3, up:2});
    if(lostFacade & bit) this.rubble.burst(c.material, p, this.quest ? 10 : 18, {velocity:out, spread:3, up:3});
   }
  }
  hideCells(ids){ for(const id of ids){ this.detached.add(id); this.handWorld.setCell(id,null,undefined,true); this.buildings.setCell(id, null, null, true); } }
- addDebris(e){ const entry = {cells:e.cells, origin:new T.Vector3(...e.origin), material:e.material, pos:new T.Vector3(), rot:new T.Quaternion(), radius:0}; for(const id of e.cells){ this.detached.add(id); this.handWorld.setCell(id,null,undefined,true); entry.radius = Math.max(entry.radius, new T.Vector3(...this.byId.get(id).p).distanceTo(entry.origin) + Math.hypot(...this.byId.get(id).queryHalf)); } this.moving.set(e.id, entry); this.poseDebris(e.id, e.p, e.q); }
+ addDebris(e){ const entry = {cells:e.cells, origin:new T.Vector3(...e.origin), material:e.material, pos:new T.Vector3(), rot:new T.Quaternion(), radius:0}; for(const id of e.cells){ this.detached.add(id); this.handWorld.setCell(id,null,undefined,true); entry.radius = Math.max(entry.radius, new T.Vector3(...this.byId.get(id).p).distanceTo(entry.origin) + Math.hypot(...this.byId.get(id).queryHalf)); } this.moving.set(e.id, entry); this.poseDebris(e.id, e.p, e.q); entry.settled=!!e.settled;if(entry.settled)for(const id of e.cells){const pose=this.buildings.pose(id);this.handWorld.setDebris(id,pose.p.toArray(),pose.q.toArray());} }
  poseDebris(id, p, q){
-  const e = this.moving.get(id); if(!e) return;
+  const e = this.moving.get(id); if(!e||e.settled) return;
   e.pos.set(p[0], p[1], p[2]); e.rot.set(q[0], q[1], q[2], q[3]);
   for(const cId of e.cells){ const c = this.byId.get(cId); tp.set(c.p[0], c.p[1], c.p[2]).sub(e.origin).applyQuaternion(e.rot).add(e.pos); this.buildings.setCell(cId, tp, e.rot, false); }
  }
@@ -78,9 +83,9 @@ export class CityView {
   }
   if(ev.id) this.moving.delete(ev.id);
  }
- reset(){ this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
+ reset(){ this.fragments.reset(); this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
  commit(){ this.buildings.commit(); }
- update(dt){ this.ground.update(dt); this.rubble.update(dt); }
+ update(dt){ this.ground.update(dt); this.rubble.update(dt); this.fragments.update(dt); }
  // ---- spatial queries ----
  rayBuilding(origin, direction, maxDistance){
   const out = [];

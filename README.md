@@ -1,5 +1,5 @@
 # COLOSSUS CITY
-### One giant. Eight jetpack raiders. Twenty-four towers that come apart.
+### One giant. Eight jetpack raiders. A dense city that comes apart.
 
 Asymmetric multiplayer prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders a Manhattan-style district; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
@@ -86,13 +86,17 @@ Raiders start in first person. Press **V** or use the pause-menu camera button f
 
 ### Midtown
 
-The district (`shared/city/layout.js`) is a 320 m grid of four avenues and four streets with 24 named towers of four construction types, 6 to 34 storeys (up to 122 m), art-deco setbacks, spires, water towers and roof equipment, a central plaza, street traffic, lamps, bridges and a far skyline. 2,543 structural bays. Raiders spawn on the outer avenues; the giant starts on the plaza.
+The district (`shared/city/layout.js`) is a 320 m grid with **169 destructible buildings and 5,452 structural bays**. Every occupied block has at least six addresses, with taller cores, storefront infill, alleys and open avenues. Custom twin towers and an Empire State–style tower use dedicated architectural parts. The 45-type kit includes steel framing, stairs, elevator doors, storefronts, fire escapes, balconies, cornices and roof services. Each building uses at least 30 types, joined into structural bays for simulation. Existing downloaded textures, roof equipment, cars and skyline models remain in use. Raiders spawn on the outer avenues; the giant starts on the plaza.
 
 ### Layered destruction with integrity
 
 Every bay is a hollow storey: slab + four columns + exterior skins. **Curtain-wall** towers are glass on a steel frame; **brick**, **limestone** and **concrete** towers have windows plus a facade. A hit pops glass first (rifle fire shatters windows), then cracks the facade — which shields the frame while it stands — then wears down the structural frame; lower storeys are stronger. Broken solid layers become real openings: colliders go, raiders and missiles pass through.
 
-Integrity is a load model on top of graph support. Weight flows down each column stack; a bay whose support is gone hangs from neighbours up to three bays away; capacity is the design load × a material safety factor × the frame's remaining HP. Overloaded columns creak, then fail after a short delay, so cascades read as progressive collapse. Failed columns are crushed to rubble immediately; a severed section falls as one rigid island, tips about whatever still stands beneath it, splits into floor bands on impact, bands into bays, and lone bays that land hard crumble into cosmetic bricks/shards. Falling chunks damage the towers they hit (domino collapses) and the giant if they land on it. The giant's torso shoves through bays it walks into and is slowed by them.
+Integrity combines support connections and load redistribution. Frames are 1.7× stronger before landmark reinforcement; surviving supports have more reserve capacity and failures creak for 0.65–1 seconds before propagating. **Walking stops at a wall and can chip at most 5% of a contacted frame; it cannot grind a building down.** Moving a hand deliberately damages its contacted layers. Holding it still does no continuing damage. Punch exposed columns to sever structure after the facade opens.
+
+Broken bays stay as visible, collidable debris. Islands tip and split on hard impacts; even failed foundation pieces remain. Sleeping rubble becomes fixed geometry for the rest of the round, freeing the 144 active-body slots and avoiding repeated pose traffic. Glass and facade panels leave persistent visual fragments as well as temporary dust. Late joiners receive fallen geometry, damaged skins and final settled poses; a round reset clears the remains.
+
+Robot missiles gently correct toward visible raiders inside a 22° forward cone, up to 75 m away, at no more than 27.5°/second. They ignore protected players and targets behind solid cover. The server sends curved-path corrections at 20 Hz; aiming and dodging still matter.
 
 This is a game structural model, not engineering analysis: no bending moments, fatigue, rebar or arbitrary cracks; bays are rigid compounds; the skyline ring is decoration.
 
@@ -102,7 +106,7 @@ Client-side prediction runs the shared flight model locally against the held inp
 
 ## 3. Performance and verification
 
-Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders; a maximal snapshot is 8,068 bytes.
+Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders; a maximal snapshot is 8,072 bytes.
 
 Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1, low-poly skyline), `medium`, `high`. Adaptive resolution lowers the pixel ratio under sustained load. Towers render as a handful of instanced batches regardless of size (~120 draw calls in play on `low`). `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
 
@@ -114,6 +118,7 @@ npm run test:network   # Real multiplayer + spectator channel integration
 npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three math)
 npm run test:all       # All Node tests
 npm run test:giant     # Rendered hand anatomy and real Midtown contact in Quest emulation
+npm run test:city
 npm run test:visual    # Imported art, roof movement, props and lasers
 npm run test:ragdoll   # Matching pilot/ragdoll skin and physics
 npm run test:xr-view   # Smooth yaw, hand orientation and rigid armor
@@ -132,7 +137,7 @@ Do not treat a syntax check, unit test, server benchmark or emulated browser ses
 
 ## 4. Swap the city or use imported assets
 
-`shared/city/layout.js` is the single source of truth: towers (tiers, material, spire, water tower), roads and spawns. Materials live in `shared/city/materials.js`. Server and browser import the same definition. See [docs/MODULES.md](docs/MODULES.md) for the module map and ownership rules, and `docs/ASSET_PIPELINE.md` for GLB conventions. `npm run assets -- --verify` checks the bundled photographic textures and models; nothing needs downloading to play.
+`shared/city/layout.js` is the single source of truth: towers (tiers, material, spire, water tower), roads and spawns. Materials live in `shared/city/materials.js`. Server and browser import the same definition. The architectural kit and source references are documented in [docs/CITY_COMPONENTS.md](docs/CITY_COMPONENTS.md). See [docs/MODULES.md](docs/MODULES.md) for the module map and ownership rules, and `docs/ASSET_PIPELINE.md` for GLB conventions. `npm run assets -- --verify` checks the bundled photographic textures and models; nothing needs downloading to play.
 
 ## Source guide
 

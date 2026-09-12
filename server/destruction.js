@@ -1,6 +1,7 @@
 // Layered building damage, structural collapse scheduling and debris lifecycle.
 // Every function takes the Room as its first argument and only touches room-owned state.
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
+import {rotate,plus,minus} from '../shared/giant-rig.js';
 import {C, group} from '../shared/config.js';
 import {roofColliders} from '../shared/props.js';
 import {MATERIALS, sideBit, ALL_SIDES, wallSolid} from '../shared/city/materials.js';
@@ -28,10 +29,21 @@ export function buildCity(room){
   floors[c.floor].cells.push(c);
  }
  for(const c of room.cells) for(const a of roofColliders(c)) c.roofHandles.push(staticCollider(room, room.buildingBodies[c.building], [c.p[0]+a[0],c.p[1]+a[1],c.p[2]+a[2],...a.slice(3)], {cell:c.id}));
+ room.buildingColumns=room.env.buildings.map(()=>({merged:true,handles:[]}));
  for(const floors of room.floors) for(const f of floors) if(f) mergeFloor(room, f);
+ // Intact columns are continuous vertical runs. Split a building's runs only when its
+ // first structural bay fails; this keeps the dense undamaged city cheap to simulate.
+ room.floors.forEach((floors,bi)=>{
+  const runs=new Map();
+  for(const f of floors)for(const a of floorColumns(f)){
+   const key=`${a[0].toFixed(3)}:${a[2].toFixed(3)}`,lo=a[1]-a[4],hi=a[1]+a[4];
+   const run=runs.get(key);if(run){run.lo=Math.min(run.lo,lo);run.hi=Math.max(run.hi,hi);}else runs.set(key,{x:a[0],z:a[2],lo,hi});
+  }
+  for(const a of runs.values())room.buildingColumns[bi].handles.push(staticCollider(room,room.buildingBodies[bi],[a.x,(a.lo+a.hi)/2,a.z,.15,(a.hi-a.lo)/2,.15],{building:bi,column:true}));
+ });
 }
 function staticCollider(room, body, a, tag){
- const co = room.world.createCollider(RAPIER.ColliderDesc.cuboid(a[3], a[4], a[5]).setTranslation(a[0], a[1], a[2]).setDensity(22).setFriction(.65).setRestitution(.06)
+ const co = room.world.createCollider(RAPIER.ColliderDesc.cuboid(a[3], a[4], a[5]).setTranslation(a[0], a[1], a[2]).setDensity(22).setFriction(1.05).setRestitution(.015)
   .setCollisionGroups(group(G.WORLD)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), body);
  room.colliderTags.set(co.handle, tag); return co.handle;
 }
@@ -42,10 +54,18 @@ function mergeFloor(room, f){
  for(const c of cells){ minX = Math.min(minX, c.p[0] - w / 2); maxX = Math.max(maxX, c.p[0] + w / 2); minZ = Math.min(minZ, c.p[2] - d / 2); maxZ = Math.max(maxZ, c.p[2] + d / 2); }
  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2, y = any.p[1], tag = {building:f.building, floor:f.floor};
  f.structure.push(staticCollider(room, body, [cx, y + h / 2 - slab, cz, (maxX - minX) / 2, slab, (maxZ - minZ) / 2], tag));
- for(let x = minX; x <= maxX + .01; x += w) for(let z = minZ; z <= maxZ + .01; z += d) f.structure.push(staticCollider(room, body, [x, y, z, col, h / 2 - .26, col], tag));
+
  f.structureMerged = true;
  const spans = [[cx, minZ + .06, (maxX - minX) / 2 - .3, .06], [maxX - .06, cz, .06, (maxZ - minZ) / 2 - .3], [cx, maxZ - .06, (maxX - minX) / 2 - .3, .06], [minX + .06, cz, .06, (maxZ - minZ) / 2 - .3]];
  for(let side = 0; side < 4; side++){ const [sx, sz, hx, hz] = spans[side]; f.walls[side].push(staticCollider(room, body, [sx, y, sz, hx, h / 2 - .22, hz], {...tag, side})); f.wallsMerged[side] = true; }
+}
+function floorColumns(f){
+ const [w,h,d]=f.cells[0].size, y=f.cells[0].p[1],minX=Math.min(...f.cells.map(c=>c.p[0]-w/2)),maxX=Math.max(...f.cells.map(c=>c.p[0]+w/2)),minZ=Math.min(...f.cells.map(c=>c.p[2]-d/2)),maxZ=Math.max(...f.cells.map(c=>c.p[2]+d/2)),out=[];
+ for(let x=minX;x<=maxX+.01;x+=w)for(let z=minZ;z<=maxZ+.01;z+=d)out.push([x,y,z,.15,h/2-.26,.15]);return out;
+}
+function unmergeColumns(room,bi){
+ const columns=room.buildingColumns[bi];if(!columns.merged)return;removeHandles(room,columns.handles);columns.merged=false;
+ for(const f of room.floors[bi])for(const a of floorColumns(f))f.structure.push(staticCollider(room,room.buildingBodies[bi],a,{building:bi,floor:f.floor}));
 }
 const floorOf = (room, c) => room.floors[c.building][c.floor];
 function attachStructure(room, c){
@@ -59,7 +79,7 @@ function attachWall(room, c, side){
  const a = cellColliders(c, c.skin).find((s, i) => i >= 5 && sideOfShape(c, s) === side); if(!a) return;
  c.wallHandles[side].push(staticCollider(room, room.buildingBodies[c.building], [c.p[0] + a[0], c.p[1] + a[1], c.p[2] + a[2], a[3], a[4], a[5]], {cell:c.id}));
 }
-function unmergeStructure(room, f){ if(!f.structureMerged) return; removeHandles(room, f.structure); f.structureMerged = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachStructure(room, c); }
+function unmergeStructure(room, f){ if(!f.structureMerged) return; unmergeColumns(room,f.building); removeHandles(room, f.structure); f.structureMerged = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachStructure(room, c); }
 function unmergeWall(room, f, side){ if(!f.wallsMerged[side]) return; removeHandles(room, f.walls[side]); f.wallsMerged[side] = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachWall(room, c, side); }
 // Remove every shape a bay owns. A static bay splits its floor first if it was still merged.
 export function detachCellColliders(room, c){
@@ -70,7 +90,7 @@ export function detachCellColliders(room, c){
 }
 // Debris is one solid box per bay: six times fewer contact shapes for the same silhouette.
 export function attachCellColliders(room, c, body, offset){
- const co = room.world.createCollider(RAPIER.ColliderDesc.cuboid(c.size[0] * .48, c.size[1] * .48, c.size[2] * .48).setTranslation(offset.x, offset.y, offset.z).setDensity(22).setFriction(.65).setRestitution(.06)
+ const co = room.world.createCollider(RAPIER.ColliderDesc.cuboid(c.size[0] * .48, c.size[1] * .48, c.size[2] * .48).setTranslation(offset.x, offset.y, offset.z).setDensity(22).setFriction(1.05).setRestitution(.015)
   .setCollisionGroups(group(G.DEBRIS)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), body);
  room.colliderTags.set(co.handle, {cell:c.id}); c.handles = [co.handle];
  for(const a of roofColliders(c)){const prop=room.world.createCollider(RAPIER.ColliderDesc.cuboid(...a.slice(3)).setTranslation(offset.x+a[0],offset.y+a[1],offset.z+a[2]).setDensity(2).setCollisionGroups(group(G.DEBRIS)),body);room.colliderTags.set(prop.handle,{cell:c.id});c.handles.push(prop.handle);}
@@ -86,7 +106,8 @@ function refreshStaticColliders(room, c, sides){
 export function resolveCell(room, tag, point){
  if(!tag) return null;
  if(tag.cell) return room.cellMap.get(tag.cell) || null;
- const f = room.floors[tag.building]?.[tag.floor]; if(!f) return null;
+ const floor=tag.column?Math.max(0,Math.floor((point.y-.15)/room.env.buildings[tag.building].story)):tag.floor;
+ const f = room.floors[tag.building]?.[floor]; if(!f) return null;
  let best = null, bestD = Infinity;
  for(const c of f.cells){ if(room.detached.has(c.id)) continue; const d = (c.p[0] - point.x) ** 2 + (c.p[2] - point.z) ** 2; if(d < bestD){ bestD = d; best = c; } }
  return best;
@@ -155,9 +176,9 @@ export function breakCells(room, requested, kick = v(0, 0, 0), hint = {}){
  // A column crushed by load or a direct hit without momentum becomes rubble at once, so it can
  // never keep propping up the storeys above. Kicked bays fly off as single pieces; a severed
  // section falls as one structural island per building so towers topple and pancake.
+ // Failed foundations detach as real bodies as well; nothing vanishes on failure.
  const crush = !!hint.crush;
- if(crush) for(const id of hits){ const c = room.cellMap.get(id); detachCellColliders(room, c); room.detached.add(id); room.handWorld?.setCell(id, c.p, undefined, true); room.pendingFailures.delete(id); room.dirtyBuildings.add(c.building); room.event({type:'crumble', cells:[id], material:c.material, p:c.p, q:[0, 0, 0, 1]}); }
- let batches = crush ? [] : hits.map(id => [id]);
+ let batches = hits.map(id => [id]);
  const islands = new Map();
  for(const id of unsupported){ const c = room.cellMap.get(id); if(!islands.has(c.building)) islands.set(c.building, []); islands.get(c.building).push(id); }
  for(const [building, ids] of islands){
@@ -172,7 +193,7 @@ export function breakCells(room, requested, kick = v(0, 0, 0), hint = {}){
   for(const id of [...hits, ...unsupported]){ const c = room.cellMap.get(id); if(!coarse.has(c.building)) coarse.set(c.building, []); coarse.get(c.building).push(id); }
   batches = [...coarse.values()];
   if(room.debris.size + batches.length > C.MAX_ACTIVE_CHUNKS){
-   // No body slot: crushed bays are already gone; everything else stays intact until capacity returns.
+   // No body slot: structure stays intact until capacity returns.
    if(crush){ const first = room.cellMap.get(hits[0]); room.event({type:'impact', p:first.p, power:.4, material:first.material}); }
    return [];
   }
@@ -219,7 +240,7 @@ function announceCollapse(room, building, count){
  room.collapsed.add(building); room.towersDown++;
  room.event({type:'towerdown', building, name:b.name, cells:count, p:[b.x, 10, b.z]});
 }
-export function debrisMeta(e){ return {type:'debris', id:e.id, cells:e.cells, origin:e.origin, material:e.material, ...bodyPose(e.body)}; }
+export function debrisMeta(e){ return {type:'debris', id:e.id, cells:e.cells, origin:e.origin, material:e.material, settled:!!e.settled, ...bodyPose(e.body)}; }
 
 // Secondary fracture: a fast island breaks into floor bands (budget permitting), a band into bays.
 export function splitDebris(room, id){
@@ -249,12 +270,17 @@ export function splitDebris(room, id){
  }
  room.event({type:'impact', p:state.p, power:Math.min(1.4, .3 + groups.length * .08), material:e.material});
 }
-// A lone bay that lands hard turns into cosmetic rubble and frees its body slot.
-export function crumble(room, id){
- const e = room.debris.get(id); if(!e) return;
- const pose = bodyPose(e.body);
- removeBody(room, e.body); room.debris.delete(id);
- room.event({type:'crumble', id, cells:e.cells, material:e.material, ...pose});
+// Hard landings roughen and slow the piece; its modeled components remain visible.
+export function crumble(room,id){
+ const e=room.debris.get(id);if(!e || e.fractured)return;
+ e.fractured=true;e.body.setLinearDamping(.4);e.body.setAngularDamping(1.1);
+ room.event({type:'impact',p:bodyPose(e.body).p,power:.45,material:e.material});
+}
+export function settleDebris(room,id){
+ const e=room.debris.get(id);if(!e || !e.body.isSleeping())return false;
+ e.body.setBodyType(RAPIER.RigidBodyType.Fixed,true);e.settled=true;
+ const pose=bodyPose(e.body);for(const cid of e.cells){const c=room.cellMap.get(cid);room.handWorld?.setDebris(cid,plus(rotate(minus(c.p,e.origin),pose.q),pose.p),pose.q);}
+ room.debris.delete(id);room.settled.set(id,e);room.event({...debrisMeta(e),type:'settled'});return true;
 }
 
 // ---- per-tick collapse processing ---------------------------------------------------
@@ -299,7 +325,8 @@ export function updateDebris(room, hits, fractures, crumbles){
  const b = room.boss;
  for(const [id, e] of room.debris){
   const pos = e.body.translation();
-  if(pos.y < -30 || (room.time - e.born > C.CHUNK_LIFETIME && e.body.isSleeping())){ removeBody(room, e.body); room.debris.delete(id); room.event({type:'remove', id}); continue; }
+  if(pos.y < -30){ removeBody(room, e.body); room.debris.delete(id); room.event({type:'remove', id}); continue; }
+  if(room.time-e.born>2 && e.body.isSleeping()){settleDebris(room,id);continue;}
   // Falling structure crushes the giant when it lands on the head or core.
   const speed = len(e.body.linvel());
   if(speed < C.DEBRIS_GIANT_MIN_SPEED || room.time - (e.hitGiantAt || -10) < .5 || room.phase) continue;

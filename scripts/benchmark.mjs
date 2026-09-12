@@ -23,7 +23,7 @@ for(const mode of [0,1,2]){
    const started=performance.now();
    if(stress&&i%150===0){const building=i/150;room.breakCells(room.cells.filter(c=>c.building===building&&c.ground).map(c=>c.id),v(4,1,2));}
    if(stress&&i%180===0)for(const p of room.players.values())if(p.body){p.invulnerable=0;room.knockdown(p,v(12,9,3),110);}
-   if(contact){const t=i/60;room.input(boss,{type:'pose',head:[0,23.8,-12],left:[-6,14,-58-Math.sin(t*2)*7],right:[6,15,-58-Math.sin(t*3)*7],yaw:0,reset:i===0});}
+   if(contact){const t=i/60;room.input(boss,{type:'pose',head:[0,23.8,-12],left:[-18,14,-67-Math.sin(t*2)*7],right:[12,15,-48-Math.sin(t*3)*7],yaw:0,reset:i===0});}
    room.step();
    if(i%3===0){const s=room.snapshot();maxBytes=Math.max(maxBytes,encodeSnapshot(s).byteLength);maxBodies=Math.max(maxBodies,s.bodies.length);}
    contacts+=room.drainEvents().filter(e=>e.type==='strike').length;maxChunks=Math.max(maxChunks,room.debris.size);times.push(performance.now()-started);

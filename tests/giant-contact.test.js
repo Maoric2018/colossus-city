@@ -14,17 +14,18 @@ test('visible knuckles and rotated corners stop at the surface and slide without
  for(const yaw of [0,.4,Math.PI/2]){const q=handQuaternion(null,yaw),result=resolveHand([0,0,0],[3,0,-20],q,world),radius=GIANT.handHalf[0]*Math.abs(Math.sin(yaw))+GIANT.handHalf[2]*Math.abs(Math.cos(yaw));assert.ok(Math.abs(result.position[2]-(-4.9+radius+.017))<.002);assert.ok(Math.abs(result.position[0]-3)<.001);assert.ok(result.contacts.length);}
  const corner=box([1.42,1.2,-5],[.04,.04,.04],identity,2),result=resolveHand([0,0,0],[0,0,-10],identity,{*near(){yield corner;}});assert.ok(result.position[2]>-4,'The far knuckle corner must hit even where the old small sphere missed');
 });
-test('gentle contact damages at the visible front face; sustained pushing breaks it',()=>{
+test('gentle contact chips at the visible face; repeated deliberate punches break it',()=>{
  const {room,client,pose,cell}=fixture();try{
   for(let i=0;i<30;i++){pose.right[2]-=.025;room.input(client,pose);room.step();if(cell.skin.hp<cell.skin.maxHp)break;}
   assert.ok(cell.skin.hp<cell.skin.maxHp&&cell.skin.hp>0,'First slow touch must register without requiring a fast swing');assert.ok(Math.abs(room.boss.right.z-(-16+GIANT.handHalf[2]+.017))<.005);
   assert.ok(room.drainEvents().some(e=>e.type==='strike'),'Contact must provide immediate feedback before collapse');
-  for(let i=0;i<200&&!room.detached.has(cell.id);i++){pose.right[2]-=.06;room.input(client,pose);room.step();}
-  assert.ok(room.detached.has(cell.id),'Keeping pressure on a wall should eventually break it');
+  const hp=cell.skin.hp;for(let i=0;i<90;i++){room.input(client,pose);room.step();}assert.equal(cell.skin.hp,hp,'A held hand must not grind the frame away');
+  for(let jab=0;jab<12&&!room.detached.has(cell.id);jab++){pose.right=[0,7.5,-13];for(let i=0;i<25;i++){room.input(client,pose);room.step();}pose.right=[3.85,7.5,-24];room.input(client,pose);room.step();}
+  assert.ok(room.detached.has(cell.id),'Deliberate strikes on the remaining columns demolish the stronger bay');
  }finally{room.dispose();}
 });
 test('a fast punch cannot tunnel through a building between pose packets',()=>{
- const {room,client,pose,cell}=fixture();try{pose.right[2]=-30;room.input(client,pose);room.step();assert.ok(room.boss.right.z>-15,'The physical fist stops at the first wall in this tick');assert.ok(room.detached.has(cell.id),'The same contact registers a strong impact');}finally{room.dispose();}
+ const {room,client,pose,cell}=fixture();try{pose.right[2]=-30;room.input(client,pose);room.step();assert.ok(room.boss.right.z>-15,'The physical fist stops at the first wall in this tick');assert.ok(cell.skin.hp<cell.skin.maxHp,'The same contact registers a strong impact');assert.equal(room.detached.has(cell.id),false,'One punch does not delete a reinforced frame');}finally{room.dispose();}
 });
 test('recenter and artificial turn still cannot become building attacks',()=>{
  const {room,client,pose,cell}=fixture();try{pose.right=[0,7.5,-20];room.input(client,{...pose,reset:true});room.step();for(let i=0;i<30;i++){room.input(client,pose);room.step();}assert.equal(cell.skin.hp,cell.skin.maxHp);assert.equal(room.detached.size,0);
@@ -67,5 +68,12 @@ test('combined snapshot retains wrist orientation, stagger, tower count and brea
   s.players=[{id:4,flags:16,p:[4,18,-6],v:[0,0,-32],yaw:.2,hp:72,fuel:.8,seq:80,pitch:.1,dodgeCooldown:.5,heavyCooldown:2.25,score:184}];
   const d=decodeSnapshot(encodeSnapshot(s));assert.equal(d.towersDown,3);assert.ok(Math.abs(d.bossStagger-.7)<1e-6);assert.equal(d.players[0].heavyCooldown,2.25);assert.equal(d.players[0].score,184);
   for(const side of ['left','right'])s[side+'Quaternion'].forEach((v,i)=>assert.ok(Math.abs(v-d[side+'Quaternion'][i])<1e-6));
+ }finally{room.dispose();}
+});
+
+test('30 Hz tracked poses during joystick walking cannot become 60 Hz hand punches',()=>{
+ const {room,client,pose,cell}=fixture();try{
+  for(let i=0;i<120;i++){if(i%2===0){pose.head=[0,23.8,room.boss.z];pose.left=[-10,12,room.boss.z];pose.right=[0,7.5,room.boss.z-14];pose.moveZ=-1;room.input(client,pose);}room.step();}
+  assert.equal(room.detached.size,0);assert.ok(cell.skin.hp>=cell.skin.maxHp*.95);assert.equal(cell.skin.glass,15,'Joystick translation must not shatter the windows with passive hands');
  }finally{room.dispose();}
 });
