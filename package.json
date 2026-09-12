@@ -24,7 +24,8 @@
     "test:visual": "node scripts/visual-smoke.mjs",
     "test:xr-view": "node scripts/xr-view-smoke.mjs",
     "test:ragdoll": "node scripts/ragdoll-smoke.mjs",
-    "test:giant": "node scripts/giant-contact-smoke.mjs"
+    "test:giant": "node scripts/giant-contact-smoke.mjs",
+    "profile": "node scripts/profile.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.17.3",

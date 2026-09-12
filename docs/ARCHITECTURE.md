@@ -1,5 +1,7 @@
 # Architecture and engineering boundaries
 
+See [MODULES.md](MODULES.md) for the file-by-file map and ownership rules.
+
 ## Authority
 
 ```text
@@ -13,35 +15,66 @@ Spectators ───────────────────────
                                     reliable entity events + 20 Hz snapshots
                                                         │
                                      interpolated Three.js clients / WebXR
+                                     + local raider prediction (replayed inputs)
 ```
 
-Only the server decides movement, collision, shooting, damage, deaths, support loss and physical body transforms. Rendering is not a source of collision authority. Local particles and cameras are cosmetic. Quest hands use a local solid-contact preview against the same map boxes as the server, so the rendered palm stops at a wall immediately while the raw controller target continues to reach the server. Only the server applies damage and destruction. Newly broken geometry can still differ briefly during network delay; full reconciliation/rollback is not implemented.
+Only the server decides movement, collision, shooting, damage, deaths, support loss, load
+failure and physical body transforms. Rendering is never a source of collision authority. The
+client simulations are: disposable particles and rubble, camera prediction, and a predicted copy
+of the local raider that runs the **same shared flight model** (`shared/flight.js`) against the
+held input at 60 Hz with simple box collision. Every authoritative snapshot re-bases that copy
+and replays inputs the server has not consumed yet (`seq`); the residual error decays visually
+over ~100 ms. There is no rewind hit validation or rollback of remote entities.
 
-The tracked grip defines the palm center and orientation. `shared/giant-rig.js` supplies the same 2.9 × 2.5 × 2.8 m oriented hand box to rendering, laser hit tests and kinematic Rapier bodies. Both wrist quaternions are validated, replicated and interpolated. Static hand contact uses continuous 15-axis box sweeps against actual hollow bay components, roof equipment, fixed props and ground, with a small contact skin and surface sliding. Slow contact produces feedback; continued pressure deals bounded repeated damage. Detached bays leave the fixed contact cache and remain movable Rapier debris. Recenter/tracking recovery retain their contact grace period, and artificial yaw does not count as punch velocity.
+Local Quest head rendering follows the current XR pose. Hands resolve against a shared cache of the current solid walls, columns, slabs and props, with immediate contact feedback. The authoritative server uses the same oriented sweep, while physical tracking remains the raw input. Skin changes rebuild the cache, and detached/crushed bays leave it so Rapier controls falling debris. The desktop giant camera is dead-reckoned from the held input.
 
-The head position and yaw define the remaining simplified giant silhouette. Arm armor spans 88% of each 6 m joint link, leaving room for exposed shoulder, elbow and wrist sockets. Imported fingers are oriented into the grip frame, and the lower arm ends at a wrist behind the palm. Neck, hip, knee and ankle sockets connect the body sections. These are visual joints, not physical elbow bodies. Core/head player collision still uses server overlap tests. Giant locomotion/feet are not a physics character controller. Raiders are dynamic capsules whose desired speed is approached smoothly, rather than setting client-supplied positions.
-
-Head/controllers are finite bounded triples, head height/reach is checked, damage velocity is clamped (the tracked hand position is preserved), stale input expires, stale tracking stops attack extrapolation. This limits accident/exploit severity but does not prove anti-cheat security: an untrusted client can fabricate plausible tracked poses. The optional debug channel transmits rendered game images while a spectator watches. No passthrough camera images, microphone recordings or user accounts are transmitted.
+The tracked controller's grip-space position and quaternion define its palm-centered 2.9 × 2.5 × 2.8 m oriented hand box. The head position and
+yaw define the giant silhouette. Raiders are dynamic capsules approaching a target velocity;
+no client position command bypasses physics. Inputs are sanitised, poses are bounded, stale
+input expires, and stale tracking never extrapolates a punch. This limits accidents and exploit
+severity but is not anti-cheat: a client can fabricate plausible poses.
 
 ## Fixed step and timestamps
 
-The server uses an accumulator at 60 Hz. At most eight catch-up steps run in one timer callback, avoiding an unbounded spiral of death. This can slow simulation relative to wall time under overload; it is not a real-time scheduling guarantee. Snapshot interval is three steps. Room time/tick are server-owned and monotonically increase across rounds. A world reset sends a fresh welcome before the reset event/snapshots; clients clear their interpolation history and entity instances.
+60 Hz accumulator, at most eight catch-up steps per timer callback. Snapshots every three
+steps. Round resets send a fresh welcome before the reset event; clients clear interpolation
+history and instances. Remote interpolation targets ~100 ms behind the newest state.
 
-Remote interpolation targets approximately 100 ms behind the newest received world state. Quaternion interpolation uses the shortest hemisphere and normalization. Discrete entity/health flags are not invented by interpolation. Local raider camera lead is capped at 75 ms and disabled during ragdolls/death. There is no client rigid-body simulation, full replay of unacknowledged inputs, rewind shooting or prediction correction animation.
+Step order per tick: giant (locomotion, hand sweeps, torso shove) → raiders (flight, rifle,
+breach) → missiles → `world.step` → collision events (debris↔raider knockdowns, debris↔bay
+damage, secondary fracture, crumble) → debris lifecycle and debris↔giant damage → due structural
+failures → new failure scheduling for dirty buildings → batched skin events → ragdoll expiry →
+end-of-round check.
 
 ## Transport
 
-Control messages are JSON: join, input, pose, restart and ping. Entity creation/removal/events are reliable JSON in the same ordered WebSocket. Transforms use a versioned little-endian binary format:
+Control messages are JSON: join, input, pose, restart, ping. Entity and gameplay events are
+reliable JSON on the same ordered socket. Transforms use the versioned little-endian binary
+snapshot **COL4** (`shared/protocol.js`):
 
 | Component | Bytes |
 | --- | ---: |
-| Frame and boss state | 124 |
-| One raider | 56 |
+| Header, boss state, stagger, towers down, wrist quaternions | 132 |
+| One raider (incl. `seq`, breach cooldown, score) | 64 |
 | One chunk or ragdoll body | 32 |
 
-At 144 chunks + 8 × 11 ragdoll parts + 8 raiders, a snapshot is 7,996 bytes. At 20 snapshots/s, one receiving client uses approximately 159,920 bytes/s for snapshots. Nine receiving players imply roughly 1.44 MB/s aggregate server snapshot egress at that configured maximum, excluding all JSON, protocol, TLS and spectator overhead. Sleeping bodies are still included until removed: this is deliberately simple full-snapshot replication, not aggressive delta compression. Empty/sparse scenes are smaller.
+At 144 chunks + 8 × 11 ragdoll parts + 8 raiders a snapshot is 8,068 bytes, 161,360 bytes/s per
+client at 20 Hz before overhead. Sleeping bodies are still included until removed.
 
-The current snapshot magic is COL3 (0x434f4c33), including both wrist quaternions as well as raider pitch, soar/dodge flags and cooldown. Every client must reload after updating from COL2. Missile creation/detonation uses reliable JSON events; welcome packets include active projectiles so late joiners see them. Server ray sweeps decide impact and splash damage. Client projectile motion is cosmetic extrapolation from the authoritative origin, direction and timestamp.
+Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
+`skin` (batched `[id, glassMask, facadeMask]` changes), `strike` (a bay was hit; material,
+power, whether its frame failed), `creak` (a building has overloaded columns), `towerdown`,
+`combo`, `stomp`, `closecall`, `gianthit` (kind `debris`/`heavy`, damage), `shot`, `heavy`,
+`missile`, `detonate`, `dodge`, `rag`, `kill`, `impact`, `end` (with scoreboard), `reset`.
+Welcome packets carry cleared cells, damaged skins, live chunks, ragdolls, missiles and the
+roster so late joiners see the same city.
+
+Outgoing buffers above 128 KiB skip snapshots; above 1 MiB the client is dropped. Input is
+limited to ~30 messages/s per client (server ceiling 100/s, 8 KiB). Same-origin WebSocket
+policy, join timeout and heartbeat as before. The room code is an invitation, not
+authentication.
+
+## Live spectator video
 
 Live views use a separate `/views` WebSocket for room-token authentication, offers/answers, ICE candidates and mode metadata. Only active room spectators can negotiate with human publishers. The video travels directly over WebRTC: a 640 × 400 canvas track, manually requested at up to 30 fps on desktop or 24 fps in XR, with a 1.2 Mb/s sender limit per spectator and a preference to maintain frame rate. Spectators display muted inline video elements; supported receiver buffering hints request minimal delay. Frame callbacks measure delivered fps and optionally estimate capture-to-presentation age. Metadata changes are sent immediately, otherwise once per second. No audio, camera or microphone permission is requested.
 
@@ -51,38 +84,68 @@ After eight seconds without usable video, the viewer requests a per-publisher JP
 
 `VIEW_ICE_SERVERS` configures STUN/TURN (JSON array); the default uses Google's public STUN service. A TURN service is not included. Local USB HTTP forwarding does not forward WebRTC media; Quest and laptop still need a reachable Wi-Fi/ICE path. Use one spectator for the demo to limit per-publisher bandwidth/encoding overhead. Background tabs can suspend rendering; each actual player's game should stay visible on its device. Menus, browser chrome, operating-system overlays and audio are not streamed.
 
-When a socket's outgoing buffer exceeds 128 KiB, fresh snapshots are skipped; reliable destruction events are not silently dropped. Beyond 1 MiB, a slow client is disconnected. This prevents application-level unbounded queues, but TCP's ordering can still stall newer data behind a lost packet. WebRTC unreliable data channels could improve snapshot delivery under loss, but require signaling plus a suitable trusted server-side data-channel endpoint. Gameplay remains on WebSockets; the spectator video transport does not change simulation or snapshot delivery.
+## Giant and raider embodiment
 
-Client input is limited to ~30 messages/s, with a server ceiling of 100 messages/s per connection and an 8 KiB inbound message limit. Handshake timeout and ping/pong heartbeat remove idle connections. There is a room/client cap and same-origin WebSocket policy. The room code is a convenience invitation, **not authentication**. This is suitable for a controlled demo, not an untrusted large public launch.
+The giant walks at 13 m/s; normal raider flight is 11 m/s. Shared `giant-rig.js` dimensions drive the hand meshes, oriented collision sweeps and laser hitboxes. Wrist quaternions survive pose input, the COL4 snapshot and normalized interpolation. Raw tracked displacement (compensated for artificial yaw) controls strike energy; a contact blocks visible hands immediately and continued physical pressure damages the contacted layers. Entry/recenter/tracking recovery retain their no-attack grace period. The wrist offset attaches the forearm behind the palm; rigid upper/lower armor keeps fixed proportions.
 
-## Flight and tracked hands
-
-The giant moves at 13 m/s versus normal raider flight at 11 m/s. Keyboard diagonals and Quest sticks are normalized to the same walking speed. The XR rig defaults to scale 14; hand reach is head + (tracked grip − head) × reach gain. Height calibration changes the rig scale, while the optional reach slider changes only the hands. Smooth yaw uses elapsed frame time and an analog deadzone. Turning preserves the head’s world position. Pose packets include accumulated artificial yaw so the server can rotate the previous collision point before measuring a physical swing. Tracking entry/recovery/recenter still rebase with a short contact grace period.
-
-Raiders start in first person; V or the pause-menu camera button toggles to third person. Desktop third person sits over the right shoulder, 6.8 m behind the raider (8.2 m while soaring), with a 72-degree base field of view and wider fast-flight/dodge views. Obstructions shorten the camera arm. The imported raider faces game -Z; its whole body leans into flight. Lasers retain authoritative hitscan endpoints and add bounded core/glow/pulse meshes and surface impact particles.
-
-Either held Shift key requests soaring; releasing both, pausing or losing focus clears it. Shift replaces the former separate desktop boost and F toggle. Hover and soaring approach server-owned target velocities; soaring follows camera pitch/yaw and rotates the raider’s capsule to match the prone body. Directional dodges use a monotonically increasing input sequence, fuel debit and cooldown, so holding or resending one input cannot retrigger them. Soar, dodge and pitch are replicated to all clients. No client position command bypasses the physics world.
+Raiders start in first person. V or the pause-menu button selects the 6.8 m shoulder camera (8.2 m while soaring). Hold either Shift to soar; release both, pause or lose focus to hover. The same armored pilot geometry and named eleven-bone skeleton drive the physical ragdoll, including prone knockdown pose, rifle and flight pack. Blue laser core/glow/pulse meshes and surface effects use authoritative hitscan endpoints.
 
 ## Structural destruction
 
-Each generated cell has stable identity, original pose, six-neighbor connectivity, a ground-anchor flag and a hollow compound collision representation. Static cells initially belong to fixed bodies. A swept giant-hand volume damages cells; a support flood fill finds remaining components disconnected from all foundations. Hit bays become separate chunks. Unsupported floors are grouped by building/storey so the first failure is a moving structural section rather than hundreds of particles.
+The district (`shared/city/layout.js`) is a grid of avenues and streets with 24 towers built
+from **tiers** on one integer bay grid (setbacks keep support continuity). Every bay is a hollow
+storey: slab + four corner columns + exterior skins. 2,543 bays. Intact floors share slabs, a column grid and exterior walls on one fixed body per building. Only affected floors/wall sides split into per-bay collision shapes when damaged. Roof equipment and street props retain separate solid proxies; falling debris uses one coarse box per bay plus roof equipment.
 
-A cluster stores its constituent cell IDs and their original positions. Each cell's current transform is computed from the cluster's current pose and its offset to the cluster's original center. A collision with sufficient pre-impact speed can split a multi-cell chunk. Each child inherits parent orientation and velocity plus angular-velocity-cross-offset, with a small separation term. This is game fracture, not exact energetic conservation.
+Each exterior wall has up to two **skin layers** over the frame, by material
+(`shared/city/materials.js`): a *curtain wall* is all glass on a steel frame; *brick*, *stone*
+and *concrete* have windows plus a facade. `damageCell(energy, sides)` pops glass first (cheap),
+then cracks the facade (which shields the frame while it stands), then reduces the frame's
+structural HP. Lower storeys have stronger frames (`frameScale`). A broken solid layer becomes an
+**opening**: its collider is removed, raiders and missiles pass through, and the client hides that
+instance and throws shards/bricks.
 
-At body-cap pressure, newly detached cells from each building are merged into a larger coarse chunk. If no body slot exists, a new break is deferred. This avoids removing still-falling geometry or freezing disconnected floors to fake a performance target. Note that coarsening reduces body count but not the same proportion of collision shapes. Maximal whole-city rubble still needs CPU profiling.
+**Integrity** has two parts. Graph support (`unsupportedCells`): bays with no path to a
+foundation. Load (`structuralLoads`): weight flows down each stack; a bay whose support below is
+gone hangs from lateral neighbours up to three bays away, splitting its load among the nearest
+supported bays; capacity is `(stack + 1) × material safety × frameHP ratio`, so damaged columns
+carry less. Overloaded bays are scheduled to fail after `COLLAPSE_DELAY` (+ jitter) with a
+`creak`, which makes cascades read as progressive collapse. A failed column is **crushed into
+rubble** immediately (never a body that could keep propping the storeys above).
 
-After at least 35 seconds, sleeping debris can be removed. It never returns as an intact building: a late join receives cleared-cell tombstones. Chunks below the world are removed immediately. Ragdoll corpses expire after nine seconds; nonfatal recovery/respawn can happen sooner. There are eight ragdoll slots; orphaned corpses are reclaimed first to preserve live knocked-down players.
+Detachment: kicked bays fly as single chunks; a severed section becomes **one rigid island per
+building** (floors when small) so towers topple and pancake. Islands receive an angular velocity
+about the far edge of whatever still stands beneath them (`topple`). On a hard landing an island
+splits into floor bands, bands into bays, and a lone bay that lands hard **crumbles** (body freed,
+cosmetic rubble on clients). Falling chunks damage bays they hit (domino collapses) and hurt the
+giant when they land on its head or core (`DEBRIS_GIANT_DAMAGE`, capped), which staggers it and
+exposes the core (+60 % rifle/breach damage while staggered). The giant's torso shoves through
+bays it walks into and is slowed by them.
 
-Limits: graph connectivity is not load capacity; one remaining foundation can support an entire connected overhang. Materials use tuned game density/friction. No plasticity, bending moments, fatigue or material-specific fracture. The broad swept building test uses a bay envelope; the physical debris collider itself is hollow. A hand can therefore fracture an empty part of the bay envelope. Raider ragdolls have constrained elbows/knees, but free spherical shoulders/hips and no self-collision. `shared/raider-rig.js` supplies model-derived part bounds and joint anchors; creation metadata names all eleven bones. The client clones one skinned version of the same live-pilot geometry and drives its bones from the existing body snapshots. The chest carries the flight pack, and the forearm carries the rifle. Bind-pose inverse matrices preserve the original surface; each ragdoll owns its skeleton but shares immutable geometry/materials. Per-body removal messages release the complete avatar when its last body is removed. Initial body transforms include yaw, prone flight pitch and bank. Debris does not recursively apply a full structural stress solver to intact neighbors.
+Budgets: 144 chunk bodies (coarse per-building islands under pressure, deferred breaks at the
+cap), eight ragdolls. Limits: graph/load are still a game model, not FEA — no bending moments,
+fatigue, rebar or arbitrary cracks; bays are rigid compounds; no self-collision on ragdolls.
 
 ## Rendering
 
-The default map has three facade material styles, shared slab/column geometry, batched exterior walls and attached roof details. Distant towers use instancing; road marks, lamp posts and bridge details use merged geometry. Custom bay GLBs are instanced per source mesh across cells of that style; each semantic wall/roof part can be hidden independently. Harbor cars, lamp posts, signboards, pavement and bridge geometry have fixed collision proxies. Rooftop tanks, dishes and solar panels contribute compound shapes to their supporting bay, including after collapse and fragmentation. Car/roof art and physics share measured model bounds and placements in `shared/props.js`; distant skyline/harbor dressing remains decorative. Camera and aim rays use the same prop bounds.
+Quality tiers (`src/render/quality.js`) are chosen from the GPU string once: `quest`, `low`
+(integrated GPUs), `medium`, `high`. Lower tiers use Lambert shading for opaque surfaces,
+no normal maps, no shadows, no bloom, pixel ratio 1, a low-poly skyline ring and smaller
+particle/rubble pools; `Q` toggles cinematic extras. Adaptive resolution lowers the pixel ratio
+when the frame-time EMA exceeds 20 ms and raises it back below 12.5 ms (never in XR; hidden tabs
+are ignored). `?quality=low|medium|high|quest` forces a tier for profiling.
 
-Quest selects a lower-cost path: no effects composer allocation by default, no default shadows, no bloom, reduced particle/background counts, framebuffer scale 0.85 and feature-detected foveation. The same scene is rendered to WebXR stereo views. A 72 Hz session-rate request is made only when supported; achieving it remains a hardware profiling task. Renderer draw calls and measured browser frames/s appear on the desktop HUD; an in-world HUD carries gameplay information in VR. Do not mistake desktop FPS for headset FPS.
+The towers render as instanced batches regardless of city size: one frame batch (slab + open
+prism columns), one facade batch per masonry material, one glass batch per material, one roof
+batch, plus roof props and spires attached to their bays. Broken layers get a zero matrix.
+Debris posing, snapshot sampling, rubble and HUD updates avoid per-frame allocation.
+
+XR uses the tier's framebuffer scale (0.8 on Quest) and foveation; the camera is never shaken
+(haptics and a camera-locked red vignette carry damage instead). Do not mistake desktop FPS for
+headset FPS: `npm run profile` measures a laptop GPU with a visible Chromium; the Quest needs a
+device.
 
 ## Scaling and operations
 
-One process owns all rooms. Exactly one Fly Machine is required until sticky room routing or a room directory/worker design is added. A second copy has independent room codes/worlds. More CPUs do not parallelize this event loop. Server restart and immediate deployment lose all matches. Empty rooms are removed after one minute. No database, persistence, save game, account system, cross-region federation or reconnect identity is implemented.
-
-First escalation after measurement: reduce dynamic collision shapes through offline convex proxies, prioritize/delta-send nearby debris, limit concurrent rooms, move rooms to worker processes, add deliberate room routing, and then consider WebRTC snapshots. Do not implement five independent client physics worlds and hope their rubble stays synchronized.
+One process owns all rooms; exactly one Fly Machine. World creation builds the merged structural colliders plus the shared prop and hand caches. Profile creation and round resets on the hosting machine. No persistence, accounts or reconnect
+identity. First escalation after measurement: delta/prioritised snapshots, worker processes per
+room, deliberate room routing, then a different gameplay snapshot transport. Spectator video already uses WebRTC.

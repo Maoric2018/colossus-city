@@ -69,11 +69,11 @@ export class GiantView{
   }catch(error){console.error('Mech armor failed to load',error);}
  }
  fist(){const g=new T.Group();this.root.add(g);mesh(rounded(2.7,1.9,2.6,.25),metal,g);for(let i=0;i<4;i++)mesh(rounded(.53,.85,1.25,.12),trim,g,[(i-1.5)*.64,-.55,-.95]);mesh(rounded(.25,.3,2.2,.04),reactor,g,[1.38,.25,0]);return g;}
- update(s,{local=false,collisionWorld=null}={}){
+ update(s,{local=false,collisionWorld=null,stagger=0}={}){
   const head=new T.Vector3(...s.head),q=new T.Quaternion().setFromAxisAngle(up,s.bossYaw||0);this.head.position.copy(head);this.head.quaternion.copy(q);this.head.visible=!local;
   // The decorative halo is for other players. From inside the giant it can
   // cover the pilot's view when looking down or leaning toward the reactor.
-  this.coreGlow.visible=!local;
+  this.coreGlow.visible=!local; this.coreGlow.scale.setScalar(6*(stagger>.35?1.6+Math.sin(performance.now()*.02)*.5:1));
   const chest=head.clone().add(new T.Vector3(0,-GIANT.chestDrop,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
   [-1,1].forEach((sign,i)=>{
    const arm=this.arms[i],side=i?'right':'left',rotation=handQuaternion(s[side+'Quaternion'],s.bossYaw||0),target=s[side];

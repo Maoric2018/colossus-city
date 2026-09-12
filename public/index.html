@@ -11,9 +11,9 @@
 <main id="lobby">
  <div class="eyebrow"><span class="line"></span>ASYMMETRIC MULTIPLAYER / WEBXR</div>
  <h1>THE CITY.<br>THE GIANT.<br><em>THE REST OF US.</em></h1>
- <p class="intro">One colossal threat. A squad of jetpack raiders.<br>Nothing here is built to last.</p>
+ <p class="intro">One colossal threat. A squad of jetpack raiders. Twenty-four towers of glass, brick and steel.<br>Nothing here is built to last.</p>
  <div class="role-picker">
-  <button class="role active" data-role="raider"><span>01 / LAPTOP</span><strong>RAIDER <b>↗</b></strong><small>Fly. Evade. Strike the core.</small></button>
+  <button class="role active" data-role="raider"><span>01 / LAPTOP</span><strong>RAIDER <b>↗</b></strong><small>Fly. Breach columns. Drop towers on it.</small></button>
   <button class="role" data-role="boss"><span>02 / QUEST 2</span><strong>COLOSSUS <b>✦</b></strong><small>Your hands. Their skyline.</small></button>
  </div>
  <details id="vr-settings"><summary>QUEST CONTROLS</summary><label>Smooth turn speed <output id="turn-value">90°/s</output><input id="turn-speed" type="range" min="30" max="180" step="15" value="90"></label><label>Hand reach <output id="reach-value">1× giant scale</output><input id="hand-reach" type="range" min="0.5" max="1.5" step="0.1" value="1"></label><small>A half-metre reach moves about 7 metres in the city at normal scale. A on the right controller calibrates height.</small></details>
@@ -22,18 +22,20 @@
  <div class="lobby-bottom"><button id="practice">ENTER PRACTICE <span>→</span></button><button id="spectate">SPECTATE</button><span>1 GIANT · UP TO 8 RAIDERS</span></div>
  <p id="notice" role="status">Loading city renderer…</p>
 </main>
-<div id="scene-caption"><span>01 / HARBOR DISTRICT</span><small>STRUCTURAL INTEGRITY: <b id="lobby-integrity">100%</b></small></div>
+<div id="scene-caption"><span>01 / MIDTOWN</span><small>STRUCTURAL INTEGRITY: <b id="lobby-integrity">100%</b></small></div>
 <section id="hud" class="hidden">
  <div id="boss-health"><div><span id="boss-caption">COLOSSUS / CORE INTEGRITY</span><strong id="boss-percent">100%</strong></div><div class="bar"><i id="boss-fill"></i></div></div>
+ <div id="feed"></div><div id="combo"></div>
  <div id="round-info"><strong id="timer">04:00</strong><span id="room-label"></span><button id="copy-link">COPY INVITE ↗</button></div>
- <div id="aim"><i></i><i></i><b></b></div><div id="hit-marker">×</div>
+ <div id="aim"><i></i><i></i><b></b></div><div id="hit-marker">×</div><div id="charge"><i></i></div><div id="numbers"></div>
  <div id="telemetry"><div><span>VITALS</span><b id="hp">100</b></div><div class="fuel"><span>THRUST</span><div class="bar"><i id="fuel-fill"></i></div></div><div><span>ALTITUDE</span><b id="altitude">00<span>m</span></b></div></div>
- <div id="score"><span>COLLATERAL</span><strong id="destruction">0%</strong><span>RAIDERS DOWN <b id="kills">0</b></span></div>
- <div id="flight-status" class="hidden"><b id="flight-mode">HOVER</b><span id="speed-readout">0 m/s</span><span id="dodge-readout">DODGE READY · E + DIRECTION</span><small>HOLD SHIFT TO SOAR · RELEASE TO HOVER</small></div><button id="open-spectator">LIVE VIEWS ↗</button><div id="capture-status" class="hidden">GAME VIEW SHARED WITH ROOM SPECTATORS</div><div id="controls"></div><div id="toast"></div><div id="roster"></div>
+ <div id="score"><span>COLLATERAL</span><strong id="destruction">0%</strong><span>TOWERS DOWN <b id="towers">0</b> · RAIDERS DOWN <b id="kills">0</b></span></div>
+ <div id="flight-status" class="hidden"><b id="flight-mode">HOVER</b><span id="speed-readout">0 m/s</span><span id="dodge-readout">DODGE READY · E</span><span id="heavy-readout">BREACH READY · HOLD RIGHT CLICK</span><small id="score-readout">SCORE 0</small></div><button id="open-spectator">LIVE VIEWS ↗</button><div id="capture-status" class="hidden">GAME VIEW SHARED WITH ROOM SPECTATORS</div><div id="controls"></div><div id="toast"></div><div id="roster"></div>
  <button id="vr-button" class="primary hidden">ENTER VR ↗</button><button id="menu-button">ESC / MENU</button>
  <div id="performance"></div>
 </section>
-<div id="overlay" class="hidden"><div><span class="eyebrow" id="overlay-kicker">CONNECTION ESTABLISHED</span><h2 id="overlay-title">READY TO DROP?</h2><p id="overlay-text">Click to capture your mouse. Escape releases it.</p><button class="primary" id="resume">DEPLOY ↗</button><button class="secondary" id="restart">NEW ROUND</button><button id="camera-toggle" class="hidden">SWITCH TO THIRD PERSON · V</button><button id="menu-spectator" class="secondary">LIVE VIEWS ↗</button><button id="leave">LEAVE ROOM</button></div></div>
+<div id="overlay" class="hidden"><div><span class="eyebrow" id="overlay-kicker">CONNECTION ESTABLISHED</span><h2 id="overlay-title">READY TO DROP?</h2><p id="overlay-text">Click to capture your mouse. Escape releases it.</p><button id="camera-toggle" class="hidden">SWITCH TO THIRD PERSON · V</button><button class="primary" id="resume">DEPLOY ↗</button><button class="secondary" id="restart">NEW ROUND</button><button id="menu-spectator" class="secondary">LIVE VIEWS ↗</button><button id="leave">LEAVE ROOM</button></div></div>
+<table id="scoreboard" class="hidden"></table>
 <section id="spectator-panel" class="hidden" aria-label="Live spectator views"><div class="spectator-toolbar"><div><span class="eyebrow">ROOM OBSERVATORY</span><h2>EVERY PILOT. EVERY ANGLE.</h2><p>Live video · select a screen to enlarge</p></div><div><button id="spectator-free" class="secondary">FREE CAMERA</button><button id="spectator-leave" class="secondary">LEAVE ROOM</button></div></div><div id="spectator-grid"></div></section>
 <div id="loading-error" class="hidden"></div>
 <script type="module" src="/src/main.js"></script>

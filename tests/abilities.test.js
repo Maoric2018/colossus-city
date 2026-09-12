@@ -29,8 +29,20 @@ test('directional dodge costs fuel, has a cooldown and cannot repeat a held sequ
  }finally{r.dispose();}
 });
 test('missiles collide with buildings, explode and detach supported structure',()=>{
- const r=new Room('ABC123');try{r.attach(ws,'boss','giant');r.boss.right=v(0,10,-20);r.world.step();assert.equal(launchMissile(r,'right',v(-1,0,0)),true);assert.equal(launchMissile(r,'right',v(-1,0,0)),false);
- for(let i=0;i<60&&r.missiles.size;i++){r.time+=C.TICK;updateMissiles(r);r.world.step();}assert.equal(r.missiles.size,0);assert.ok(r.detached.size>0);assert.ok(r.drainEvents().some(e=>e.type==='detonate'));
+ const r=new Room('ABC123');try{r.attach(ws,'boss','giant');r.boss.right=v(0,10,-20);r.world.step();assert.equal(launchMissile(r,'right',v(0,0,-1)),true);assert.equal(launchMissile(r,'right',v(0,0,-1)),false);
+ for(let i=0;i<90&&r.missiles.size;i++){r.time+=C.TICK;updateMissiles(r);r.world.step();}assert.equal(r.missiles.size,0);assert.ok(r.detached.size>0);assert.ok(r.drainEvents().some(e=>e.type==='detonate'));
+ }finally{r.dispose();}
+});
+test('a charged breach shot cracks structure, hurts the giant more and respects its cooldown',()=>{
+ const {r,c,p}=raider();try{
+  r.spawn(p,v(0,6,-40));p.invulnerable=0;const hp=r.bossHP;
+  // Aim straight at MERIDIAN ONE's south face.
+  r.input(c,{type:'input',yaw:0,pitch:0,heavy:1});r.step();
+  const heavy=r.drainEvents().find(e=>e.type==='heavy');assert.ok(heavy&&heavy.structure,'the bolt hit a bay');assert.ok(p.fuel<1);assert.ok(p.heavyReady>r.time);
+  r.input(c,{type:'input',yaw:0,pitch:0,heavy:2});r.step();assert.equal(r.drainEvents().filter(e=>e.type==='heavy').length,0,'cooldown blocks a second bolt');
+  r.spawn(p,v(0,20,30));p.invulnerable=0;p.heavyReady=0;p.fuel=1;const aim=sub(r.boss.head,v(0,19.5,30));
+  r.input(c,{type:'input',yaw:Math.atan2(-aim.x,-aim.z),pitch:Math.atan2(aim.y,Math.hypot(aim.x,aim.z)),heavy:3});r.step();
+  assert.ok(hp-r.bossHP>=C.HEAVY_DAMAGE-1,'a headshot bolt deals heavy damage');assert.ok(r.boss.stagger>0);
  }finally{r.dispose();}
 });
 test('missiles hit a raider, respect spawn protection and reset with the round',()=>{

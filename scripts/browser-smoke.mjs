@@ -44,7 +44,7 @@ try{
  await raider.keyboard.up('Space');await raider.keyboard.up('KeyW');
  assert.ok(await raider.evaluate(()=>window.__COLOSSUS.renderer.info.render.calls)>0);
  await raider.screenshot({path:'artifacts/desktop-smoke.png'});
- // Clear the 16 m Union Works roof before testing full soaring speed.
+ // Lift off along the Midtown spawn avenue before testing full soaring speed.
  await raider.keyboard.down('Space');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].p[1]>22);await raider.keyboard.up('Space');
  await raider.keyboard.down('ShiftLeft');await raider.waitForFunction(()=>{const p=window.__COLOSSUS.state.players[0];return (p.flags&16)&&Math.hypot(...p.v)>23;});
  assert.equal(await raider.locator('#flight-mode').textContent(),'SOARING');
@@ -55,6 +55,7 @@ try{
  await raider.keyboard.up('ShiftRight');await raider.waitForFunction(()=>!(window.__COLOSSUS.state.players[0].flags&16));
  await raider.keyboard.down('ShiftRight');await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].flags&16);
  await raider.evaluate(()=>window.dispatchEvent(new Event('blur')));await raider.waitForFunction(()=>!(window.__COLOSSUS.state.players[0].flags&16));await raider.keyboard.up('ShiftRight');
+ await raider.mouse.down({button:'right'});await raider.waitForTimeout(800);await raider.mouse.up({button:'right'});await raider.waitForFunction(()=>window.__COLOSSUS.state.players[0].heavyCooldown>1);checks.push('Charged right-click breach shot reaches the server and starts its cooldown');
  checks.push('Hold either Shift to soar, release or lose focus to hover; fast flight, directional dodge and cooldown HUD');
  checks.push('Desktop WebGL rendering, room creation and keyboard jetpack ascent');console.log(checks.at(-1));
  const headset=await browser.newContext({viewport:{width:1200,height:800}});
@@ -70,6 +71,7 @@ try{
  await quest.waitForFunction(()=>Math.abs(window.__COLOSSUS.net.latest.head[1]-23.8)<.4);
  assert.ok(poses.length>0,'Tracked pose messages must reach the real server');
  assert.ok(poses.at(-1).left[0]<poses.at(-1).right[0],'Left and right Touch hands must not be swapped');
+ const desktopFov=await quest.evaluate(()=>window.__COLOSSUS.xr.saved.fov);
  const render=await quest.evaluate(()=>({calls:window.__COLOSSUS.renderer.info.render.calls,triangles:window.__COLOSSUS.renderer.info.render.triangles,shadows:window.__COLOSSUS.renderer.shadowMap.enabled,frameRate:window.__COLOSSUS.renderer.xr.getSession().frameRate}));
  assert.equal(render.shadows,false);assert.equal(render.frameRate,72);
  await quest.screenshot({path:'artifacts/quest2-emulated-stereo.png'});
@@ -145,7 +147,7 @@ try{
  await quest.waitForFunction(()=>window.__COLOSSUS.renderer.xr.isPresenting);
  await quest.evaluate(()=>window.__COLOSSUS.renderer.xr.getSession().end());
  await quest.waitForFunction(()=>!window.__COLOSSUS.renderer.xr.isPresenting);
- assert.equal(await quest.evaluate(()=>window.__COLOSSUS.camera.fov),65);
+ assert.equal(await quest.evaluate(()=>window.__COLOSSUS.camera.fov),desktopFov);
  assert.equal(await quest.evaluate(()=>window.__COLOSSUS.rig.scale.y),1);
  checks.push('Exit and re-enter immersive VR in the same room');
  const practice=await pageFor(desktop);await practice.locator('[data-role="boss"]').click();await practice.locator('#practice').click();await practice.waitForFunction(()=>window.__COLOSSUS.state?.players.length===3);
