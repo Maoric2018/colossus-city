@@ -1,5 +1,11 @@
 # Validation record and acceptance gates
 
+## Raider soaring breaches — September 12, 2026
+
+- **122 Node tests and 109 JavaScript modules: PASS.** Real-room tests cover entry/exit holes, preserved flight speed and health, narrow damage, persistent rubble/late joins, starting from rest against a wall, normal flight/dodge/fuel/stale-input exclusions, owner-only contact grace and expiry, and generated-block damage restoration. Shared sweep/prediction tests cover thin walls, props and settled rubble.
+- **Rendered breach sequence: PASS.** The real server's events and 20 Hz binary snapshots drive the client with six ticks of delivery delay. The actual third-person camera follows the raider through both walls; 20 facade fragments and the impact pulse render. Minimum predicted speed is 31.09 m/s, with no backward steps over 0.2 m, no failed assets and no browser errors. Reports/screenshots: `artifacts/soar-breach-report.json`, `soar-breach-{11,32,50}.png`.
+- **Multiplayer and emulated Quest regression: PASS.** Controls, first/third-person toggles, missiles, live spectator video and XR lifecycle pass with contact filtering installed. The existing eight-raider benchmark remains within its prior typical budget (staged-collapse p95 7.24 ms, maximum 27.67 ms); this run is a regression check, not a controlled performance comparison or physical-headset test.
+
 ## Performance optimization — September 12, 2026
 
 - **115 Node tests and 105 JavaScript modules: PASS.** Added coverage for deferred real-physics queries, same-tick wall openings, idle sleep and immediate wake, stable building/component slots, persistent-fragment growth, pending GPU writes and compressed/conditional HTTP responses.

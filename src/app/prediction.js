@@ -3,6 +3,7 @@
 // snapshots re-base the state and unacknowledged inputs are replayed. Visual error is smoothed.
 import {C, F} from '../../shared/config.js';
 import {flightStep} from '../../shared/flight.js';
+import {soarBreachCells,flightHalf} from '../../shared/soar-breach.js';
 import {v, add, mul, vec, clamp} from '../../shared/math.js';
 const HALF = {x:.36, y:1.14, z:.36};
 export class Prediction {
@@ -26,17 +27,18 @@ export class Prediction {
  }
  simulate(input){
   const {velocity} = flightStep(this.state, this.pos, this.vel, input, this.time + this.accumulator);
+  const breached=this.state.soaring?new Set(soarBreachCells(this.state,this.pos,velocity,input,this.city?.handWorld)):undefined;
   this.vel = velocity; this.vel.y += C.GRAVITY * C.TICK;
   this.pos = add(this.pos, mul(this.vel, C.TICK));
-  this.collide();
+  this.collide(this.state.soaring?flightHalf(this.state,input):HALF,breached);
  }
- collide(){
+ collide(half=HALF,ignoredCells){
   const p = this.pos;
-  if(p.y < HALF.y){ p.y = HALF.y; if(this.vel.y < 0) this.vel.y = 0; this.grounded = true; } else this.grounded = false;
+  if(p.y < half.y){ p.y = half.y; if(this.vel.y < 0) this.vel.y = 0; this.grounded = true; } else this.grounded = false;
   // Push out of nearby structural boxes along the least-penetration axis.
   for(let iteration = 0; iteration < 3; iteration++){
-   const box = this.city?.overlapBox?.(p, HALF); if(!box) break;
-   const dx = box.half.x + HALF.x - Math.abs(p.x - box.center.x), dy = box.half.y + HALF.y - Math.abs(p.y - box.center.y), dz = box.half.z + HALF.z - Math.abs(p.z - box.center.z);
+   const box = this.city?.overlapBox?.(p, half,ignoredCells); if(!box) break;
+   const dx = box.half.x + half.x - Math.abs(p.x - box.center.x), dy = box.half.y + half.y - Math.abs(p.y - box.center.y), dz = box.half.z + half.z - Math.abs(p.z - box.center.z);
    if(dx <= 0 || dy <= 0 || dz <= 0) break;
    if(dx < dy && dx < dz){ p.x += Math.sign(p.x - box.center.x) * dx; this.vel.x *= .05; }
    else if(dy < dz){ p.y += Math.sign(p.y - box.center.y) * dy; this.vel.y = 0; if(p.y > box.center.y) this.grounded = true; }

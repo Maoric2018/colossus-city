@@ -123,16 +123,16 @@ export class CityView {
   return result;
  }
  // First static collider box overlapping an axis-aligned box (for client prediction).
- overlapBox(center, half){
+ overlapBox(center, half,ignoredCells){
   for(let bi = 0; bi < this.bounds.length; bi++){
    const b = this.bounds[bi]; if(center.x + half.x < b[0] || center.x - half.x > b[3] || center.y + half.y < b[1] || center.y - half.y > b[4] || center.z + half.z < b[2] || center.z - half.z > b[5]) continue;
    for(const c of this.cellsByBuilding[bi]){
-    if(this.detached.has(c.id) || Math.abs(center.x - c.p[0]) > half.x + c.queryHalf[0] || Math.abs(center.y - c.p[1]) > half.y + c.queryHalf[1] || Math.abs(center.z - c.p[2]) > half.z + c.queryHalf[2]) continue;
+    if(this.detached.has(c.id) || ignoredCells?.has(c.id) || Math.abs(center.x - c.p[0]) > half.x + c.queryHalf[0] || Math.abs(center.y - c.p[1]) > half.y + c.queryHalf[1] || Math.abs(center.z - c.p[2]) > half.z + c.queryHalf[2]) continue;
     for(const a of this.colliderCache.get(c.id)){ const cx = c.p[0] + a[0], cy = c.p[1] + a[1], cz = c.p[2] + a[2]; if(Math.abs(center.x - cx) < half.x + a[3] && Math.abs(center.y - cy) < half.y + a[4] && Math.abs(center.z - cz) < half.z + a[5]) return {center:{x:cx, y:cy, z:cz}, half:{x:a[3], y:a[4], z:a[5]}}; }
    }
   }
   for(const b of this.solidProps()){if(b.center[1]<0)continue;if(b.center.every((v,i)=>Math.abs([center.x,center.y,center.z][i]-v)<[half.x,half.y,half.z][i]+b.extent[i]))return {center:{x:b.center[0],y:b.center[1],z:b.center[2]},half:{x:b.extent[0],y:b.extent[1],z:b.extent[2]}};}
-  for(const v of this.stream?.views.values()||[]){const hit=v.overlapBox(center,half);if(hit)return hit;}
+  for(const v of this.stream?.views.values()||[]){const hit=v.overlapBox(center,half,ignoredCells);if(hit)return hit;}
   return null;
  }
  // Intact bays whose envelope a segment crosses (local pre-impact effects for tracked hands).

@@ -21,9 +21,9 @@ export function spawn(room, p, at){
  }
  room.stream?.ensureAround(spawnPoint.x,spawnPoint.z);
  p.body = room.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(spawnPoint.x, Math.max(1.2, spawnPoint.y), spawnPoint.z).lockRotations().setLinearDamping(.12).setCcdEnabled(true));
- const co = room.world.createCollider(RAPIER.ColliderDesc.capsule(.8, .34).setMass(70).setFriction(.05).setRestitution(0).setCollisionGroups(group(G.PLAYER, G.WORLD | G.DEBRIS)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), p.body);
+ const co = room.world.createCollider(RAPIER.ColliderDesc.capsule(.8, .34).setMass(70).setFriction(.05).setRestitution(0).setCollisionGroups(group(G.PLAYER, G.WORLD | G.DEBRIS)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS).setActiveHooks(RAPIER.ActiveHooks.FILTER_CONTACT_PAIRS), p.body);
  room.colliderTags.set(co.handle, {player:p.id});
- p.colliderRotation=null;p.hp = C.PLAYER_HP; p.fuel = 1; p.rag = null; p.deadUntil = 0; p.recoverAt = 0; p.invulnerable = room.time + C.INVULNERABLE_SECONDS; p.lastShot = -1; p.soaring = false; p.dodgeUntil = 0; p.dodgeReady = 0; p.lastDodgeSeq = p.input.dodge || 0; p.lastHeavySeq = p.input.heavy || 0;
+ p.breachCells=new Map();p.breachFXAt=0;p.colliderRotation=null;p.hp = C.PLAYER_HP; p.fuel = 1; p.rag = null; p.deadUntil = 0; p.recoverAt = 0; p.invulnerable = room.time + C.INVULNERABLE_SECONDS; p.lastShot = -1; p.soaring = false; p.dodgeUntil = 0; p.dodgeReady = 0; p.lastDodgeSeq = p.input.dodge || 0; p.lastHeavySeq = p.input.heavy || 0;
 }
 export function removePlayer(room, id){
  const p = room.players.get(id); if(!p) return;

@@ -30,7 +30,8 @@
     "test:city": "node scripts/city-smoke.mjs",
     "test:streaming": "node scripts/streaming-smoke.mjs",
     "test:cars": "node scripts/car-smoke.mjs",
-    "test:flight-animation": "node scripts/flight-animation-smoke.mjs"
+    "test:flight-animation": "node scripts/flight-animation-smoke.mjs",
+    "test:soar-breach": "node scripts/soar-breach-smoke.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.17.3",

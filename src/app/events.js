@@ -15,6 +15,7 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
    case 'missile': missiles.add(e); audio.play('missile', {p:e.p}); if(state.role === 'boss') xr.haptic(.25, 60); return;
    case 'detonate': missiles.remove(e.id); fx.impact(e.p, 1.5); audio.play('explosion', {p:e.p}); shake.add(near(e.p, 60) * .6); return;
    case 'dodge': fx.particle(fx.flares, e.p, {life:.25, size:2, color:new T.Color(0x8beaff), growth:2}); if(e.player === state.localId){ flightFX.dodge(); audio.play('dodge'); } return;
+   case 'soar-breach': fx.particle(fx.flares,e.p,{life:.18,size:2.5,color:new T.Color(0xa7edff),growth:1.8});audio.play('heavy',{p:e.p,power:.65});if(e.player===state.localId){flightFX.dodge();shake.add(.18);}return;
    case 'skin': for(const [id, glass, facade] of e.cells) city.setSkin(id, glass, facade); city.commit(); return;
    case 'strike': {
     const power = e.power || .5; fx.impact(e.p, power * .8, e.material); audio.play(e.material === 'glass' && !e.broke ? 'glass' : e.material === 'body' ? 'thud' : e.material, {p:e.p, power:.6 + power * .5});

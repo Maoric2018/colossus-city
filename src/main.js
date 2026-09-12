@@ -69,7 +69,7 @@ async function start(create = false, practice = false, spectator = false){
   $('flight-status').classList.toggle('hidden', role !== 'raider'); $('telemetry').classList.toggle('hidden', role !== 'raider'); $('aim').classList.toggle('hidden', role !== 'raider'); $('vr-button').classList.toggle('hidden', role !== 'boss');
   if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE COLOSSUS.', 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
-  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift for fast soaring; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant. Topple a tower onto the colossus for massive damage.', {renderer, net});
+  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift to soar and smash through buildings; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant.', {renderer, net});
   const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u); localStorage.setItem('colossus-name', $('name').value);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
  finally{ $('create').disabled = $('join').disabled = false; }

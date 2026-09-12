@@ -12,6 +12,7 @@ shared/            pure, dependency-free logic imported by BOTH server and brows
   math.js          vectors, quaternions, sweeps, input sanitising
   protocol.js      binary snapshot codec (COL6). Bump MAGIC when the layout changes.
   flight.js        raider flight model (flightStep) used by the server AND client prediction
+  soar-breach.js   shared swept bay selection and prone capsule prediction bounds
   environment.js   facade: the active district + re-exports of shared/city/*
   city/components.js  101 modeled part types and per-bay placement rules
   city/layout.js   Midtown + seeded infinite blocks, 16 families and stable coordinate IDs
@@ -30,6 +31,7 @@ server/            authoritative simulation (Node + Rapier). Nothing here render
   players.js       raider spawn/lifecycle, per-tick input, practice drones
   combat.js        rifle + breach shot, knockdowns, ragdolls
   abilities.js     flight (calls shared/flight.js), missiles
+  soar-breach.js   powered wall breaches, sideways debris and brief owner contact filtering
   destruction.js   layered damage (glass -> facade -> frame), collapse scheduling, islands,
                    topple, secondary fracture, crumble, debris vs buildings / raiders
   views.js         spectator image channel (/views)

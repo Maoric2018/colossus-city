@@ -210,6 +210,7 @@ export function breakCells(room, requested, kick = v(0, 0, 0), hint = {}){
   }
  }
  const created = [];
+ if(hint.shatter)for(const id of hits){const c=room.cellMap.get(id);c.skin.hp=0;c.skin.glass=0;c.skin.facade=0;c.skin.facadeHp.fill(0);c.lastHitBy=hint.by||0;room.skinEvents.push([id,0,0]);}
  for(const ids of batches){
   let origin = v(); for(const id of ids) origin = add(origin, vec(room.cellMap.get(id).p)); origin = mul(origin, 1 / ids.length);
   const building = room.cellMap.get(ids[0]).building;

@@ -5,6 +5,7 @@ import {v, add, sub, mul, norm, dist, arr, vec, clamp} from '../shared/math.js';
 import {blastCars} from './cars.js';
 import {flightStep, flightRotation} from '../shared/flight.js';
 import {damageSphere, breakCells} from './destruction.js';
+import {breachBuildings} from './soar-breach.js';
 const G = C.COLLISION;
 export function fly(room, p, i){
  const at = p.body.translation(), lv = p.body.linvel();
@@ -15,6 +16,7 @@ export function fly(room, p, i){
  // Rotate the capsule with the prone pilot, keeping visible and physical bodies aligned.
  const q=flightRotation(p,i),previous=p.colliderRotation;
  if(!previous||q.x!==previous.x||q.y!==previous.y||q.z!==previous.z||q.w!==previous.w){p.body.collider(0).setRotation(q);p.colliderRotation=q;room.world.invalidateSceneQueries();}
+ breachBuildings(room,p,i,velocity);
 }
 export function launchMissile(room, side, aim){
  const b = room.boss; if(room.phase || room.time < b.missileReady || room.missiles.size >= C.MAX_MISSILES) return false;
