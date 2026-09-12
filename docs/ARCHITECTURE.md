@@ -119,7 +119,7 @@ The original five-by-five Midtown grid remains the home district. Beyond it, `ge
 
 Unloading releases fixed structures, ground, hand-query entries and debris bodies, and recycles building array slots. The sparse round journal stores exact structural/glass/facade HP, skin masks, detached IDs, collapsed-building state, pending failure delays, body poses and velocities. Pristine blocks need no archive. Offscreen physics pauses; loading recreates the same damage and resumes movement and pending failures. An owner block stays active when one of its thrown pieces is within 100 m of a player. Damaged history grows with destruction until round reset; it is not saved across server restarts.
 
-The client independently keeps up to nine detailed generated blocks around the viewing camera and a bounded ring of inexpensive, windowed silhouettes through the fog. State arriving for an unloaded view is retained and applied when approached. Shared architectural batches span all detailed views. Hand contact queries use 35 m spatial buckets and query child views, avoiding a scan of every bay for each sweep.
+The client independently keeps up to nine detailed generated blocks around the viewing camera with no simplified silhouette ring. State arriving for an unloaded view is retained and applied when approached. Shared architectural batches span all detailed views. Hand contact queries use 35 m spatial buckets and query child views, avoiding a scan of every bay for each sweep.
 
 ## Structural destruction
 
@@ -152,7 +152,7 @@ fatigue, rebar or arbitrary cracks; bays are rigid compounds; no self-collision 
 
 Quality tiers (`src/render/quality.js`) are chosen from the GPU string once: `quest`, `low`
 (integrated GPUs), `medium`, `high`. Lower tiers use Lambert shading for opaque surfaces,
-no normal maps, no shadows, no bloom, pixel ratio 1, inexpensive distant silhouettes and smaller
+no normal maps, no shadows, no bloom, pixel ratio 1, shorter fog distance and smaller
 particle/rubble pools; `Q` toggles cinematic extras. Adaptive resolution lowers the pixel ratio
 when the frame-time EMA exceeds 20 ms and raises it back below 12.5 ms (never in XR; hidden tabs
 are ignored). `?quality=low|medium|high|quest` forces a tier for profiling.
@@ -166,7 +166,7 @@ Visible core/detail instances retain their slots; removing one swaps only the la
 
 The exact left-eye spectator mirror reuses visibility from the just-rendered stereo frame. Independent bot/free cameras still select their own view. Nearby block construction uses a queue rebuilt at block boundaries instead of sorting all preview blocks every frame. Low tiers avoid fetching maps their materials do not use, and the infinite city's source HDR texture is released after preparing its reflection map.
 
-Linear fog covers 105–230 m on Quest and 140–340 m on desktop. The moving sky uses the same horizon color and output color space as full fog, hiding the terrain and silhouette cutoff. A world-space road shader repeats the street grid over a moving plane using downloaded asphalt/concrete textures. Nearby roof equipment reuses the existing downloaded models and rides destructible bays. Generated blocks replace the old decorative skyline ring and harbor boundary.
+Linear fog covers 32–60 m on Quest and 40–65 m on desktop, inside the fully detailed neighborhood. The shader measures distance per pixel, so the sides of a wide or stereo view also fade before radial visibility culling. The moving sky uses the same horizon color and output color space as full fog, hiding the terrain and detailed-block cutoff. A world-space road shader repeats the street grid over a moving plane using downloaded asphalt/concrete textures. Nearby roof equipment reuses the existing downloaded models and rides destructible bays. Generated blocks replace the old decorative skyline ring and harbor boundary.
 
 XR uses the tier's framebuffer scale (0.8 on Quest) and foveation; the camera is never shaken
 (haptics and a camera-locked red vignette carry damage instead). Do not mistake desktop FPS for
