@@ -1,5 +1,13 @@
 # Validation record and acceptance gates
 
+## Articulated soaring — September 12, 2026
+
+- **95 Node tests, 89 JavaScript modules and 64 bundled assets: PASS.** Shared pose tests cover individual limb motion and connected joint anchors across hover, flight transitions, banking and dodges. The real physics knockdown stays connected while tumbling.
+- **Animation render: PASS.** Flight/hover transitions match at 30 and 144 fps (blend error below 1e-6). Independently cloned skeletons animate the existing pilot surface. Sampled surface movement reaches 0.11 m during the loop; jet attachments also move with the torso. Fuel exhaustion hides the jets, first person hides the local body, and release returns to hover. Hover, soaring, banking/dodge and braking screenshots were inspected.
+- **Ragdoll render and emulated Quest stereo: PASS.** Animated live and initial ragdoll surfaces match within 0.000002 m across all 31,674 vertices, including identical colors and attached gear. Late joins and removal pass.
+- **Multiplayer/browser regression: PASS.** Held Shift, first/third-person toggles, authentic spectator feeds and Quest stereo pass with the animated pilot. The animation clock interpolates between 20 Hz snapshots so joint motion follows render frames.
+- Preview: `artifacts/raider-soaring.mp4`; reports: `artifacts/flight-animation-report.json` and `artifacts/ragdoll-report.json`. Actual headset frame time still needs a hardware check.
+
 ## Movable cars — September 12, 2026
 
 - **93 Node tests: PASS.** Includes movable car bodies, no leftover static proxies, gentle pushes, tracked hard hits, cover blocking punches, recenter protection, footsteps and missile destruction, single explosions, sleeping wrecks, late joins and round resets.

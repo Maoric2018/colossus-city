@@ -74,6 +74,8 @@ Raiders start in first person. Press **V** or use the pause-menu camera button f
 
 **Flight:** hold Space to take off, hold Shift to soar. Soaring flies prone at 32 m/s along the mouse; S brakes. Hover is 11 m/s. The giant walks at 13 m/s so it can catch a hovering raider. A full tank of hover thrust climbs about 115 m; soaring with the nose up climbs cheaper. E dodges (12 % thrust, 1.2 s cooldown). Passing within a few metres of a swinging hand without being hit is a **close call** that refills thrust.
 
+Soaring animates the existing armored pilot: the helmet looks forward, the weapon arm reaches ahead, the other arm balances, and knees and feet make small continuous corrections. Turns bank the body and vector the jetpack nozzles; entering and leaving flight tuck the legs smoothly. Press **V** for third person to see your own pilot. The same articulated model becomes the ragdoll on a hit.
+
 **Breach shot:** hold right mouse for 0.7 s and release. The bolt cracks the bay it hits (and its neighbours), costs 22 % thrust and has a 3 s cooldown. Against the giant it deals 42 (76 on the head) and **staggers** it, which exposes the core: all raider damage gets +60 % while the giant is staggered.
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode on scenery or raiders and blow a hole through most bays. Shared 0.8 s cooldown, eight-projectile cap.
@@ -124,6 +126,7 @@ npm run test:city
 npm run test:cars      # Moving cars, crushed models, explosions, collision queries and late joins
 npm run test:visual    # Imported art, roof movement, props and lasers
 npm run test:ragdoll   # Matching pilot/ragdoll skin and physics
+npm run test:flight-animation # Soaring limbs, transitions, nozzles and animation preview
 npm run test:xr-view   # Smooth yaw, hand orientation and rigid armor
 npm run bench          # Server physics: intact city, staged collapses, active hand contact
 npm run profile        # Real GPU frame times in a visible Chromium, per quality tier

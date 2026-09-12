@@ -2,6 +2,7 @@
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {handRay} from '../shared/giant-rig.js';
 import {raiderParts, raiderLinks, raiderGear} from '../shared/raider-rig.js';
+import {raiderPose,composeRotation} from '../shared/raider-pose.js';
 import {C, group} from '../shared/config.js';
 import {v, add, sub, mul, arr, vec, clamp, quatYaw, quatEuler, rotateYaw, raySphere, lookDir} from '../shared/math.js';
 import {damageCell, damageSphere, facingSide, removeBody, resolveCell, bodyPose} from './destruction.js';
@@ -51,9 +52,10 @@ export function makeRag(room, p, at, velocity, flightVelocity = v()){
   // Match the live pilot's yaw * flight lean * bank, including prone knockdowns.
   const local=quatEuler(tilt,0,bank),sy=Math.sin(yaw/2),cy=Math.cos(yaw/2),q={x:cy*local.x+sy*local.z,y:cy*local.y+sy*local.w,z:cy*local.z-sy*local.x,w:cy*local.w-sy*local.y};
   const rotate=p=>{const t=v(2*(q.y*p.z-q.z*p.y),2*(q.z*p.x-q.x*p.z),2*(q.x*p.y-q.y*p.x));return v(p.x+q.w*t.x+q.y*t.z-q.z*t.y,p.y+q.w*t.y+q.z*t.x-q.x*t.z,p.z+q.w*t.z+q.x*t.y-q.y*t.x);};
+  const pose=raiderPose({soar:p.soaring?1:0,time:room.time,id:p.id,bank,dodge:room.time<p.dodgeUntil?1:0});
   const parts=defs.map((d,i)=>{
-   const pos=add(at,rotate(vec(d.o)));
-   const body=room.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x,pos.y,pos.z).setRotation(q).setLinearDamping(.12).setAngularDamping(.6).setCcdEnabled(true));
+   const pos=add(at,rotate(vec(pose[i].p))),rotation=composeRotation([q.x,q.y,q.z,q.w],pose[i].q);
+   const body=room.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x,pos.y,pos.z).setRotation({x:rotation[0],y:rotation[1],z:rotation[2],w:rotation[3]}).setLinearDamping(.12).setAngularDamping(.6).setCcdEnabled(true));
    room.world.createCollider(RAPIER.ColliderDesc.cuboid(d.s[0]/2,d.s[1]/2,d.s[2]/2).setMass(i===1?22:i===0?14:5).setFriction(.65).setRestitution(.04).setCollisionGroups(group(G.RAGDOLL,G.WORLD|G.DEBRIS|G.GIANT)),body);
    for(const gear of raiderGear.filter(g=>g.part===d.name)){const o=sub(vec(gear.o),vec(d.o));room.world.createCollider(RAPIER.ColliderDesc.cuboid(...gear.s.map(v=>v/2)).setTranslation(o.x,o.y,o.z).setDensity(0).setFriction(.65).setCollisionGroups(group(G.RAGDOLL,G.WORLD|G.DEBRIS|G.GIANT)),body);}
    body.setLinvel(velocity,true);body.setAngvel(v(velocity.z*.14,0,-velocity.x*.14),true);

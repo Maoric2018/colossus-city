@@ -50,6 +50,9 @@ export class Connection {
   for(let i = 1; i < this.snapshots.length; i++){ if(this.snapshots[i].time >= target){ a = this.snapshots[i - 1]; b = this.snapshots[i]; break; } a = this.snapshots[i]; }
   const t = Math.max(0, Math.min(1, (target - a.time) / (b.time - a.time || 1))), s = this.scratch.state;
   for(const key of Object.keys(b)) if(key !== 'players' && key !== 'bodies' && key !== 'head' && key !== 'left' && key !== 'right' && key !== 'leftQuaternion' && key !== 'rightQuaternion') s[key] = b[key];
+  // Animation needs a continuous clock between the 20 Hz packets, matching the
+  // interpolated positions. Keep authoritative time unchanged for gameplay.
+  s.renderTime=mix(a.time,b.time,t);
   vectorInto(s.head, a.head, b.head, t); vectorInto(s.left, a.left, b.left, t); vectorInto(s.right, a.right, b.right, t);
   s.bossYaw = angle(a.bossYaw, b.bossYaw, t); s.bossX = mix(a.bossX, b.bossX, t); s.bossZ = mix(a.bossZ, b.bossZ, t);
   for(const side of ['left', 'right']){ const key = side + 'Quaternion'; if(!s[key] || s[key] === b[key]) s[key] = [0, 0, 0, 1]; quatInto(s[key], handQuaternion(a[key], a.bossYaw), handQuaternion(b[key], b.bossYaw), t); }

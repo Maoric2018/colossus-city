@@ -70,7 +70,7 @@ test('500 randomized transform packets survive the codec within float32 toleranc
  const rand = seeded(58); for(let k = 0; k < 500; k++){ const s = base(); s.bodies = Array.from({length:10}, (_, i) => ({id:i + 1000, p:Array.from({length:3}, () => rand() * 160 - 80), q:[0, 0, 0, 1]})); const d = decodeSnapshot(encodeSnapshot(s)); d.bodies.forEach((p, i) => p.p.forEach((x, j) => near(x, s.bodies[i].p[j], 1e-4))); }
 });
 test('interpolation preserves flags and normalizes quaternion interpolation', () => {
- const n = new Connection(() => {}, () => {}); try{ const a = base(), b = base(); a.time = 0; b.time = .2; a.bodies = [{id:1, p:[0, 0, 0], q:[0, 0, 0, 1]}]; b.bodies = [{id:1, p:[2, 0, 0], q:[0, 0, 0, -1]}]; n.snapshots = [a, b]; n.receivedAt = performance.now(); const s = n.sample(); near(s.bodies[0].p[0], 1, .02); near(Math.hypot(...s.bodies[0].q), 1); }finally{ n.dispose(); }
+ const n = new Connection(() => {}, () => {}); try{ const a = base(), b = base(); a.time = 0; b.time = .2; a.bodies = [{id:1, p:[0, 0, 0], q:[0, 0, 0, 1]}]; b.bodies = [{id:1, p:[2, 0, 0], q:[0, 0, 0, -1]}]; n.snapshots = [a, b]; n.receivedAt = performance.now(); const s = n.sample(); near(s.bodies[0].p[0], 1, .02); near(Math.hypot(...s.bodies[0].q), 1); near(s.renderTime,s.bodies[0].p[0]/10);const before=s.renderTime;n.receivedAt-=5;const next=n.sample();assert.ok(next.renderTime>before+.004);near(next.time,.2); }finally{ n.dispose(); }
 });
 test('shared flight model is deterministic and burns fuel while ascending', () => {
  const state = () => ({fuel:1, soaring:false, dodgeUntil:0, dodgeReady:0, dodgeDirection:v(0, 0, -1), lastDodgeSeq:0});

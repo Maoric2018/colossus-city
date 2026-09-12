@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {Room,physicsReady} from '../server/room.js';
 import {raiderParts,raiderLinks} from '../shared/raider-rig.js';
+import {raiderPose} from '../shared/raider-pose.js';
 import {C} from '../shared/config.js';
 import {v,arr} from '../shared/math.js';
 await physicsReady;const ws={send(){},readyState:1};
@@ -11,7 +12,9 @@ test('ragdoll metadata names the pilot bones and preserves a soaring knockdown p
  const r=new Room('RIG123');try{const c=r.attach(ws,'raider','pilot'),p=r.players.get(c.id);r.spawn(p,v(0,20,60));p.invulnerable=0;p.soaring=true;p.input.yaw=.7;p.input.pitch=.2;p.body.setLinvel(v(0,0,0),true);r.knockdown(p,v(2,5,0),120);const rag=r.rags.get(p.rag),meta=r.welcome(c).rags[0];
  assert.deepEqual(meta.parts.map(p=>p.name),raiderParts.map(p=>p.name));assert.equal(rag.parts.length,11);assert.equal(r.world.impulseJoints.len(),10);
  const q=new T.Quaternion().setFromEuler(new T.Euler(-Math.PI/2+.2,.7,0,'YXZ'));
- for(const [i,part]of meta.parts.entries()){const expected=new T.Vector3(...raiderParts[i].o).applyQuaternion(q).add(new T.Vector3(0,20,60));assert.ok(expected.distanceTo(new T.Vector3(...part.p))<.00001);assert.ok(q.angleTo(new T.Quaternion(...part.q))<.001);}
+ const pose=raiderPose({soar:1,time:r.time,id:p.id});
+ for(const [i,part]of meta.parts.entries()){const expected=new T.Vector3(...pose[i].p).applyQuaternion(q).add(new T.Vector3(0,20,60)),rotation=q.clone().multiply(new T.Quaternion(...pose[i].q));assert.ok(expected.distanceTo(new T.Vector3(...part.p))<.00001);assert.ok(rotation.angleTo(new T.Quaternion(...part.q))<.001);}
+ for(let n=0;n<120;n++){r.world.step();for(const link of raiderLinks){const a=rag.parts[link.a],b=rag.parts[link.b];assert.ok(worldPoint(a.body,link.anchor.map((v,i)=>v-a.offset[i])).distanceTo(worldPoint(b.body,link.anchor.map((v,i)=>v-b.offset[i])))<.15,'Animated knockdown joints must stay attached');}}
  }finally{r.dispose();}
 });
 test('pilot ragdoll joints stay connected while the full body tumbles onto the ground',()=>{

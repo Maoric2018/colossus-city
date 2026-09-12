@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {raiderParts} from '../shared/raider-rig.js';
+import {raiderPose} from '../shared/raider-pose.js';
 import {armElbow} from './arm-rig.js';
 import {GIANT,handQuaternion,resolveHand} from '../shared/giant-rig.js';
 import {loadModel,bakedModel} from './assets.js';
@@ -115,7 +116,8 @@ function suitGeometry(color){
 }
 function flightPack(parent,offset=new T.Vector3()){
  const pack=new T.Group();pack.position.set(0,.28,.27).sub(offset);parent.add(pack);mesh(rounded(.32,.4,.18,.04),dark,pack);
- for(const sign of [-1,1]){mesh(new T.CylinderGeometry(.095,.13,.48,10),metal,pack,[sign*.25,-.07,.05]);mesh(new T.CylinderGeometry(.065,.065,.05,10),cyan,pack,[sign*.25,-.33,.05]);}return pack;
+ pack.thrusters=[];
+ for(const sign of [-1,1]){const nozzle=new T.Group();nozzle.position.set(sign*.25,-.07,.05);pack.add(nozzle);pack.thrusters.push(nozzle);mesh(new T.CylinderGeometry(.095,.13,.48,10),metal,nozzle);mesh(new T.CylinderGeometry(.065,.065,.05,10),cyan,nozzle,[0,-.26,0]);}return pack;
 }
 function equipRifle(parent,rifle,mount,offset=new T.Vector3()){
  return rifle.parts.map(part=>{const material=part.material.clone();material.color.set(0x587486);material.metalness=.6;const gun=new T.Mesh(part.geometry,material);gun.scale.setScalar(1.2);gun.position.fromArray(mount).add(new T.Vector3(0,-1.25,-.13)).sub(offset);gun.castShadow=true;parent.add(gun);return material;});
@@ -124,20 +126,30 @@ export class RaiderView{
  constructor(scene,id){
   this.id=id;this.weaponMaterials=[];this.root=new T.Group();scene.add(this.root);const color=TEAM_COLORS[(id-1)%TEAM_COLORS.length];
   this.mesh=new T.Mesh(suitGeometry(color),new T.MeshStandardMaterial({vertexColors:true,metalness:.4,roughness:.56}));this.mesh.castShadow=true;this.root.add(this.mesh);
-  this.disposed=false;this.ready=Promise.all([loadModel('/assets/imported/raider/armored-pilot.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([model,rifle])=>{
+  this.flight={blend:0,dodge:0,time:0};this.disposed=false;this.ready=Promise.all([loadModel('/assets/imported/raider/armored-ragdoll.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([source,rifle])=>{
    if(this.disposed)return;this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.removeFromParent();
-   this.mesh=new T.Group();model.traverse(part=>{if(!part.isMesh)return;const m=new T.Mesh(part.geometry,part.material);m.position.y=-1.15;m.castShadow=true;this.mesh.add(m);});
-   this.pack=flightPack(this.mesh);this.weaponMaterials=equipRifle(this.mesh,rifle,model.getObjectByName('Raider_ArmoredPilot').userData.weaponMount);
+   this.mesh=cloneSkeleton(source);this.mesh.traverse(part=>{if(part.isSkinnedMesh){this.skin=part;part.castShadow=true;part.frustumCulled=false;}});
+   this.bones=new Map(this.skin.skeleton.bones.map(b=>[b.name.replace('rag_',''),b]));
+   this.pack=flightPack(this.bones.get('chest'),new T.Vector3(...raiderParts.find(p=>p.name==='chest').o));
+   this.weaponMaterials=equipRifle(this.bones.get('lowerR'),rifle,this.skin.userData.weaponMount,new T.Vector3(...raiderParts.find(p=>p.name==='lowerR').o));
+   for(const jet of this.jets){jet.material.dispose();jet.removeFromParent();}
+   this.jets=this.pack.thrusters.map(nozzle=>glow(nozzle,color,.9,[0,-.4,0]));
    this.root.add(this.mesh);this.imported=true;
   }).catch(error=>console.error('Raider model failed to load',error));
   this.jets=[-1,1].map(s=>glow(this.root,color,.9,[s*.27,-.21,.36]));this.color=color;
  }
- update(p,local=false,firstPerson=false){
+ update(p,local=false,firstPerson=false,dt=1/60,time=null){
   this.root.visible=!(p.flags&3)&&!(local&&firstPerson);this.root.position.set(...p.p);this.root.rotation.set(0,p.yaw,0);
-  const speed=Math.hypot(p.v[0],p.v[2]);const target=p.flags&16?-Math.PI/2+(p.pitch||0):-Math.min(.4,speed*.018);this.mesh.rotation.x+=(target-this.mesh.rotation.x)*.2;this.mesh.rotation.z+=(Math.max(-.4,Math.min(.4,(p.v[0]*Math.cos(p.yaw)-p.v[2]*Math.sin(p.yaw))*.025))-this.mesh.rotation.z)*.15;
-  for(const [index,j]of this.jets.entries()){j.position.set(index? .27:-.27,-.21,.36).applyAxisAngle(new T.Vector3(1,0,0),this.mesh.rotation.x);const on=(p.v[1]>1||speed>4)&&p.fuel>.01;j.visible=on;j.scale.setScalar((p.flags&32?2:p.flags&16?1.4:.8)+Math.sin(performance.now()*.06)*.2);}
+  const speed=Math.hypot(p.v[0],p.v[2]),k=1-Math.exp(-Math.min(dt,.1)*9),flight=this.flight;
+  flight.time=time??flight.time+dt;flight.blend+=((p.flags&16?1:0)-flight.blend)*k;flight.dodge+=((p.flags&32?1:0)-flight.dodge)*k;
+  const target=-(1-flight.blend)*Math.min(.4,speed*.018)+flight.blend*(-Math.PI/2+(p.pitch||0));this.mesh.rotation.x=target;
+  const bank=Math.max(-.4,Math.min(.4,(p.v[0]*Math.cos(p.yaw)-p.v[2]*Math.sin(p.yaw))*.025));this.mesh.rotation.z+=(bank-this.mesh.rotation.z)*k;
+  this.pose=raiderPose({soar:flight.blend,time:flight.time,id:this.id,bank:this.mesh.rotation.z,dodge:flight.dodge});
+  if(this.bones)for(const [i,part]of raiderParts.entries()){const bone=this.bones.get(part.name);bone.position.fromArray(this.pose[i].p);bone.quaternion.fromArray(this.pose[i].q);}
+  for(const [index,j]of this.jets.entries()){if(!this.imported)j.position.set(index?.27:-.27,-.21,.36).applyAxisAngle(tmp.set(0,0,1),this.mesh.rotation.z).applyAxisAngle(tmp.set(1,0,0),this.mesh.rotation.x);const on=(p.v[1]>1||speed>4)&&p.fuel>.01;j.visible=on;j.scale.setScalar(.8+flight.blend*.6+flight.dodge*.6+Math.sin(flight.time*38+index)*.12);}
+  for(const [i,nozzle]of (this.pack?.thrusters||[]).entries()){nozzle.rotation.x=flight.blend*(.1+Math.sin(flight.time*3.8+i)*.04);nozzle.rotation.z=-this.mesh.rotation.z*.4+(i?1:-1)*flight.dodge*.18;}
  }
- dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}this.pack?.traverse(o=>o.geometry?.dispose());for(const material of this.weaponMaterials)material.dispose();for(const j of this.jets)j.material.dispose();}
+ dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}this.pack?.traverse(o=>{if(o.isMesh)o.geometry.dispose();});for(const material of this.weaponMaterials)material.dispose();for(const j of this.jets)j.material.dispose();this.skin?.skeleton.dispose();}
 }
 export class RagView{
  constructor(scene,rag){

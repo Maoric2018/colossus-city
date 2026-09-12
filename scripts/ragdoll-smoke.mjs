@@ -25,7 +25,7 @@ try{
     const scene=new T.Scene();scene.background=new T.Color(0x162b37);scene.add(new T.HemisphereLight(0xd7f6ff,0x506878,3));const light=new T.DirectionalLight(0xffffff,4);light.position.set(-3,8,65);scene.add(light);
     const floor=new T.Mesh(new T.PlaneGeometry(200,200),new T.MeshStandardMaterial({color:0x435762}));floor.rotation.x=-Math.PI/2;scene.add(floor);
     const camera=new T.PerspectiveCamera(43,1200/900,.05,200);camera.position.set(3,6,66);camera.lookAt(0,4,60);
-    const live=new RaiderView(scene,1),rag=new RagView(scene,initial);await Promise.all([live.ready,rag.ready]);for(let i=0;i<100;i++)live.update(liveState);
+    const live=new RaiderView(scene,liveState.id),rag=new RagView(scene,initial);await Promise.all([live.ready,rag.ready]);for(let i=0;i<160;i++)live.update(liveState,false,false,1/60,0);
     scene.updateMatrixWorld(true);rag.skin.skeleton.update();const body=live.mesh.children.find(o=>o.isMesh),vertex=new T.Vector3(),actual=new T.Vector3();let error=0,colorError=0;
     for(let i=0;i<body.geometry.attributes.position.count;i++){body.getVertexPosition(i,vertex).applyMatrix4(body.matrixWorld);rag.skin.getVertexPosition(i,actual).applyMatrix4(rag.skin.matrixWorld);error=Math.max(error,vertex.distanceTo(actual));for(let j=0;j<3;j++)colorError=Math.max(colorError,Math.abs(body.geometry.attributes.color.getComponent(i,j)-rag.skin.geometry.attributes.color.getComponent(i,j)));}
     live.root.visible=false;renderer.render(scene,camera);window.ragPreview={scene,camera,live,rag,initial};return {maxVertexError:error,maxColorError:colorError,vertices:body.geometry.attributes.position.count,bones:rag.skin.skeleton.bones.length,gear:!!rag.pack&&rag.weaponMaterials.length>0};

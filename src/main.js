@@ -138,8 +138,8 @@ function frame(now, xrFrame){
   for(const p of s.players){
    ids.add(p.id); if(!players.has(p.id)) players.set(p.id, new RaiderView(scene, p.id));
    const isLocal = p.id === net.id;
-   if(isLocal && prediction.active && !presenting){ const pp = prediction.position(), pv = prediction.velocity(); Object.assign(localOverride, p); localOverride.p = [pp.x, pp.y, pp.z]; localOverride.v = [pv.x, pv.y, pv.z]; players.get(p.id).update(localOverride, true, state.firstPerson); }
-   else players.get(p.id).update(p, isLocal, state.firstPerson);
+   if(isLocal && prediction.active && !presenting){ const pp = prediction.position(), pv = prediction.velocity(); Object.assign(localOverride, p); localOverride.p = [pp.x, pp.y, pp.z]; localOverride.v = [pv.x, pv.y, pv.z]; localOverride.flags=(p.flags&~16)|(prediction.state.soaring?16:0); players.get(p.id).update(localOverride, true, state.firstPerson,dt,s.renderTime); }
+   else players.get(p.id).update(p, isLocal, state.firstPerson,dt,s.renderTime);
   }
   for(const [id, p] of players) if(!ids.has(id)){ p.dispose(); players.delete(id); }
   for(const body of s.bodies){ if(rags.has(body.id)) rags.get(body.id).update(body.p, body.q); else if(cityView.cars.entries.has(body.id))cityView.cars.pose(body.id,body.p,body.q);else cityView.poseDebris(body.id, body.p, body.q); }
