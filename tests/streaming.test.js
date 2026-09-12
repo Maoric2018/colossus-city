@@ -5,6 +5,7 @@ import {generateBlock,blockCellBase,cellBlock,homeBlock,buildingFootprint,BUILDI
 import {generateCells} from '../shared/environment.js';
 import {componentPlacements} from '../shared/city/components.js';
 import {STYLE_BY_ID} from '../shared/city/catalog.js';
+import {genericBuilding} from '../shared/city/generic-details.js';
 import {flightStep} from '../shared/flight.js';
 import {noInput} from '../server/players.js';
 import {v} from '../shared/math.js';
@@ -14,7 +15,7 @@ test('procedural addresses are deterministic, disjoint, detailed and vary across
  for(const [x,z]of [[3,0],[-3,0],[0,3],[0,-3],[105,-83],[-900,420]]){
   const env=generateBlock(x,z),cells=generateCells(env);assert.deepEqual(env,generateBlock(x,z));assert.ok(cells.length<4096);assert.ok(!homeBlock(x,z));
   for(const c of cells){assert.ok(!ids.has(c.id));ids.add(c.id);assert.deepEqual(cellBlock(c.id),[x,z]);}
-  env.buildings.forEach((b,i)=>{styles.add(b.architecture);const f=buildingFootprint(b);assert.ok(f[0]>=x*70-27&&f[2]<=x*70+27);assert.ok(f[1]>=z*70-29&&f[3]<=z*70+29);for(const a of env.buildings.slice(i+1)){const g=buildingFootprint(a);assert.ok(f[0]>=g[2]||f[2]<=g[0]||f[1]>=g[3]||f[3]<=g[1]);}assert.ok(new Set(cells.filter(c=>c.building===i).flatMap(c=>componentPlacements(c,{interiors:false}).map(p=>p.type))).size>=(STYLE_BY_ID.has(b.architecture)?30:75),b.architecture);});
+  env.buildings.forEach((b,i)=>{styles.add(b.architecture);const f=buildingFootprint(b);assert.ok(f[0]>=x*70-27&&f[2]<=x*70+27);assert.ok(f[1]>=z*70-29&&f[3]<=z*70+29);for(const a of env.buildings.slice(i+1)){const g=buildingFootprint(a);assert.ok(f[0]>=g[2]||f[2]<=g[0]||f[1]>=g[3]||f[3]<=g[1]);}if(!genericBuilding(b.architecture))assert.ok(new Set(cells.filter(c=>c.building===i).flatMap(c=>componentPlacements(c,{interiors:false}).map(p=>p.type))).size>=(STYLE_BY_ID.has(b.architecture)?30:75),b.architecture);});
  }
  for(let x=3;x<1200;x++)for(const b of generateBlock(x,7).buildings)styles.add(b.architecture);
  assert.deepEqual([...styles].sort(),[...BUILDING_STYLES.map(s=>s.id),'chrysler'].sort());assert.notEqual(blockCellBase(3,0),blockCellBase(-3,0));

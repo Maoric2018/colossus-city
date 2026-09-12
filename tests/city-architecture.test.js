@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {city,generateCells,buildingFootprint,buildingHeight} from '../shared/environment.js';
 import {COMPONENTS,componentPlacements} from '../shared/city/components.js';
-import {CATALOG_COMPONENTS} from '../shared/city/catalog-components.js';
+import {genericBuilding} from '../shared/city/generic-details.js';
 const cells=generateCells(city);
 test('dense blocks preserve clear roads, alleys, plaza and disjoint building footprints',()=>{
  assert.ok(city.buildings.length>=150);const perBlock=new Map();
@@ -15,13 +15,13 @@ test('dense blocks preserve clear roads, alleys, plaza and disjoint building foo
  }
  assert.equal(perBlock.size,24);assert.ok([...perBlock.values()].every(n=>n>=6));
 });
-test('every building uses 75+ distinct modeled component types on both quality kits',()=>{
+test('home landmarks retain their detailed kits and generic buildings use restrained coherent detail',()=>{
  const used=new Set();for(const interiors of [true,false])for(let b=0;b<city.buildings.length;b++){
   const parts=cells.filter(c=>c.building===b).flatMap(c=>componentPlacements(c,{interiors}));for(const p of parts){used.add(p.type);assert.ok(COMPONENTS[p.type]);}
-  assert.ok(new Set(parts.map(p=>p.type)).size>=75,city.buildings[b].name);
+  if(!genericBuilding(city.buildings[b].architecture))assert.ok(new Set(parts.map(p=>p.type)).size>=75,city.buildings[b].name);
+  else assert.ok(!parts.some(p=>p.type==='crossBrace'||p.type==='securityGrille'),city.buildings[b].name);
  }
- // Home addresses keep their original kit. New district-only assemblies are lazy.
- assert.deepEqual([...used].sort(),Object.keys(COMPONENTS).filter(t=>!CATALOG_COMPONENTS[t]).sort());
+ for(const type of ['generic_brick_trim','generic_stone_trim','generic_concrete_trim'])assert.ok(used.has(type));
  for(const spec of Object.values(COMPONENTS))for(const p of spec.parts){assert.ok(p.s.every(n=>n>0&&Number.isFinite(n)));assert.ok([...p.p,...p.r].every(Number.isFinite));}
 });
 test('landmark silhouettes and component kits are distinct and stay structurally supported',()=>{

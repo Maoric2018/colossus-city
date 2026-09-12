@@ -1,12 +1,18 @@
 # Infinite city building catalog
 
-This urban/New York expansion adds 52 building recipes: 44 ordinary building types and eight New York landmarks, with 101 modeled component types. Each recipe actually places 33–56 distinct types on the Quest detail tier. The subsequent [world landmark expansion](WORLD_LANDMARKS.md) adds another 18 recipes and 100 components. The current infinite street-address catalog contains 86 recipes and the shared component registry contains 415 types, plus the existing special Chrysler courtyard and home landmarks. Counts below are component **types**, not repeated bricks or instances.
+This urban/New York expansion adds 52 building recipes: 44 ordinary building types and eight New York landmarks. The subsequent [world landmark expansion](WORLD_LANDMARKS.md) adds another 18 recipes. The infinite street-address catalog contains 86 recipes, plus the special Chrysler courtyard and home landmarks. Counts below are component **types** in the default Quest gallery variant, not repeated bricks or instances; ordinary buildings use useful details without a minimum type quota.
 
 ## Generation
 
-Six neighborhood mixes—residential, industrial, civic, arts, office and market—bias nearby blocks toward related uses. Each block independently randomizes its building selections, ordinary building heights, bay widths, story heights, setback directions and material variation. Eight different street-address types are selected per block; approximately one block in three includes one of the 26 New York/world catalog landmarks. Existing occasional Chrysler courtyards still work, including manual host spawning.
+Six neighborhood mixes—residential, industrial, civic, arts, office and market—bias nearby blocks toward related uses. Each block independently randomizes its building selections, ordinary building heights, bay widths, story heights, setback directions and material variation. Eight different street-address types are selected per block; approximately one block in three includes one of the 26 New York/world catalog landmarks. Occasional courtyards contain a Chrysler landmark.
 
-All random choices derive from the world seed and block coordinates. The server, every player and late-joining spectators generate the same buildings regardless of exploration order. Reloading a district preserves its geometry, damage and resting debris. The original home buildings retain their previous geometry, IDs and architecture assignments.
+All random choices derive from the world seed and block coordinates. The server, every player and late-joining spectators generate the same buildings regardless of exploration order. Reloading a district preserves its geometry, damage and resting debris. Home buildings keep their massing, IDs and architecture assignments; the generic detail cleanup applies to home buildings and generated districts alike.
+
+## Generic detail rules
+
+Masonry and concrete window surrounds follow the actual pane outlines in the facade texture. Glass facades reuse their existing mullion texture. Extra grids, diagonal braces, window grilles and decorative panels that cross panes are omitted. Each building has one main entrance; brick walkups can have a continuous rear fire escape. Appropriate balconies and roof profiles remain.
+
+Flat roofs have one access area with a hatch and vent, or one small water tower where specified. Plant, garden and solar roofs place their service feature once on the highest roof, with adjacent access where space permits. Random satellite dishes and repeated equipment on every roof bay are removed. Shared placement rules keep visible roof props, previews and collision geometry aligned. Landmark-specific components retain their existing placement.
 
 ## Recipes
 
@@ -14,50 +20,50 @@ Dimensions are adapted to the game's city scale. Structural storeys group real-w
 
 | New building type | Massing recipe | Roof | Distinct placed components |
 | --- | --- | --- | --- |
-| Brooklyn rowhouse | flat | mansard | 56 |
-| Dutch gabled house | flat | gable | 55 |
-| Federal townhouse | flat | hip | 56 |
-| Greystone apartments | setback | mansard | 54 |
-| Limestone mansion | wings | hip | 54 |
-| Carriage house | flat | gable | 56 |
-| Corner bodega apartments | flat | flat | 52 |
-| Chrome diner | flat | barrel | 50 |
-| Art Moderne cinema | setback | flat | 53 |
-| City firehouse | rear-tower | hip | 53 |
-| Neighborhood precinct | setback | flat | 50 |
-| Public library | wings | hip | 51 |
-| Courthouse | wings | dome | 51 |
-| Post office | flat | hip | 53 |
-| Transit headhouse | flat | gable | 51 |
-| Power substation | flat | saw | 51 |
-| Municipal clock tower | tower | pyramid | 53 |
-| Neighborhood church | rear-tower | pyramid | 51 |
-| Neighborhood synagogue | wings | dome | 51 |
-| Gothic cathedral | twin-tower | pyramid | 51 |
-| Glass conservatory | flat | glass-ridge | 54 |
-| University hall | wings | hip | 53 |
-| City school | wings | flat | 54 |
-| Hospital wing | slab | flat | 50 |
-| Research laboratory | setback | plant | 50 |
-| Parking garage | flat | flat | 49 |
-| Bus depot | flat | saw | 53 |
-| Railway terminal | wings | barrel | 51 |
-| Ferry terminal | rear-tower | hip | 53 |
-| Shipping warehouse | flat | saw | 53 |
-| Textile mill | rear-tower | saw | 53 |
-| Brewery | setback | plant | 53 |
-| Cold storage warehouse | flat | plant | 51 |
-| Printing house | setback | saw | 53 |
-| Converted industrial lofts | setback | flat | 54 |
-| Music hall | wings | barrel | 54 |
-| Contemporary museum | terrace | flat | 52 |
-| Art gallery | setback | glass-ridge | 54 |
-| Garden apartments | terrace | garden | 55 |
-| Balcony condominiums | setback | garden | 54 |
-| Slender point tower | flat | plant | 50 |
-| Slab apartments | slab | garden | 53 |
-| Stepped offices | tower | flat | 50 |
-| Solar office building | terrace | solar | 50 |
+| Brooklyn rowhouse | flat | mansard | 18 |
+| Dutch gabled house | flat | gable | 16 |
+| Federal townhouse | flat | hip | 16 |
+| Greystone apartments | setback | mansard | 15 |
+| Limestone mansion | wings | hip | 15 |
+| Carriage house | flat | gable | 17 |
+| Corner bodega apartments | flat | flat | 20 |
+| Chrome diner | flat | barrel | 16 |
+| Art Moderne cinema | setback | flat | 17 |
+| City firehouse | rear-tower | hip | 16 |
+| Neighborhood precinct | setback | flat | 17 |
+| Public library | wings | hip | 16 |
+| Courthouse | wings | dome | 15 |
+| Post office | flat | hip | 16 |
+| Transit headhouse | flat | gable | 17 |
+| Power substation | flat | saw | 16 |
+| Municipal clock tower | tower | pyramid | 15 |
+| Neighborhood church | rear-tower | pyramid | 15 |
+| Neighborhood synagogue | wings | dome | 16 |
+| Gothic cathedral | twin-tower | pyramid | 16 |
+| Glass conservatory | flat | glass-ridge | 14 |
+| University hall | wings | hip | 15 |
+| City school | wings | flat | 18 |
+| Hospital wing | slab | flat | 18 |
+| Research laboratory | setback | plant | 16 |
+| Parking garage | flat | flat | 18 |
+| Bus depot | flat | saw | 16 |
+| Railway terminal | wings | barrel | 15 |
+| Ferry terminal | rear-tower | hip | 15 |
+| Shipping warehouse | flat | saw | 16 |
+| Textile mill | rear-tower | saw | 16 |
+| Brewery | setback | plant | 17 |
+| Cold storage warehouse | flat | plant | 17 |
+| Printing house | setback | saw | 15 |
+| Converted industrial lofts | setback | flat | 18 |
+| Music hall | wings | barrel | 15 |
+| Contemporary museum | terrace | flat | 17 |
+| Art gallery | setback | glass-ridge | 14 |
+| Garden apartments | terrace | garden | 21 |
+| Balcony condominiums | setback | garden | 17 |
+| Slender point tower | flat | plant | 16 |
+| Slab apartments | slab | garden | 19 |
+| Stepped offices | tower | flat | 17 |
+| Solar office building | terrace | solar | 16 |
 | 432 Park Avenue | flat | flat | 45 |
 | Woolworth Building | gothic-tower | woolworth | 46 |
 | 40 Wall Street | wall-tower | wall40 | 46 |
@@ -84,12 +90,13 @@ No new building names or text signs are shown in the game. Reference description
 
 Roof geometry is attached to its supporting bay and follows that bay into persistent debris. Stepped cuboid proxies approximate pitched roofs and crowns for the server, local hand prediction and missiles. Open mechanical levels and raised bases have matching open collision skins. Disconnected cathedral tower tops no longer acquire an invisible bounding slab across their gap.
 
-Close components use global instance batches allocated only when a type appears. Small detail remains distance-limited; roof silhouettes and landmark signatures persist farther out. Distant landmarks use one shared instance batch per design and flat façade strips instead of solid trim boxes. Distant ordinary roofs also share batches. Nearby district loading remains capped at nine detailed client blocks; no per-detail physics bodies or unbounded per-address mesh cache are introduced.
+Close components use instance batches allocated only when a type appears. Small detail remains distance-limited; roof silhouettes and landmark signatures persist farther out. Up to 25 detailed generated blocks surround the camera, and fog hides their outer boundary without a simplified distant building ring. The generic cleanup reduces repeated geometry without introducing per-detail physics bodies.
 
 ## Verification
 
 - 1,024 generated blocks: every type appears; deterministic reloads, seed variation, unique neighbors, clear streets/plots and bounded cell counts.
-- Every new recipe at four variants and both detail tiers: 30+ distinct placed components, finite geometry, reciprocal support links, no pristine collapse or overload.
+- Every new recipe at four variants and both detail tiers: valid components, finite geometry, reciprocal support links, no pristine collapse or overload. Landmarks retain 30+ distinct placed types.
+- Generic home and catalog buildings: window trims stay outside panes, entrances and roof services have bounded placement, and random window bars and satellite dishes are absent.
 - Real server collision checks: open mechanical floors, cathedral gaps, roof contacts and detached roof colliders.
 - Browser model gallery: all 52 recipes, moving roof attachment matrices and valid distant meshes. Gallery inspection enables full detail; gameplay uses the normal distance limits.
 - Streaming browser checks: district traversal, both-eye culling, persistent rubble after unload/reload, and emulated Quest 2 stereo traversal. This verifies the rendering path, not physical Quest frame rate.

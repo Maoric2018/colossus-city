@@ -3,6 +3,7 @@ import {mergeParts} from '../art.js';
 import {componentGeometry} from './component-geometry.js';
 import {surface} from './quality.js';
 import {generateCells} from '../../shared/city/cells.js';
+import {finishGenericDetails} from '../../shared/city/generic-details.js';
 import {catalogBuilding,STYLE_BY_ID,catalogLandmark} from '../../shared/city/catalog.js';
 import {CATALOG_COMPONENTS,catalogRoofTypes} from '../../shared/city/catalog-components.js';
 import {WORLD_STYLE_BY_ID,shapeWorldCell,worldPlacements} from '../../shared/city/world-landmarks.js';
@@ -20,7 +21,7 @@ export function roofSites(b){
  const occupied=(t,x,z)=>t&&x>=t.ix&&x<t.ix+t.nx&&z>=t.iz&&z<t.iz+t.nz&&!t.voids?.some(v=>x>=v.ix&&x<v.ix+v.nx&&z>=v.iz&&z<v.iz+v.nz);
  for(let i=0;i<b.tiers.length;i++){const t=b.tiers[i];floor+=t.floors;
   for(let iz=t.iz;iz<t.iz+t.nz;iz++)for(let ix=t.ix;ix<t.ix+t.nx;ix++)if(occupied(t,ix,iz)&&!occupied(b.tiers[i+1],ix,iz))out.push({architecture:b.architecture,ix,iz,roof:true,topFloor:i===b.tiers.length-1,floor:floor-1,size:[b.bay,b.story,b.bay],p:[b.x+(ix-(base.nx-1)/2)*b.bay,.15+(floor-.5)*b.story,b.z+(iz-(base.nz-1)/2)*b.bay]});
- }for(const c of out){c.buildingFloors=floor;shapeWorldCell(c,b);}return out;
+ }for(const c of out){c.buildingFloors=floor;shapeWorldCell(c,b);}finishGenericDetails(out,b);return out;
 }
 function landmarkGeometry(style){
  const b=catalogBuilding(style,0,0),cells=generateCells({buildings:[b]}),parts=[],local=new T.Matrix4(),world=new T.Matrix4(),scale=new T.Vector3();

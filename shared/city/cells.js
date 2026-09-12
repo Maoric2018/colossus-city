@@ -1,5 +1,6 @@
 import {shapeModernCell,finishModernCells} from './modern-landmarks.js';
 import {shapeCatalogCell,finishCatalogCells} from './catalog.js';
+import {finishGenericDetails} from './generic-details.js';
 import {fractureColliders} from './fracture.js';
 // A structural cell is one hollow storey bay: slab + four corner columns + exterior skins.
 // Cells form a support graph anchored at foundations. No triangle-mesh physics anywhere.
@@ -46,6 +47,7 @@ export function generateCells(env){
   if(b.architecture==='chrysler'){const top=mine.find(c=>c.floor===totalFloors-1&&c.ix===2&&c.iz===2);if(top)top.chryslerCrown=true;for(const c of mine)delete c.roofAsset;}
   finishModernCells(mine,b);
   finishCatalogCells(mine,b);
+  finishGenericDetails(mine,b);
   for(let i=mine.length-1;i>=0;i--){const c=mine[i];c.stackAbove=c.above?byId.get(c.above).stackAbove+1:0;}
  });
  return cells;

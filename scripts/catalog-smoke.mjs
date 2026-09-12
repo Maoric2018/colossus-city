@@ -11,7 +11,7 @@ const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,POR
 await mkdir('artifacts/catalog',{recursive:true});
 try{
  for(let i=0;i<100;i++){if(await fetch(url+'/healthz').then(r=>r.ok).catch(()=>false))break;await delay(100);}
- browser=await chromium.launch({headless:false,channel:'chromium',args:['--enable-webgl','--ignore-gpu-blocklist','--disable-backgrounding-occluded-windows']});
+ browser=await chromium.launch({headless:process.env.HEADLESS==='1',channel:'chromium',args:['--enable-webgl','--ignore-gpu-blocklist','--disable-backgrounding-occluded-windows']});
  const page=await browser.newPage({viewport:{width:900,height:900}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.goto(url+'/?quality=quest');await page.waitForFunction(()=>window.COLOSSUS_ART_READY);
  await page.evaluate(()=>{const {renderer}=window.__COLOSSUS;renderer.setAnimationLoop(null);document.body.replaceChildren(renderer.domElement);});
@@ -34,7 +34,7 @@ try{
    const lodRoot=new T.Group(),lod=new CatalogLOD(lodRoot,TIERS.quest);if(!lod.building(b))lod.roofs(b);lod.commit();let lodFinite=true;for(const mesh of lod.batches.values())lodFinite&&=[...mesh.geometry.attributes.position.array].every(Number.isFinite);
    renderer.render(scene,camera);window.catalogShot={scene,camera,root,buildings,lodRoot};return {id,registered,attached,lodFinite,roofMatch,...stats};
   },style.id);
-  assert.ok(result.registered>=30&&result.attached&&result.lodFinite&&result.roofMatch,JSON.stringify(result));models.push(result);await page.screenshot({path:`artifacts/catalog/${style.id}.png`});
+  assert.ok((!style.landmark||result.registered>=30)&&result.attached&&result.lodFinite&&result.roofMatch,JSON.stringify(result));models.push(result);await page.screenshot({path:`artifacts/catalog/${style.id}.png`});
   if(worldOnly){await page.evaluate(()=>{const {scene,camera,root,lodRoot}=window.catalogShot;root.visible=false;scene.add(lodRoot);window.__COLOSSUS.renderer.render(scene,camera);});await page.screenshot({path:`artifacts/catalog/${style.id}-distant.png`});}
   await page.evaluate(()=>{const {scene,lodRoot}=window.catalogShot;for(const root of [scene,lodRoot])root.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();if(o.isInstancedMesh)o.dispose();}});window.catalogShot=null;});
  }

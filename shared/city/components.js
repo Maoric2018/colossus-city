@@ -2,6 +2,7 @@ import {MODERN_LANDMARK_COMPONENTS,modernLandmark,modernPlacements} from './mode
 import {CHRYSLER_COMPONENTS,chryslerPlacements} from './chrysler.js';
 import {CATALOG_COMPONENTS,catalogPlacements} from './catalog-components.js';
 import {STYLE_BY_ID} from './catalog.js';
+import {genericBuilding,genericPlacements,GENERIC_WINDOWS} from './generic-details.js';
 // Architectural kit in normalized bay coordinates. Parts have distinct geometry and jobs;
 // structural assemblies share a physics bay, while facade/glass pieces follow their own skin.
 // All of these same assemblies remain attached when their bay falls or comes to rest.
@@ -9,8 +10,17 @@ const box=(s,p=[0,0,0],r=[0,0,0])=>({s,p,r});
 const rail=(y,z=-.51)=>[box([.9,.024,.022],[0,y,z]),...[-.42,-.21,0,.21,.42].map(x=>box([.016,.23,.018],[x,y-.11,z]))];
 const beam=(x=0,z=0)=>[box([.1,.86,.025],[x,-.025,z]),...[-.075,.075].map(d=>box([.1,.86,.02],[x,-.025,z+d]))];
 const kit=(label,material,parts)=>({label,material,parts});
+// Match the existing brick, stone and concrete window openings. All bars stay
+// outside the pane, with the same .925 vertical scale as the facade surface.
+const windowTrim=windows=>windows.flatMap(([x,y,w,h])=>{
+ const cx=x+w/2-.5,top=(.5-y)*.925,bottom=(.5-y-h)*.925;
+ return [box([w+.04,.025,.045],[cx,top+.014,-.527]),box([w+.06,.027,.065],[cx,bottom-.015,-.535]),...[-1,1].map(s=>box([.018,top-bottom,.035],[cx+s*(w/2+.011),(top+bottom)/2,-.522]))];
+});
 export const COMPONENTS=Object.freeze({
  ...CHRYSLER_COMPONENTS, ...MODERN_LANDMARK_COMPONENTS, ...CATALOG_COMPONENTS,
+ generic_brick_trim:kit('Individual brick window lintels, reveals and sills','stone',windowTrim(GENERIC_WINDOWS.brick)),
+ generic_stone_trim:kit('Individual stone window surrounds','stone',windowTrim(GENERIC_WINDOWS.stone)),
+ generic_concrete_trim:kit('Concrete ribbon window perimeter','silver',windowTrim(GENERIC_WINDOWS.concrete)),
  slabEdge:kit('Precast slab edge','stone',[box([1,.075,.07],[0,.46,-.48])]),
  iBeam:kit('Steel I girder','steel',[box([.96,.09,.024],[0,.38,-.38]),...[-.05,.05].map(y=>box([.96,.018,.075],[0,.38+y,-.38]))]),
  hColumn:kit('Flanged steel column','steel',beam(-.46,-.46)),
@@ -115,6 +125,7 @@ export const COMPONENTS=Object.freeze({
 });
 export function componentPlacements(c,{interiors=true}={}){
  const out=[],put=(type,side=-1,layer='frame')=>out.push({type,side,layer});
+ if(genericBuilding(c.architecture)){genericPlacements(c,put,catalogPlacements,{interiors,specs:COMPONENTS});return out;}
  const core=c.ix%2===0&&c.iz%2===0||c.architecture==='citigroup'&&c.ix===1&&c.iz===1;
  if(core && (interiors || c.ground))for(const type of ['iBeam','hColumn','joists','coreWall','elevator','stairFlight','stairLanding','stairRail','pipe'])put(type);
  if(core&&c.floor%3===1)put('crossBrace');

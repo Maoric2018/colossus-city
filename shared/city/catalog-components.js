@@ -119,6 +119,7 @@ Object.freeze(CATALOG_COMPONENTS);
 
 export function catalogRoofTypes(c){
  const style=STYLE_BY_ID.get(c.architecture);if(!style||!c.roof||style.roof==='flat')return [];
+ if(!style.landmark&&['plant','garden','solar'].includes(style.roof)&&!c.genericRoofFeature)return [];
  if(style.world)return worldRoofTypes(c);
  if(style.landmark&&!c.topFloor)return [];
  if(style.roof==='citi')return [`citiRoof${c.iz}`];

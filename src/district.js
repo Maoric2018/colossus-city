@@ -45,7 +45,7 @@ export async function installRoofDressing(view){
   const cells = view.cells.filter(c => roofProp(c)?.asset === name);
   if(!cells.length) return;
   for(const part of model.parts){ const batch = view.batch(part.geometry, part.material, cells.length); cells.forEach((c, index) => {
-   const local = new T.Matrix4().compose(new T.Vector3(0, c.size[1] / 2 + .04, 0), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), (c.roofYaw??c.building) * Math.PI / 2), new T.Vector3().setScalar(height / model.size.y));
+   const local = new T.Matrix4().compose(new T.Vector3(0, c.size[1] / 2 + .04, 0), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), (c.roofYaw??c.building) * Math.PI / 2), new T.Vector3().setScalar(roofProp(c).height / model.size.y));
    if(!view.attachments.has(c.id)) view.attachments.set(c.id, []); view.attachments.get(c.id).push({batch, index, local});
   }); }
   attachRoofProps(view, cells);

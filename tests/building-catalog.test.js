@@ -9,9 +9,11 @@ import {unsupportedCells,overloadedCells} from '../shared/city/structure.js';
 import {componentGeometry} from '../src/render/component-geometry.js';
 import {Room,physicsReady} from '../server/room.js';
 import {v} from '../shared/math.js';
+import {genericBuilding} from '../shared/city/generic-details.js';
+import {roofProp} from '../shared/props.js';
 await physicsReady;
 const envFor=(s,variant=0)=>({...midtown,id:'catalog-test',infinite:false,buildings:[catalogBuilding(s,0,-30,{variant,random:()=>variant%2?.99:0})]});
-test('the urban and world catalogs have distinct designs, at least 30 actually placed component types, and stable structures',()=>{
+test('the urban and world catalogs have distinct designs, valid components, and stable structures',()=>{
  assert.equal(NEW_BUILDING_STYLES.length,52);assert.equal(BUILDING_STYLES.length,68+WORLD_BUILDING_STYLES.length);assert.equal(NEW_BUILDING_STYLES.filter(s=>s.landmark).length,8);
  const designs=new Set(),used=new Set();
  for(const s of CATALOG_STYLES){
@@ -20,13 +22,33 @@ test('the urban and world catalogs have distinct designs, at least 30 actually p
    const cells=generateCells(envFor(s,variant)),byId=new Map(cells.map(c=>[c.id,c]));
    for(const interiors of [false,true]){
     const types=new Set(cells.flatMap(c=>componentPlacements(c,{interiors}).map(p=>p.type)));
-    assert.ok(types.size>=30,s.id+' '+types.size+' component types');for(const type of types){assert.ok(COMPONENTS[type],type);used.add(type);}
+    if(s.landmark)assert.ok(types.size>=30,s.id+' '+types.size+' landmark component types');
+    for(const type of types){assert.ok(COMPONENTS[type],type);used.add(type);}
    }
    assert.deepEqual(unsupportedCells(cells,new Set()),[],s.id);assert.deepEqual(overloadedCells(cells,new Set()),[],s.id);
    for(const c of cells)for(const n of c.neighbors)assert.ok(byId.get(n)?.neighbors.includes(c.id),s.id+' reciprocal support');
   }
  }
- for(const type of Object.keys(CATALOG_COMPONENTS))assert.ok(used.has(type),'unused new component '+type);
+ for(const [type,spec]of Object.entries(CATALOG_COMPONENTS))if(spec.signature)assert.ok(used.has(type),'unused landmark component '+type);
+});
+test('generic buildings keep windows unobstructed and share a small rooftop service area',()=>{
+ const buildings=[...midtown.buildings.filter(b=>genericBuilding(b.architecture)),...CATALOG_STYLES.filter(s=>!s.landmark).map(s=>catalogBuilding(s,0,0))];
+ for(const building of buildings){
+  const cells=generateCells({buildings:[building]}),placements=cells.flatMap(c=>componentPlacements(c));
+  assert.ok(!placements.some(p=>['crossBrace','securityGrille','mullion','casement','transom'].includes(p.type)),building.architecture+' stacked window bars');
+  assert.equal(cells.filter(c=>c.genericEntrySide!==undefined).length,1,'one main entry per building');
+  assert.ok(cells.filter(c=>c.genericRoofParts?.length).length<=1,'one roof-access area');
+  assert.ok(cells.filter(c=>c.genericRoofFeature).length<=1,'one roof plant/solar/garden area');
+  assert.ok(cells.filter(c=>roofProp(c)).length<=1,'one downloaded rooftop utility');
+  assert.ok(!cells.some(c=>c.roofAsset?.[0].includes('satellite')),'no random satellite dishes');
+ }
+ // These new surrounds follow the real pane outlines instead of crossing them.
+ for(const [material,windows]of Object.entries({brick:[[.1,.28,.2,.42],[.4,.28,.2,.42],[.7,.28,.2,.42]],stone:[[.12,.22,.3,.5],[.58,.22,.3,.5]],concrete:[[.06,.3,.88,.36]]})){
+  for(const p of COMPONENTS[`generic_${material}_trim`].parts)for(const [x,y,w,h]of windows){
+   const overlaps=p.p[0]+p.s[0]/2>x-.5&&p.p[0]-p.s[0]/2<x+w-.5&&p.p[1]+p.s[1]/2>(.5-y-h)*.925&&p.p[1]-p.s[1]/2<(.5-y)*.925;
+   assert.ok(!overlaps,material+' trim crosses a pane');
+  }
+ }
 });
 test('all new component geometry has finite positions, normals and texture coordinates',()=>{
  for(const [name,spec] of Object.entries(CATALOG_COMPONENTS))for(const part of spec.parts){
