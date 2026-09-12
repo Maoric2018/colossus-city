@@ -1,6 +1,7 @@
 import {modernColliders} from './city/modern-landmarks.js';
 import {catalogRoofColliders} from './city/catalog-components.js';
 import {chryslerColliders} from './city/chrysler.js';
+import {trafficRoutes,routePose} from './traffic.js';
 import {seeded} from './math.js';
 import {propBounds} from './prop-bounds.js';
 export const ROOF_ASSETS=[['city-kit-industrial/water-tower',2.8],['space-kit/satelliteDish_detailed',2.4],['city-kit-industrial/detail-tank',1.1],['city-kit-industrial/solar-panel-flat',.25]];
@@ -33,16 +34,19 @@ export function staticProps(env){
 }
 
 function midtownCars(env){
- const cars=['taxi','sedan','police','van','firetruck','delivery'],out=[],rand=seeded(78103),perLane=12,{avenues,streets,avenueWidth}=env.roads;
- for(const [ai,x] of avenues.entries())for(let i=0;i<perLane;i++){
-  const z=-env.half+10+i/perLane*(env.half*2-20)+rand()*6;if(streets.some(s=>Math.abs(z-s)<10))continue;
-  const type=(i+ai)%cars.length,swap=(i+ai)%2,asset='car-kit/'+cars[type],scale=(type>2?4.8:3.9)/propBounds[asset][2],size=propBounds[asset].map(v=>v*scale);
-  out.push({id:`car-${ai}-${i}`,kind:'car',asset,scale,size,position:[x+(swap?avenueWidth/4:-avenueWidth/4),.13,z],yaw:swap?0:Math.PI,boxes:[[0,size[1]/2,0,size[0]/2,size[1]/2,size[2]/2]]});
+ const cars=['taxi','sedan','police','van','firetruck','delivery'],out=[],rand=seeded(78103),routes=trafficRoutes(env);
+ for(const [ri,route] of routes.entries())for(let i=0;i<4;i++){
+  // Keep spawn gaps clear even where neighbouring circuits share a lane.
+  let at,distance;for(let attempt=0;attempt<12;attempt++){distance=(i*.25+.04+rand()*.12)*route.length;at=routePose(route,distance);if(!at.turn&&out.every(p=>Math.hypot(p.position[0]-at.x,p.position[2]-at.z)>9))break;at=null;}
+  if(!at)continue;const type=(ri*4+i)%cars.length,asset='car-kit/'+cars[type],scale=(type>2?4.8:3.9)/propBounds[asset][2],size=propBounds[asset].map(v=>v*scale);
+  out.push({id:`car-${ri}-${i}`,kind:'car',asset,scale,size,position:[at.x,.13,at.z],yaw:Math.atan2(at.dx,at.dz),traffic:{route,distance,speed:4.8+rand()*2},boxes:[[0,size[1]/2,0,size[0]/2,size[1]/2,size[2]/2]]});
  }return out;
 }
+
 function midtownProps(env){
- const out=[],add=(id,kind,position,half)=>out.push({id,kind,position,yaw:0,boxes:[[0,0,0,...half]]}),{avenues,avenueWidth}=env.roads;
+ const out=[],add=(id,kind,position,half)=>out.push({id,kind,position,yaw:0,boxes:[[0,0,0,...half]]}),{avenues,streets,avenueWidth,streetWidth}=env.roads;
  for(const x of avenues)for(let z=-env.half+8;z<=env.half-8;z+=24)for(const side of [-1,1]){
+  if(streets.some(s=>Math.abs(z-s)<streetWidth/2+2))continue;
   const lx=x+side*(avenueWidth/2+.8),id=`lamp-${lx}-${z}`;add(id,'lamp',[lx,3,z],[.1,3,.1]);add(id+'-arm','lamp',[lx-side*.7,6.1,z],[.8,.05,.05]);add(id+'-bulb','lamp',[lx-side*1.2,6.03,z],[.4,.025,.15]);
  }
  for(const [i,b] of env.buildings.entries()){

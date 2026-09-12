@@ -28,7 +28,7 @@ export function buildGround(root, env, tier, textures){
  for(const p of env.spawns){ const pad = new T.Mesh(new T.CircleGeometry(3.8, 40), surface(tier, {color:0x234348, metalness:.55, roughness:.6})); pad.rotation.x = -Math.PI / 2; pad.position.set(p[0], .06, p[2]); root.add(pad); const t = new T.Mesh(new T.PlaneGeometry(5, 5), new T.MeshBasicMaterial({map:labelTexture('H', {bg:'#25494b', fg:'#b8efad', w:256, h:256})})); t.rotation.x = -Math.PI / 2; t.position.set(p[0], .08, p[2]); root.add(t); }
  // Street lamps along every avenue.
  const lamps = [], bulbs = [];
- for(const x of avenues) for(let z = -half + 8; z <= half - 8; z += 24) for(const side of [-1, 1]){ const lx = x + side * (avenueWidth / 2 + .8); lamps.push([new T.CylinderGeometry(.07, .1, 6, 5), [lx, 3, z]], [new T.BoxGeometry(1.6, .1, .1), [lx - side * .7, 6.1, z]]); bulbs.push([new T.BoxGeometry(.8, .05, .3), [lx - side * 1.2, 6.03, z]]); }
+ for(const x of avenues) for(let z = -half + 8; z <= half - 8; z += 24) for(const side of [-1, 1]){ if(streets.some(s=>Math.abs(z-s)<streetWidth/2+2))continue;const lx = x + side * (avenueWidth / 2 + .8); lamps.push([new T.CylinderGeometry(.07, .1, 6, 5), [lx, 3, z]], [new T.BoxGeometry(1.6, .1, .1), [lx - side * .7, 6.1, z]]); bulbs.push([new T.BoxGeometry(.8, .05, .3), [lx - side * 1.2, 6.03, z]]); }
  mesh(mergeParts(lamps), dark, root).castShadow = false; mesh(mergeParts(bulbs), new T.MeshBasicMaterial({color:0xffd998, toneMapped:false}), root).castShadow = false;
  if(env.infinite)return {update(){}};
  // Water beyond the island, a shore ring and two harbour bridges.

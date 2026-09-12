@@ -6,7 +6,7 @@ import {lazySceneQueries} from './queries.js';
 import {breachHooks} from './soar-breach.js';
 import {GIANT, handQuaternion, identity} from '../shared/giant-rig.js';
 import {HandWorld} from '../shared/hand-world.js';
-import {buildCars,carMeta,updateCars,crashCar,carSnapshots} from './cars.js';
+import {buildCars,carMeta,updateCars,driveCars,crashCar,carSnapshots} from './cars.js';
 import {staticProps} from '../shared/props.js';
 import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
@@ -144,6 +144,7 @@ export class Room {
   updateBoss(this);
   for(const p of this.players.values()) updatePlayer(this, p);
   for(const e of this.debris.values()){e.preImpactVelocity=e.body.linvel();e.preImpactAngular=e.body.angvel();e.preImpactSpeed=len(e.preImpactVelocity);}
+  driveCars(this);
   for(const c of this.cars.values())if(c.body)c.preImpactSpeed=len(c.body.linvel());
   updateMissiles(this);
   this.world.step(this.queue,this.physicsHooks);

@@ -9,7 +9,7 @@ const scrapNames=['debris-door','debris-bumper','debris-tire','debris-drivetrain
 export class CarsView {
  constructor(root,env,tier){
   this.root=root;this.tier=tier;this.placements=carPlacements(env);this.entries=new Map();this.batches=[];this.ready=this.load();
-  this.placements.forEach((prop,i)=>this.entries.set(CAR_ID_START+i,{id:CAR_ID_START+i,prop,parts:[],p:[prop.position[0],prop.position[1]+prop.size[1]/2,prop.position[2]],q:[0,Math.sin(prop.yaw/2),0,Math.cos(prop.yaw/2)],wreck:false,sleeping:true,removed:false,burn:0}));
+  this.placements.forEach((prop,i)=>this.entries.set(CAR_ID_START+i,{id:CAR_ID_START+i,prop,parts:[],p:[prop.position[0],prop.position[1]+prop.size[1]/2,prop.position[2]],q:[0,Math.sin(prop.yaw/2),0,Math.cos(prop.yaw/2)],wreck:false,driving:!!prop.traffic,sleeping:true,removed:false,burn:0}));
   for(const e of this.entries.values())this.apply(e);
  }
  batch(g,m,count,name){const b=new T.InstancedMesh(g,m,count);b.name=name;b.instanceMatrix.setUsage(T.DynamicDrawUsage);b.frustumCulled=false;b.castShadow=this.tier.shadows;b.receiveShadow=true;this.root.add(b);this.batches.push(b);return b;}
@@ -29,9 +29,9 @@ export class CarsView {
   e.box=carBox(e.prop.size,e.p,e.q,e.wreck);
   for(const part of e.parts){part.batch.setMatrixAt(part.index,e.removed||e.wreck!==part.wreck?zero:dummy.matrix);part.batch.instanceMatrix.needsUpdate=true;}
  }
- setState(state){const e=this.entries.get(state.id);if(!e)return;for(const k of ['p','q','wreck','sleeping','removed','burn'])if(state[k]!==undefined)e[k]=Array.isArray(state[k])?[...state[k]]:state[k];this.apply(e);}
+ setState(state){const e=this.entries.get(state.id);if(!e)return;for(const k of ['p','q','wreck','driving','sleeping','removed','burn'])if(state[k]!==undefined)e[k]=Array.isArray(state[k])?[...state[k]]:state[k];this.apply(e);}
  pose(id,p,q){const e=this.entries.get(id);if(!e||e.sleeping||e.removed)return;this.setState({id,p,q});}
- reset(){for(const e of this.entries.values()){const p=e.prop;this.setState({id:e.id,p:[p.position[0],p.position[1]+p.size[1]/2,p.position[2]],q:[0,Math.sin(p.yaw/2),0,Math.cos(p.yaw/2)],wreck:false,sleeping:true,removed:false,burn:0});}}
+ reset(){for(const e of this.entries.values()){const p=e.prop;this.setState({id:e.id,p:[p.position[0],p.position[1]+p.size[1]/2,p.position[2]],q:[0,Math.sin(p.yaw/2),0,Math.cos(p.yaw/2)],wreck:false,driving:!!p.traffic,sleeping:true,removed:false,burn:0});}}
  *boxes(){for(const e of this.entries.values())if(!e.removed)yield e.box;}
  update(dt,fx){
   for(const e of this.entries.values())if(e.burn>0&&!e.removed){e.burn=Math.max(0,e.burn-dt);e.smokeAt=(e.smokeAt||0)-dt;if(fx&&e.smokeAt<=0){e.smokeAt=.22;const p=[e.p[0],e.p[1]+e.prop.size[1]*.1,e.p[2]];fx.particle(fx.smoke,p,{v:new T.Vector3(0,2,0),life:1.5,size:.9,color:new T.Color(0x252a2c),growth:2,opacity:.6});if(e.burn>3)fx.particle(fx.flares,p,{life:.2,size:.7,color:new T.Color(0xff7525),growth:1});}}
