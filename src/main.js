@@ -17,8 +17,9 @@ import {FlightFX} from './flight-fx.js';
 import {XRControl} from './xr.js';
 import {GameAudio} from './audio.js';
 import {GameRenderer} from './render/renderer.js';
-import {state, quest, me, $} from './app/state.js';
+import {state, quest, touch, me, $} from './app/state.js';
 import {Input, lockPointer} from './app/input.js';
+import {TouchControls} from './app/touch.js';
 import {CameraRig} from './app/camera.js';
 import {Shake} from './app/shake.js';
 import {Prediction} from './app/prediction.js';
@@ -27,11 +28,13 @@ import {RoundEnding} from './app/round-end.js';
 import {makeEventHandler} from './app/events.js';
 import {bindLobby, notice} from './app/lobby.js';
 const canvas = $('world');
-let gr; try{ gr = new GameRenderer(canvas, {quest}); }catch(e){ notice(e.message); throw e; }
+document.body.classList.toggle('touch', touch);
+if(touch) $('menu-button').textContent = 'MENU';
+let gr; try{ gr = new GameRenderer(canvas, {quest, touch}); }catch(e){ notice(e.message); throw e; }
 const renderer = gr.renderer, tier = gr.tier;
 const scene = new T.Scene(); scene.background = new T.Color(city.sky.horizon);
 const camera = new T.PerspectiveCamera(72, innerWidth / innerHeight, .05, tier.far), rig = new T.Group(); rig.add(camera); scene.add(rig);
-const cityView = new CityView(scene, city, {tier, quest});
+const cityView = new CityView(scene, city, {tier, quest:quest || touch});
 const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(scene), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
 const net = new Connection(onMessage, onDisconnect), hud = new HUD(), cameraRig = new CameraRig(camera, rig, cityView, shake, prediction);
 const players = new Map(), rags = new Map();
@@ -43,23 +46,25 @@ const input = new Input(canvas, {
  onChargeStart(){ audio.play('charge'); }, onHeavyFire(){}, onChargeCancel(){ hud.toast('BREACH NEEDS A FULL CHARGE', 1); },
  onScoreboard(show){ if(state.playing && !state.current?.phase) hud.setScoreboardVisible(show); }
 });
+const touchControls = touch ? new TouchControls(input) : null;
 const xr = new XRControl(renderer, camera, rig, net, {onEnter(){ document.exitPointerLock?.(); document.body.classList.add('xr-active'); hud.hideOverlay(); input.reset(); }, onExit(){ document.body.classList.remove('xr-active'); if(state.playing) hud.showOverlay('VR SESSION ENDED', 'Re-enter VR or use desktop giant controls.', {renderer, net}); }});
 xr.localImpact = (a, b, speed, side) => { const hit = resolveHand(a, b, xr.local?.[side + 'Quaternion'] || [0,0,0,1], cityView.handWorld).contacts.find(hit => hit.cell); if(!hit) return false; const c = cityView.getCell(hit.cell); fx.impact(hit.point, Math.min(1, speed / 30) * .5, c.material); xr.hapticMaterial(c.material, .2); return true; };
-const views = new SpectatorViews(renderer, scene, camera, {getState:() => state.current, getRole:() => state.role, getPlayerId:() => net.id, getMode:() => state.role === 'boss' ? 'Desktop giant' : state.firstPerson ? 'Desktop first person' : 'Desktop third person', getPaused:() => state.paused, getTracking:() => !xr.trackingStopped, players, giant, xr});
+const views = new SpectatorViews(renderer, scene, camera, {getState:() => state.current, getRole:() => state.role, getPlayerId:() => net.id, getMode:() => `${touch ? 'Mobile' : 'Desktop'} ${state.role === 'boss' ? 'giant' : state.firstPerson ? 'first person' : 'third person'}`, getPaused:() => state.paused, getTracking:() => !xr.trackingStopped, players, giant, xr});
+views.mobile = touch;
 const listenerPosition = () => [camera.matrixWorld.elements[12], camera.matrixWorld.elements[13], camera.matrixWorld.elements[14]];
 const ending=new RoundEnding({scene,giant,fx,audio,hud,shake,xr,net,renderer,listenerPosition});
 const handleEvent = makeEventHandler({city:cityView, fx, audio, hud, shake, xr, missiles, flightFX, giant, ending, addRag, rags, listenerPosition});
 const lobby = bindLobby({
  start, leave, toggleCamera, resume(){ if(state.role === 'boss' && quest) hud.hideOverlay(); else pointer(); }, menu(){ input.reset(); hud.showOverlay(undefined, undefined, {renderer, net}); },
  openSpectator(){ if(state.role === 'spectator'){ document.exitPointerLock?.(); hud.hideOverlay(); input.reset(); views.setVisible(true); } else { const url = new URL(location.href); url.searchParams.set('spectator', '1'); window.open(url.toString(), '_blank', 'noopener'); } },
- freeCamera(){ views.setVisible(false); hud.showOverlay('FREE CAMERA', 'WASD moves; Space and C change height; Shift is fast. Use LIVE VIEWS to return to the panel.', {renderer, net}); },
+ freeCamera(){ views.setVisible(false); hud.showOverlay('FREE CAMERA', touch ? 'Drag left to fly and right to look. UP and DOWN change height. LIVE VIEWS returns to the panel.' : 'WASD moves; Space and C change height; Shift is fast. Use LIVE VIEWS to return to the panel.', {renderer, net}); },
  restart(){ net.send({type:'restart'}); },
  async enterVR(){ hud.hideOverlay(); audio.unlock(); try{ await xr.enter(); }catch(e){ hud.showOverlay('VR COULD NOT START', e.message, {renderer, net}); } },
  async copyLink(){ const u = new URL(location.href); u.searchParams.set('room', net.room); try{ await navigator.clipboard.writeText(u.toString()); hud.toast('INVITE LINK COPIED'); }catch{ hud.toast(`ROOM CODE / ${net.room}`, 5); } },
  settings(s){ xr.setSettings(s); }
 });
-function toggleCamera(){ if(state.role !== 'raider' || renderer.xr.isPresenting) return; state.firstPerson = !state.firstPerson; $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V'; }
-function pointer(){ hud.hideOverlay(); audio.unlock(); lockPointer(canvas, () => hud.showOverlay('CLICK THE CITY TO PLAY', 'Your browser needs a fresh click to lock the pointer.', {renderer, net})); }
+function toggleCamera(){ if(state.role !== 'raider' || renderer.xr.isPresenting) return; state.firstPerson = !state.firstPerson; $('camera-toggle').textContent = `SWITCH TO ${state.firstPerson ? 'THIRD' : 'FIRST'} PERSON${touch ? '' : ' · V'}`; }
+function pointer(){ hud.hideOverlay(); audio.unlock(); if(touch){ touchControls.update(); return; } lockPointer(canvas, () => hud.showOverlay('CLICK THE CITY TO PLAY', 'Your browser needs a fresh click to lock the pointer.', {renderer, net})); }
 // Generate a short roster label now that the lobby has no callsign field.
 const tag = Math.random().toString(16).slice(2, 5).toUpperCase();
 const callsign = role => `${role === 'boss' ? 'COLOSSUS' : role === 'spectator' ? 'WATCH' : 'DEFENDER'}-${tag}`;
@@ -70,11 +75,13 @@ async function start(create = false, practice = false, spectator = false){
   const m = await net.connect({create, practice, role:wanted, room:$('room-input').value.trim().toUpperCase(), name:callsign(wanted)});
   state.playing = true; document.body.classList.add('playing'); $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden');
   const role = state.role;
+  touchControls?.install(role);
   $('controls').textContent = role === 'boss' ? 'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY' : role === 'spectator' ? 'WASD FLY · SPACE UP · C DOWN · SHIFT FAST · MOUSE LOOK' : 'WASD MOVE · SPACE FLY · HOLD SHIFT SOAR · E DODGE · CLICK FIRE · HOLD RIGHT CLICK: BREACH SHOT · V CAMERA · TAB SCORES';
   $('flight-status').classList.toggle('hidden', role !== 'raider'); $('telemetry').classList.toggle('hidden', role !== 'raider'); $('aim').classList.toggle('hidden', role !== 'raider'); $('vr-button').classList.toggle('hidden', role !== 'boss');
-  if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE COLOSSUS.', 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
+  if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE COLOSSUS.', touch ? 'Drag left to move and right to look. Hold SWEEP and drag to aim. SLAM hits the ground; MISSILE fires rockets.' : 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
-  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift to soar and smash through buildings; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant.', {renderer, net});
+  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', touch ? 'Drag left to move and right to look. Hold THRUST to rise; tap SOAR to fly. Hold FIRE and drag to aim. Hold BREACH until charged, then release.' : 'Space lifts you. Hold Shift to soar and smash through buildings; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant.', {renderer, net});
+  touchControls?.update();
   if(m.result)hud.hideOverlay();
   const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
@@ -82,7 +89,7 @@ async function start(create = false, practice = false, spectator = false){
 }
 function onMessage(m){
  if(m.type === 'welcome'){
-  ending.reset();cameraRig.endShot=null;
+  ending.reset();cameraRig.endShot=null;input.reset();
   state.welcome = m; state.role = m.role; state.localId = m.id; views.connect(m); missiles.reset(); for(const missile of m.missiles || []) missiles.add(missile);
   state.current = null; state.previousPhase = 0; xr.resetPose(); cityView.reset();for(const block of m.blocks||[])cityView.stream?.state(block); for(const r of rags.values()) r.dispose(); rags.clear(); for(const p of players.values()) p.dispose(); players.clear();
   for(const car of m.cars||[])cityView.cars.setState(car);cityView.hideCells(m.clearedCells || []); for(const s of m.skins || []) cityView.setSkin(s[0], s[1], s[2], false); for(const e of m.entities) cityView.addDebris(e); for(const r of m.rags) addRag(r); cityView.commit();
@@ -106,6 +113,7 @@ function onDisconnect(){
  hud.showOverlay('CONNECTION LOST', 'The shared simulation is no longer connected. Leave and rejoin the room; do not trust frozen positions.', {renderer, net}); $('resume').classList.add('hidden');
 }
 function leave(){
+ touchControls?.detach();
  ending.reset();cameraRig.endShot=null;
  views.setVisible(false); views.disconnect(); missiles.reset(); input.soar = false; net.close(); state.playing = false; state.current = null; input.reset(); document.exitPointerLock?.(); if(xr.session) xr.session.end().catch(() => {});
  document.body.classList.remove('playing', 'xr-active'); $('lobby').classList.remove('hidden'); $('hud').classList.add('hidden'); $('overlay').classList.add('hidden'); $('resume').classList.remove('hidden'); $('scoreboard').classList.add('hidden');
@@ -131,7 +139,7 @@ function frame(now, xrFrame){
  gr.adapt(dt, now);
  const s = net.sample();
  if(state.playing && s){
-  state.current = s;
+  state.current = s; touchControls?.update(now);
   const local = xr.update(xrFrame, s, now), presenting = renderer.xr.isPresenting;
   ending.update(s);
   if(!ending.defeated)giant.update(local || s, {local:presenting || state.role === 'boss', stagger:s.bossStagger || 0, collisionWorld:presenting ? cityView.handWorld : null});
@@ -165,7 +173,7 @@ function frame(now, xrFrame){
   giant.update({head:[0, 24, 0], left:[-6, 13 + Math.sin(t * 5), -3], right:[6, 12 + Math.cos(t * 5), -4], bossYaw:-.35});
   cameraRig.intro(now, city);
  }
- missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, state.role==='raider'&&prediction.active?localOverride:me(state.current), state.playing && !state.current?.phase && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
+ missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, state.role==='raider'&&prediction.active?localOverride:me(state.current), state.playing && !state.current?.phase && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting && !touch);
  cityView.update(dt);cityView.cars.update(dt,fx); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
  renderer.info.reset();
  if(!(state.playing && state.role === 'spectator' && views.visible)) gr.render(scene, camera, dt);
@@ -176,12 +184,12 @@ window.addEventListener('resize', () => gr.resize(camera));
 input.bind();
 // Pointer lock sends clicks to the canvas, so the controls panel needs a key.
 addEventListener('keydown', e => { if(e.code === 'KeyH' && state.playing && !e.repeat){ const p = $('controls-panel'); if(p) p.open = !p.open; } });
-canvas.addEventListener('click', () => { if(state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
-document.addEventListener('pointerlockchange', () => { if(state.playing && !state.current?.phase && !ending.result && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
+canvas.addEventListener('click', () => { if(!touch && state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
+document.addEventListener('pointerlockchange', () => { if(!touch && state.playing && !state.current?.phase && !ending.result && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
 const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, fx.ready, flightFX.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(''); });
 if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.then(() => start(false, false, true));
 // Keep practice available by URL after removing its lobby button.
 if(lobby.params.get('practice') === '1') artReady.then(() => start(true, true));
 window.COLOSSUS_READY = true; notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test and profiling tools.
-window.__COLOSSUS = {renderer, gameRenderer:gr, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, ending, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};
+window.__COLOSSUS = {renderer, gameRenderer:gr, input, touch, touchControls, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, ending, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};

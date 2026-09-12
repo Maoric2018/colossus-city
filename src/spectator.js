@@ -69,7 +69,7 @@ export class SpectatorViews{
    }}
    return;
   }
-  const stream=this.stream,headset=this.renderer.xr.isPresenting,interval=this.captureBudget.interval(headset?24:30),frameMS=1000/(headset?(this.xr?.session?.frameRate||72):60),workMS=frameStart===undefined?NaN:performance.now()-frameStart;
+  const stream=this.stream,headset=this.renderer.xr.isPresenting,interval=this.captureBudget.interval(headset?24:this.mobile?12:30),frameMS=1000/(headset?(this.xr?.session?.frameRate||72):60),workMS=frameStart===undefined?NaN:performance.now()-frameStart;
   if(!this.active||!stream||now-this.lastFrame<interval-.5)return;
   if(!this.captureBudget.allow(workMS,frameMS))return;
   this.lastFrame+=Math.max(1,Math.floor((now-this.lastFrame+.5)/interval))*interval;

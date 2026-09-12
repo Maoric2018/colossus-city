@@ -1,0 +1,81 @@
+/* Mobile controls adapted from ui/attack-on-titan. Keep the aiming area clear; safe-area
+   insets protect controls from notches and the home indicator in either orientation. */
+#touch-layer{position:fixed;inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);z-index:4;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#tc-stick{position:absolute;left:0;top:0;width:0;height:0;transform:translate(86px,calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 120px));opacity:.35;pointer-events:none}
+#tc-stick.on{opacity:1}
+#tc-stick::before{content:'';position:absolute;left:-56px;top:-56px;width:112px;height:112px;border-radius:50%;border:1px solid #e3ecdc66;background:#0a191b40}
+#tc-stick::after{content:'MOVE';position:absolute;top:-76px;left:-30px;width:60px;text-align:center;font:9px monospace;letter-spacing:2px;color:#eff8e8}
+#tc-stick.on::after{content:''}
+#tc-stick i{position:absolute;left:-24px;top:-24px;width:48px;height:48px;border-radius:50%;background:#d2e2d52b;border:2px solid #eef8e899}
+.tc-btn{position:absolute;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;border-radius:50%;border:1px solid #e3ecdc70;background:#0a191b99;color:#f1f7ec;font:600 10px/1 monospace;letter-spacing:1px;padding:0;-webkit-tap-highlight-color:transparent;touch-action:none;text-shadow:0 1px 4px #000}
+.tc-btn small{font:8px monospace;letter-spacing:.5px;color:#cbd6c3;pointer-events:none}
+.tc-btn small:empty{display:none}
+.tc-btn.down,.tc-btn.on{background:#344832bc;border-color:#d9f0b4;color:#efffd2;box-shadow:0 0 0 3px #d9f0b41c}
+.tc-btn.unavailable{border-color:#e3ecdc35;color:#a1aca1;background:#0a191b88}
+.tc-btn.unavailable small{color:#b8bfb3}
+.tc-heavy.down{background:radial-gradient(circle,#18251df2 64%,transparent 66%),conic-gradient(#d9c18d calc(var(--charge,0)*360deg),#d9c18d22 0)}
+.tc-fire{right:12px;bottom:14px;width:88px;height:88px;font-size:12px}
+.tc-thrust{right:112px;bottom:24px;width:70px;height:70px}
+.tc-soar{right:24px;bottom:116px;width:66px;height:66px}
+.tc-dodge{right:116px;bottom:110px;width:62px;height:62px}
+.tc-heavy{right:200px;bottom:26px;width:68px;height:68px}
+.tc-descend{left:156px;bottom:20px;width:52px;height:52px;font-size:9px}
+body.touch{overscroll-behavior:none}
+body.touch #world{touch-action:none}
+body.touch #flight-effects,body.touch #brand,body.touch #status,body.touch #controls-panel,body.touch #roster,body.touch #performance,body.touch #capture-status,body.touch #vr-button,body.touch #vr-settings{display:none!important}
+/* HUD descendants must escape its stacking context to keep MENU above the touch surface. */
+body.touch #hud{position:static;z-index:auto;pointer-events:none}
+body.touch #hud>div{z-index:3}
+body.touch #menu-button,body.touch #open-spectator{z-index:6;pointer-events:auto;min-height:44px;min-width:64px;padding:12px;font:10px monospace;background:#0a191b99;border:1px solid #e3ecdc40;touch-action:manipulation}
+body.touch #menu-button{top:calc(env(safe-area-inset-top,0px) + 8px);left:calc(env(safe-area-inset-left,0px) + 12px);bottom:auto}
+body.touch #open-spectator{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:calc(env(safe-area-inset-left,0px) + 12px);right:auto}
+body.touch #copy-link{display:none}
+body.touch #boss-health{top:calc(env(safe-area-inset-top,0px) + 12px);width:48vw}
+body.touch #boss-health>div:first-child{font-size:8px;letter-spacing:.5px;margin-bottom:6px}
+body.touch #round-info{top:calc(env(safe-area-inset-top,0px) + 8px);right:calc(env(safe-area-inset-right,0px) + 12px);gap:2px}
+body.touch #timer{font-size:20px}
+body.touch #telemetry{left:calc(env(safe-area-inset-left,0px) + 12px);bottom:auto;top:calc(env(safe-area-inset-top,0px) + 66px);gap:14px}
+body.touch #telemetry>div{gap:5px}
+body.touch #telemetry b{font-size:18px}
+body.touch #telemetry span{font-size:8px}
+body.touch .fuel{width:66px}
+body.touch #score{display:none}
+body.touch #flight-status{top:calc(env(safe-area-inset-top,0px) + 114px);bottom:auto;left:calc(env(safe-area-inset-left,0px) + 12px);transform:none;text-align:left;font-size:9px;gap:3px}
+body.touch #flight-mode{font-size:12px;letter-spacing:1px}
+body.touch #dodge-readout,body.touch #heavy-readout,body.touch #score-readout{display:none}
+body.touch #toast{top:22%;font-size:10px;letter-spacing:1px;width:60vw}
+body.touch #scoreboard{min-width:0;width:94vw;font-size:11px}
+body.touch #scoreboard th,body.touch #scoreboard td{padding:6px 10px}
+body.touch #overlay>div{width:min(470px,92vw);padding:20px;max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+body.touch #overlay h2{font-size:24px;margin:0 0 12px}
+body.touch #overlay p{font-size:12px;margin:8px 0;line-height:1.5}
+body.touch #overlay .primary,body.touch #overlay .secondary{margin-top:9px;padding:12px}
+body.touch .primary,body.touch .secondary,body.touch #leave,body.touch #camera-toggle{min-height:44px;touch-action:manipulation}
+body.touch #lobby{top:50%;bottom:auto;left:50%;transform:translate(-50%,-50%);width:505px;max-width:calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px) - 32px);max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 32px);overflow-y:auto;padding:0;scrollbar-width:thin}
+body.touch #lobby .role{padding:12px 10px;min-width:0}
+body.touch #lobby .role span{font-size:8px;letter-spacing:.5px;line-height:1.5}
+body.touch #lobby .role strong{font-size:14px;letter-spacing:0}
+body.touch #lobby .role b{display:none}
+body.touch #room-input{font-size:16px;padding:14px;letter-spacing:4px}
+body.touch #notice{margin:8px 0 0;min-height:15px}
+body.touch #spectator-panel{padding:calc(env(safe-area-inset-top,0px) + 16px) calc(env(safe-area-inset-right,0px) + 16px) calc(env(safe-area-inset-bottom,0px) + 16px) calc(env(safe-area-inset-left,0px) + 16px)}
+body.touch .spectator-toolbar{flex-wrap:wrap;gap:12px;margin-bottom:12px}
+body.touch .spectator-toolbar h2{font-size:20px}
+body.touch .spectator-toolbar>div:last-child{display:flex;gap:8px}
+body.touch #spectator-grid{grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))}
+@media(max-width:550px){
+ body.touch #boss-health{top:calc(env(safe-area-inset-top,0px) + 66px);width:calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px) - 24px)}
+ body.touch #telemetry{top:calc(env(safe-area-inset-top,0px) + 100px)}
+ body.touch #flight-status{top:calc(env(safe-area-inset-top,0px) + 152px)}
+ .tc-fire{width:78px;height:78px;bottom:22px}
+ .tc-thrust{right:102px;width:64px;height:64px;bottom:28px}
+ .tc-soar{right:20px;bottom:112px;width:62px;height:62px}
+ .tc-dodge{right:102px;bottom:104px;width:60px;height:60px}
+ .tc-heavy{right:20px;bottom:186px;width:62px;height:62px}
+ .tc-descend{left:24px;bottom:20px}
+ #tc-stick{transform:translate(78px,calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 132px))}
+ body.touch #lobby .role strong{font-size:12px}
+ body.touch #lobby .role-picker{gap:6px}
+ body.touch #lobby .role span{min-height:24px}
+ body.touch #spectator-room{margin-bottom:12px}
+}

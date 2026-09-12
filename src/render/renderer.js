@@ -8,11 +8,13 @@ import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {TIERS, detectTier, gpuName} from './quality.js';
 export class GameRenderer {
- constructor(canvas, {quest = false} = {}){
+ constructor(canvas, {quest = false, touch = false} = {}){
   let renderer;
-  try{ renderer = new T.WebGLRenderer({canvas, antialias:!quest, alpha:false, powerPreference:'high-performance', stencil:false}); }
+  try{ renderer = new T.WebGLRenderer({canvas, antialias:!quest && !touch, alpha:false, powerPreference:'high-performance', stencil:false}); }
   catch(e){ throw Error('WebGL 2 is unavailable. Enable hardware acceleration in your browser.'); }
-  this.renderer = renderer; this.quest = quest; this.tierName = detectTier(renderer, quest); this.tier = TIERS[this.tierName]; this.gpu = gpuName(renderer);
+  this.renderer = renderer; this.quest = quest; this.touch = touch; this.tierName = detectTier(renderer, quest, touch); this.tier = TIERS[this.tierName]; this.gpu = gpuName(renderer);
+  // A DPR-3 phone would otherwise shade nine times the pixels of its CSS viewport.
+  this.minScale = touch ? .5 : .6;
   this.cinematic = false; this.scale = 1; this.frameEMA = 16; this.lastAdjust = performance.now(); this.composer = null; this.adaptive = true;
   renderer.setSize(innerWidth, innerHeight); renderer.info.autoReset = false;
   renderer.shadowMap.enabled = this.tier.shadows; renderer.shadowMap.type = T.PCFShadowMap;
@@ -20,7 +22,7 @@ export class GameRenderer {
   renderer.xr.enabled = true; renderer.xr.setFramebufferScaleFactor(this.tier.xrScale); renderer.xr.setFoveation(1);
   this.applyScale(this.targetRatio());
  }
- targetRatio(){ return this.cinematic ? Math.min(devicePixelRatio, TIERS.high.pixelRatio) : Math.min(devicePixelRatio, this.tier.pixelRatio); }
+ targetRatio(){ return Math.min(devicePixelRatio, this.touch ? 1 : Infinity, this.cinematic ? TIERS.high.pixelRatio : this.tier.pixelRatio); }
  applyScale(ratio){ this.scale = ratio; this.renderer.setPixelRatio(ratio); this.composer?.setPixelRatio(ratio); this.composer?.setSize(innerWidth, innerHeight); }
  resize(camera){ camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer?.setSize(innerWidth, innerHeight); }
  ensureComposer(scene, camera){
@@ -43,7 +45,7 @@ export class GameRenderer {
   this.frameEMA += (dt * 1000 - this.frameEMA) * .06;
   if(now - this.lastAdjust < 1200) return;
   const target = this.targetRatio();
-  if(this.frameEMA > 20 && this.scale > .6){ this.applyScale(Math.max(.6, this.scale - .1)); this.lastAdjust = now; }
+  if(this.frameEMA > 20 && this.scale > this.minScale){ this.applyScale(Math.max(this.minScale, this.scale - .1)); this.lastAdjust = now; }
   else if(this.frameEMA < 12.5 && this.scale < target){ this.applyScale(Math.min(target, this.scale + .05)); this.lastAdjust = now; }
  }
  render(scene, camera, dt){

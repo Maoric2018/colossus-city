@@ -2,7 +2,7 @@
 // scoreboard and the pause overlay. Updated at 10 Hz except for the cheap per-frame bits.
 import {C, F} from '../../shared/config.js';
 import {bossHealthFraction} from '../../shared/boss-health.js';
-import {state, me, $} from './state.js';
+import {state, touch, me, $} from './state.js';
 const escapeText = value => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export class HUD {
  constructor(){
@@ -11,11 +11,11 @@ export class HUD {
  toast(text, seconds = 2){ $('toast').textContent = text; this.toastUntil = performance.now() + seconds * 1000; }
  hit(weak){ this.hitUntil = performance.now() + (weak ? 160 : 100); $('hit-marker').classList.toggle('weak', !!weak); }
  flash(ms){ this.flashUntil = performance.now() + ms; }
- showOverlay(title = 'READY TO DROP?', text = 'Click to capture your mouse. Escape releases it.', {renderer, net} = {}){
+ showOverlay(title = 'READY TO DROP?', text = touch ? 'Drag left to move and right to look. MENU pauses your controls.' : 'Click to capture your mouse. Escape releases it.', {renderer, net} = {}){
   if(renderer?.xr.isPresenting) return; state.paused = true; $('overlay-title').textContent = title; $('overlay-text').textContent = text; $('overlay').classList.remove('hidden');
-  $('camera-toggle').classList.toggle('hidden', state.role !== 'raider'); $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V';
+  $('camera-toggle').classList.toggle('hidden', state.role !== 'raider'); $('camera-toggle').textContent = `SWITCH TO ${state.firstPerson ? 'THIRD' : 'FIRST'} PERSON${touch ? '' : ' · V'}`;
   for(const id of ['menu-spectator', 'open-spectator']) $(id).classList.toggle('hidden', state.role !== 'spectator');
-  $('resume').textContent = state.role === 'boss' ? 'DESKTOP CONTROLS ↗' : 'DEPLOY ↗'; $('restart').classList.toggle('hidden', !state.current?.phase || net?.id !== state.welcome?.host);
+  $('resume').textContent = touch ? 'CONTINUE ↗' : state.role === 'boss' ? 'DESKTOP CONTROLS ↗' : 'DEPLOY ↗'; $('restart').classList.toggle('hidden', !state.current?.phase || net?.id !== state.welcome?.host);
  }
  hideOverlay(){ state.paused = false; $('overlay').classList.add('hidden'); }
  scoreboard(players, winner){
@@ -35,8 +35,8 @@ export class HUD {
   if(p){
    $('hp').textContent = Math.ceil(p.hp); $('fuel-fill').style.width = `${p.fuel * 100}%`; $('altitude').textContent = `${Math.max(0, p.p[1]).toFixed(0).padStart(2, '0')}m`;
    $('flight-mode').textContent = p.flags & F.DODGE ? 'DODGE' : p.flags & F.SOAR ? 'SOARING ∞' : 'HOVER'; $('speed-readout').textContent = `${Math.round(Math.hypot(...p.v))} m/s`;
-   $('dodge-readout').textContent = p.dodgeCooldown > 0 ? `DODGE ${p.dodgeCooldown.toFixed(1)}s` : p.fuel < C.DODGE_FUEL ? 'DODGE · RECHARGING' : 'DODGE READY · E';
-   $('heavy-readout').textContent = p.heavyCooldown > 0 ? `BREACH ${p.heavyCooldown.toFixed(1)}s` : p.fuel < C.HEAVY_FUEL ? 'BREACH · LOW THRUST' : 'BREACH READY · HOLD RIGHT CLICK';
+   $('dodge-readout').textContent = p.dodgeCooldown > 0 ? `DODGE ${p.dodgeCooldown.toFixed(1)}s` : p.fuel < C.DODGE_FUEL ? 'DODGE · RECHARGING' : touch ? 'DODGE READY' : 'DODGE READY · E';
+   $('heavy-readout').textContent = p.heavyCooldown > 0 ? `BREACH ${p.heavyCooldown.toFixed(1)}s` : p.fuel < C.HEAVY_FUEL ? 'BREACH · LOW THRUST' : touch ? 'BREACH READY' : 'BREACH READY · HOLD RIGHT CLICK';
    $('score-readout').textContent = `SCORE ${Math.round(p.score)}`;
    if(p.hp < this.lastHP) this.flash(240); this.lastHP = p.hp;
   }
