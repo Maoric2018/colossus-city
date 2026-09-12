@@ -23,7 +23,7 @@ try{
   return {id:crown.id,p:crown.p,bays:view.cells.filter(c=>c.architecture==='chrysler').length,types:[...types].filter(t=>t.startsWith('chrysler')).length};
  },key);
  const host=await inspect(page,spawned.key);assert.equal(host.types,35);assert.ok(await page.evaluate(key=>window.chryslerBefore!==window.__COLOSSUS.city.stream.views.get(key),spawned.key),'an existing preview rebuilds for the spawned landmark');
- await page.evaluate(()=>{for(const id of ['lobby','brand','status','scene-caption','vignette','overlay','hud'])document.getElementById(id).style.display='none';});await page.screenshot({path:'artifacts/chrysler-spawned.png'});
+ await page.evaluate(()=>{for(const id of ['lobby','brand','status','vignette','overlay','hud'])document.getElementById(id)?.style.setProperty('display','none');});await page.screenshot({path:'artifacts/chrysler-spawned.png'});
  const spectator=await browser.newPage({viewport:{width:1000,height:700}});watch(spectator);await spectator.goto(url+`/?quality=quest&room=${spawned.room}`);await spectator.waitForFunction(()=>window.COLOSSUS_ART_READY);await spectator.locator('[data-role="spectator"]').click();await spectator.locator('#join').click();await spectator.waitForFunction(()=>window.__COLOSSUS.role==='spectator');await spectator.waitForFunction(key=>window.__COLOSSUS.city.stream.records.get(key)?.landmark==='chrysler',spawned.key);
  assert.ok(await spectator.locator('#spawn-chrysler').isHidden());const late=await inspect(spectator,spawned.key);assert.deepEqual(late,host);
  const persistence=await page.evaluate(async key=>{

@@ -12,7 +12,7 @@ try{
  browser=await chromium.launch({headless:false,channel:'chromium',args:['--enable-webgl','--ignore-gpu-blocklist','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
  const page=await browser.newPage({viewport:{width:1500,height:950}});page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.setDefaultTimeout(60000);
  await page.goto(url+'/?quality=low');await page.waitForFunction(()=>window.COLOSSUS_ART_READY);
- await page.evaluate(()=>{const {renderer,giant}=window.__COLOSSUS;renderer.setAnimationLoop(null);giant.root.visible=false;for(const id of ['lobby','brand','status','scene-caption','vignette'])document.getElementById(id).style.display='none';});
+ await page.evaluate(()=>{const {renderer,giant}=window.__COLOSSUS;renderer.setAnimationLoop(null);giant.root.visible=false;for(const id of ['lobby','brand','status','vignette'])document.getElementById(id)?.style.setProperty('display','none');});
  const tours=[['infinite-city',[720,32,570],[700,22,530]],['infinite-street',[595,13,480],[615,12,440]],['infinite-distant',[-1240,24,-670],[-1260,24,-700]]],stats=[];
  for(const [name,position,target]of tours){
   const sample=await page.evaluate(async({position,target})=>{

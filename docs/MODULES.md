@@ -41,6 +41,7 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
   main.js          bootstrap and the frame loop only. Wires the modules below together.
   app/state.js     shared client state object + $ helper
   app/input.js     keyboard/mouse -> input packets, breach charge, sequence counters
+  app/touch.js     on-screen stick, look drag and action pads; writes Input.touch (phones)
   app/prediction.js client-side prediction + reconciliation for the local raider
   app/camera.js    desktop cameras (predicted raider, dead-reckoned giant, spectator, intro)
   app/shake.js     trauma camera shake (desktop only; never in XR)

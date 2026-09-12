@@ -17,8 +17,9 @@ import {FlightFX} from './flight-fx.js';
 import {XRControl} from './xr.js';
 import {GameAudio} from './audio.js';
 import {GameRenderer} from './render/renderer.js';
-import {state, quest, me, $} from './app/state.js';
+import {state, quest, touch, me, $} from './app/state.js';
 import {Input, lockPointer} from './app/input.js';
+import {TouchControls} from './app/touch.js';
 import {CameraRig} from './app/camera.js';
 import {Shake} from './app/shake.js';
 import {Prediction} from './app/prediction.js';
@@ -26,7 +27,8 @@ import {HUD} from './app/hud.js';
 import {makeEventHandler} from './app/events.js';
 import {bindLobby, notice} from './app/lobby.js';
 const canvas = $('world');
-let gr; try{ gr = new GameRenderer(canvas, {quest}); }catch(e){ notice(e.message); throw e; }
+document.body.classList.toggle('touch', touch);
+let gr; try{ gr = new GameRenderer(canvas, {quest, touch}); }catch(e){ notice(e.message); throw e; }
 const renderer = gr.renderer, tier = gr.tier;
 const scene = new T.Scene(); scene.background = new T.Color(city.sky.horizon);
 const camera = new T.PerspectiveCamera(72, innerWidth / innerHeight, .05, tier.far), rig = new T.Group(); rig.add(camera); scene.add(rig);
@@ -42,9 +44,11 @@ const input = new Input(canvas, {
  onChargeStart(){ audio.play('charge'); }, onHeavyFire(){}, onChargeCancel(){ hud.toast('BREACH NEEDS A FULL CHARGE', 1); },
  onScoreboard(show){ if(state.playing && !state.current?.phase) hud.setScoreboardVisible(show); }
 });
+const touchControls = touch ? new TouchControls(input, {onSoar(on){ audio.play('ui'); hud.toast(on ? 'SOARING · SMASH THROUGH BUILDINGS' : 'HOVER', 1.4); }, onBlocked(){ hud.toast('BREACH RECHARGING', 1); }}) : null;
 const xr = new XRControl(renderer, camera, rig, net, {onEnter(){ document.exitPointerLock?.(); document.body.classList.add('xr-active'); hud.hideOverlay(); input.reset(); }, onExit(){ document.body.classList.remove('xr-active'); if(state.playing) hud.showOverlay('VR SESSION ENDED', 'Re-enter VR or use desktop giant controls.', {renderer, net}); }});
 xr.localImpact = (a, b, speed, side) => { const hit = resolveHand(a, b, xr.local?.[side + 'Quaternion'] || [0,0,0,1], cityView.handWorld).contacts.find(hit => hit.cell); if(!hit) return false; const c = cityView.getCell(hit.cell); fx.impact(hit.point, Math.min(1, speed / 30) * .5, c.material); xr.hapticMaterial(c.material, .2); return true; };
 const views = new SpectatorViews(renderer, scene, camera, {getState:() => state.current, getRole:() => state.role, getPlayerId:() => net.id, getMode:() => state.role === 'boss' ? 'Desktop giant' : state.firstPerson ? 'Desktop first person' : 'Desktop third person', getPaused:() => state.paused, getTracking:() => !xr.trackingStopped, players, giant, xr});
+views.noCapture = touch;
 const listenerPosition = () => [camera.matrixWorld.elements[12], camera.matrixWorld.elements[13], camera.matrixWorld.elements[14]];
 const handleEvent = makeEventHandler({city:cityView, fx, audio, hud, shake, xr, missiles, flightFX, giant, addRag, rags, listenerPosition});
 const lobby = bindLobby({
@@ -57,7 +61,12 @@ const lobby = bindLobby({
  settings(s){ xr.setSettings(s); }
 });
 function toggleCamera(){ if(state.role !== 'raider' || renderer.xr.isPresenting) return; state.firstPerson = !state.firstPerson; $('camera-toggle').textContent = state.firstPerson ? 'SWITCH TO THIRD PERSON · V' : 'SWITCH TO FIRST PERSON · V'; }
-function pointer(){ hud.hideOverlay(); audio.unlock(); lockPointer(canvas, () => hud.showOverlay('CLICK THE CITY TO PLAY', 'Your browser needs a fresh click to lock the pointer.', {renderer, net})); }
+function pointer(){
+ hud.hideOverlay(); audio.unlock();
+ // A phone has no pointer lock: the on-screen controls carry look and fire instead.
+ if(touch){ document.documentElement.requestFullscreen?.().catch(() => {}); return; }
+ lockPointer(canvas, () => hud.showOverlay('CLICK THE CITY TO PLAY', 'Your browser needs a fresh click to lock the pointer.', {renderer, net}));
+}
 // The callsign field was removed from the lobby, but the roster and the spectator
 // cards still label players, so each session generates a short one.
 const tag = Math.random().toString(16).slice(2, 5).toUpperCase();
@@ -70,10 +79,11 @@ async function start(create = false, practice = false, spectator = false){
   state.playing = true; document.body.classList.add('playing'); $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden');
   const role = state.role;
   $('controls').textContent = role === 'boss' ? 'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY' : role === 'spectator' ? 'WASD FLY · SPACE UP · C DOWN · SHIFT FAST · MOUSE LOOK' : 'WASD MOVE · SPACE FLY · HOLD SHIFT SOAR · E DODGE · CLICK FIRE · HOLD RIGHT CLICK: BREACH SHOT · V CAMERA · TAB SCORES';
+  touchControls?.install(role);
   $('flight-status').classList.toggle('hidden', role !== 'raider'); $('telemetry').classList.toggle('hidden', role !== 'raider'); $('aim').classList.toggle('hidden', role !== 'raider'); $('vr-button').classList.toggle('hidden', role !== 'boss');
   if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE TITAN.', 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
-  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift to soar and smash through buildings; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant.', {renderer, net});
+  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', touch ? 'Left thumb flies, drag the right side to look. THRUST lifts you, SOAR latches fast flight that smashes through buildings, FIRE also aims, DODGE evades and BREACH cracks columns.' : 'Space lifts you. Hold Shift to soar and smash through buildings; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant.', {renderer, net});
   const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
  finally{ $('create').disabled = $('join').disabled = false; }
@@ -103,7 +113,7 @@ function onDisconnect(){
  hud.showOverlay('CONNECTION LOST', 'The shared simulation is no longer connected. Leave and rejoin the room; do not trust frozen positions.', {renderer, net}); $('resume').classList.add('hidden');
 }
 function leave(){
- views.setVisible(false); views.disconnect(); missiles.reset(); input.soar = false; net.close(); state.playing = false; state.current = null; input.reset(); document.exitPointerLock?.(); if(xr.session) xr.session.end().catch(() => {});
+ views.setVisible(false); views.disconnect(); missiles.reset(); input.soar = false; net.close(); state.playing = false; state.current = null; input.reset(); touchControls?.detach(); document.exitPointerLock?.(); if(xr.session) xr.session.end().catch(() => {});
  document.body.classList.remove('playing', 'xr-active'); $('lobby').classList.remove('hidden'); $('hud').classList.add('hidden'); $('overlay').classList.add('hidden'); $('resume').classList.remove('hidden'); $('scoreboard').classList.add('hidden');
  cityView.reset(); for(const p of players.values()) p.dispose(); players.clear(); for(const r of rags.values()) r.dispose(); rags.clear(); notice('');
 }
@@ -158,7 +168,8 @@ function frame(now, xrFrame){
   giant.update({head:[0, 24, 0], left:[-6, 13 + Math.sin(t * 5), -3], right:[6, 12 + Math.cos(t * 5), -4], bossYaw:-.35});
   cameraRig.intro(now, city);
  }
- missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
+ // The full-screen streamline overlay repaints every frame; a phone spends that budget on the city.
+ missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); if(!touch) flightFX.update(dt, me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
  cityView.update(dt);cityView.cars.update(dt,fx); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
  renderer.info.reset();
  if(!(state.playing && state.role === 'spectator' && views.visible)) gr.render(scene, camera, dt);
@@ -169,12 +180,14 @@ window.addEventListener('resize', () => gr.resize(camera));
 input.bind();
 // Pointer lock sends clicks to the canvas, so the controls panel needs a key.
 addEventListener('keydown', e => { if(e.code === 'KeyH' && state.playing && !e.repeat){ const p = $('controls-panel'); if(p) p.open = !p.open; } });
-canvas.addEventListener('click', () => { if(state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
-document.addEventListener('pointerlockchange', () => { if(state.playing && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
+if(!touch){
+ canvas.addEventListener('click', () => { if(state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
+ document.addEventListener('pointerlockchange', () => { if(state.playing && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
+}
 const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(''); });
 if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.then(() => start(false, false, true));
 // Practice lost its lobby button in the retheme; keep a URL entry point for the drone tests.
 if(lobby.params.get('practice') === '1') artReady.then(() => start(true, true));
 window.COLOSSUS_READY = true; notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test and profiling tools.
-window.__COLOSSUS = {renderer, gameRenderer:gr, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};
+window.__COLOSSUS = {renderer, gameRenderer:gr, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, input, touch, touchControls, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};
