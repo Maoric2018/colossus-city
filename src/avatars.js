@@ -7,8 +7,16 @@ const dark=new T.MeshStandardMaterial({color:0x172b37,metalness:.68,roughness:.4
 const trim=new T.MeshStandardMaterial({color:0x9aada8,metalness:.82,roughness:.35});
 const reactor=new T.MeshBasicMaterial({color:0xdfff97,toneMapped:false});
 const cyan=new T.MeshBasicMaterial({color:0x83eeff,toneMapped:false});
-const tmp=new T.Vector3();
-function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();parent.add(g);const armor=mesh(rounded(width,1,depth,.1),material,g),joint=mesh(new T.SphereGeometry(width*.5,10,8),dark,g);return {g,armor,joint,width,set(a,b){g.position.copy(a).add(b).multiplyScalar(.5);g.quaternion.setFromUnitVectors(up,tmp.copy(b).sub(a).normalize());this.armor.scale.y=a.distanceTo(b);this.joint.position.y=-a.distanceTo(b)*.5;}};}
+const tmp=new T.Vector3(),frameInverse=new T.Quaternion(),swing=new T.Quaternion();
+function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();parent.add(g);const armor=mesh(rounded(width,1,depth,.1),material,g),joint=mesh(new T.SphereGeometry(width*.5,10,8),dark,g);return {g,armor,joint,width,set(a,b,bodyRotation){
+ g.position.copy(a).add(b).multiplyScalar(.5);
+ // Solve the limb's swing in body space, then carry it into the world. A
+ // world-up shortest arc reaches the endpoints but introduces unwanted twist
+ // when the whole tracked rig yaws (especially for nearly downward arms).
+ frameInverse.copy(bodyRotation).invert();tmp.copy(b).sub(a).normalize().applyQuaternion(frameInverse);
+ g.quaternion.copy(bodyRotation).multiply(swing.setFromUnitVectors(up,tmp));
+ this.armor.scale.y=a.distanceTo(b);this.joint.position.y=-a.distanceTo(b)*.5;
+}};}
 export class GiantView{
  constructor(scene){
   this.root=new T.Group();scene.add(this.root);this.body=new T.Group();this.head=new T.Group();this.root.add(this.body,this.head);
@@ -56,13 +64,16 @@ export class GiantView{
  fist(){const g=new T.Group();this.root.add(g);mesh(rounded(2.7,1.9,2.6,.25),metal,g);for(let i=0;i<4;i++)mesh(rounded(.53,.85,1.25,.12),trim,g,[(i-1.5)*.64,-.55,-.95]);mesh(rounded(.25,.3,2.2,.04),reactor,g,[1.38,.25,0]);return g;}
  update(s,{local=false}={}){
   const head=new T.Vector3(...s.head),q=new T.Quaternion().setFromAxisAngle(up,s.bossYaw||0);this.head.position.copy(head);this.head.quaternion.copy(q);this.head.visible=!local;
+  // The decorative halo is for other players. From inside the giant it can
+  // cover the pilot's view when looking down or leaning toward the reactor.
+  this.coreGlow.visible=!local;
   const chest=head.clone().add(new T.Vector3(0,-7.2,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
   [-1,1].forEach((sign,i)=>{
    const shoulder=new T.Vector3(sign*4.2,3.1,0).applyQuaternion(q).add(chest),hand=new T.Vector3(...(i?s.right:s.left));
    const center=shoulder.clone().lerp(hand,.47),bend=new T.Vector3(sign*1.5,-1,2).applyQuaternion(q);center.add(bend);
-   this.arms[i].upper.set(shoulder,center);this.arms[i].lower.set(center,hand);this.arms[i].fist.position.copy(hand);this.arms[i].fist.quaternion.copy(q);if(s[i?'rightQuaternion':'leftQuaternion'])this.arms[i].fist.quaternion.fromArray(s[i?'rightQuaternion':'leftQuaternion']);
+   this.arms[i].upper.set(shoulder,center,q);this.arms[i].lower.set(center,hand,q);this.arms[i].fist.position.copy(hand);this.arms[i].fist.quaternion.copy(q);if(s[i?'rightQuaternion':'leftQuaternion'])this.arms[i].fist.quaternion.fromArray(s[i?'rightQuaternion':'leftQuaternion']);
    const hip=new T.Vector3(sign*1.6,-4.3,0).applyQuaternion(q).add(chest),foot=new T.Vector3(sign*2.1,1,1.1).applyQuaternion(q);foot.x+=head.x;foot.z+=head.z;
-   const knee=hip.clone().lerp(foot,.52).add(new T.Vector3(0,0,-1.3).applyQuaternion(q));this.legs[i].thigh.set(hip,knee);this.legs[i].shin.set(knee,foot);this.legs[i].foot.position.copy(foot);this.legs[i].foot.quaternion.copy(q);
+   const knee=hip.clone().lerp(foot,.52).add(new T.Vector3(0,0,-1.3).applyQuaternion(q));this.legs[i].thigh.set(hip,knee,q);this.legs[i].shin.set(knee,foot,q);this.legs[i].foot.position.copy(foot);this.legs[i].foot.quaternion.copy(q);
   });
  }
 }

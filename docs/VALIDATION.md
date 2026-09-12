@@ -3,7 +3,7 @@
 ## Current local validation — September 11, 2026
 
 - **52 Node tests: PASS:** 24 dependency-free unit tests, 11 real Rapier physics tests, six movement/projectile tests, one real multiplayer/debug-channel integration test, and ten XR lifecycle/input tests using fake XR frames with real Three.js math.
-- **32 JavaScript modules: syntax/import checks PASS.** All 55 bundled asset files pass SHA-256 verification.
+- **33 JavaScript modules: syntax/import checks PASS.** All 55 bundled asset files pass SHA-256 verification.
 - **Actual browser renderer and multiplayer: PASS.** Chromium renders the imported art and uses real pointer capture/keyboard controls for ascent, hover/soar switching, fast flight and directional dodge. Two raider clients and a Quest client publish real images into a fourth spectator client. Closing the panel stops capture.
 - **Meta IWER Quest 2 emulation: PASS.** Stereo views, Touch mapping, proportional smooth yaw, 0.5 m physical controller extension reaching 7 m on the actual server, trigger-fired missiles, A calibration, controller tracking loss/recovery, visibility changes, recentering and repeated exit/re-entry. No browser JavaScript, resource or shader errors were reported. The sampled intact VR view submitted 156 draw calls / 442,548 triangles across both eyes with shadows disabled, before live-view capture. This is one view, not a worst-case GPU budget.
 - **Spectator visual inspection: PASS.** Headset left-eye scene, projection and in-world HUD match the emulated headset. Smoke/glow billboards now account for the giant camera scale; they no longer swamp the mirrored view. Actual player images are separated from explicitly simulated AI cameras.
@@ -12,6 +12,10 @@
 - **USB tool installed, headset unavailable.** Android Platform Tools 37.0.1 was downloaded from Google; the earlier `npm run quest:check` found no connected device.
 
 Current logs: `artifacts/test-results.txt`, `artifacts/syntax-results.txt`, `artifacts/browser-smoke.json`, `artifacts/visual-report.json`, `artifacts/physics-benchmark.json`. Screenshots include `artifacts/raider-soaring.png`, `artifacts/spectator-panel.png`, `artifacts/quest2-while-watched.png` and `artifacts/quest2-emulated-stereo.png`. Older validation files are historical records.
+
+## Arm orientation and self-glow regression
+
+`npm run test:xr-view` reproduces stationary-controller turning with the real Quest 2 emulator and imported armor. Before the fix, forearms could twist by about 163 degrees in headset space while the fists stayed still. Limb swing is now solved relative to the giant’s body rotation before applying world yaw. The test covers tilted head/wrists, an offset standing position, a complete turn and yaw wraparound, and checks rendered mesh transforms. The pilot and its mirrored view exclude the local reactor halo; other players retain it. Reports and before/after-turn images are in `artifacts/xr-view-report.json` and `artifacts/xr-hands-*.png`.
 
 ## Still not validated
 

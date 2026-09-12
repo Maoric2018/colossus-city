@@ -21,7 +21,8 @@
     "assets": "node scripts/fetch-assets.mjs",
     "check": "node scripts/check.mjs",
     "bench": "node scripts/benchmark.mjs",
-    "test:visual": "node scripts/visual-smoke.mjs"
+    "test:visual": "node scripts/visual-smoke.mjs",
+    "test:xr-view": "node scripts/xr-view-smoke.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.17.3",
