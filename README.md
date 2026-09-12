@@ -88,6 +88,8 @@ Soaring animates the existing armored pilot: the helmet looks forward, the weapo
 
 **Winning:** raiders win by reducing the core to zero within four minutes; the giant wins by surviving. Kills, towers down and city damage are tracked; the round-end scoreboard ranks raiders by score. Building debris does not damage or stagger the colossus. Raiders damage it with their weapons.
 
+**Colossus defeat:** zero core health starts a reactor failure animation, followed by 15 staggered explosions and the robot's actual head, armor, hands and limbs flying apart. Desktop cameras pull back to a clear view; Quest keeps the pilot's tracked viewpoint and displays the defeat in the headset. Results appear after 6.5 seconds, and the next round starts 20 seconds after defeat. Wreckage reuses the robot meshes and follows synchronized cosmetic trajectories onto the ground, with no additional server physics bodies or damage. Late viewers resume the current wreckage state, and a new round clears the sequence. Verify with `node --test tests/round-end.test.js` and `node scripts/colossus-death-smoke.mjs`.
+
 **Spectator video:** Live Views shows each human player over WebRTC at up to 30 fps on desktop / 24 fps from the headset’s actual left-eye view. Failed video links use a bounded 15 fps image fallback. AI cameras are labeled simulated. Use one spectator for the demo; keep each player’s game visible on its device.
 
 ## What is implemented in source

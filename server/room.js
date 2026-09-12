@@ -5,6 +5,7 @@ import {CityStreaming} from './streaming.js';
 import {lazySceneQueries} from './queries.js';
 import {breachHooks} from './soar-breach.js';
 import {GIANT, handQuaternion, identity} from '../shared/giant-rig.js';
+import {ROUND_END} from '../shared/round-end.js';
 import {HandWorld} from '../shared/hand-world.js';
 import {buildCars,carMeta,updateCars,driveCars,crashCar,carSnapshots} from './cars.js';
 import {staticProps} from '../shared/props.js';
@@ -41,7 +42,7 @@ export class Room {
   this.queue = new RAPIER.EventQueue(true); this.colliderTags = new Map(); this.cells = generateCells(this.env);
   this.cellMap = new Map(); this.detached = new Set(); this.debris = new Map(); this.settled = new Map(); this.nextDebris = 1000; this.missiles = new Map(); this.nextMissile = 20000; this.rags = new Map(); this.events = [];
   initFracture(this);
-  this.phase = 0; this.remaining = C.MATCH_SECONDS; this.bossMaxHP = bossMaxHealth(this.players.size); this.bossHP = this.bossMaxHP; this.kills = 0; this.startTime = this.time; this.towersDown = 0; this.destroyedThisRound = 0;
+  this.phase = 0; this.result=null; this.remaining = C.MATCH_SECONDS; this.bossMaxHP = bossMaxHealth(this.players.size); this.bossHP = this.bossMaxHP; this.kills = 0; this.startTime = this.time; this.towersDown = 0; this.destroyedThisRound = 0;
   this.boss = initialBoss();
   this.ground = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -.3, 0));
   this.world.createCollider(RAPIER.ColliderDesc.cuboid(this.env.half + 60, .3, this.env.half + 60).setFriction(.82).setCollisionGroups(group(G.WORLD)), this.ground);
@@ -95,7 +96,7 @@ export class Room {
  roster(){ return [...this.clients.values()].map(c => ({id:c.id, name:c.name, role:c.role})).concat([...this.players.values()].filter(p => p.bot).map(p => ({id:p.id, name:p.name, role:'bot'}))); }
  welcome(client){
   return {type:'welcome', id:client.id, viewKey:client.viewKey, role:client.role, room:this.code, practice:this.practice, environment:this.env.id, round:this.round, host:this.hostId(),
-   blocks:this.stream?.welcome()||[],
+   time:this.time, result:this.result, blocks:this.stream?.welcome()||[],
    cars:[...this.cars.values()].map(c=>carMeta(this,c)),
    missiles:[...this.missiles.values()].map(m => ({...m, time:this.time, p:arr(m.p)})),
    clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity) && !this.settled.has(c.entity)).map(c => c.id),
@@ -105,6 +106,7 @@ export class Room {
  }
  // ---- input ----
  input(client, m){
+  if(this.phase&&(m.type==='input'||m.type==='pose'))return;
   if(m.type === 'input'){
    const data = sanitizeInput(m); if(!data) return;
    if(client.role === 'raider'){ const p = this.players.get(client.id); if(p){ p.input = data; p.lastInput = this.time; } }
@@ -137,7 +139,7 @@ export class Room {
  // ---- simulation ----
  step(){
   this.tick++; this.time += C.TICK;this.world.invalidateSceneQueries();
-  if(this.phase){ this.world.step(this.queue,this.physicsHooks); this.queue.drainCollisionEvents(() => {}); updateCars(this); processFineCollapses(this); updateShards(this); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
+  if(this.phase){ this.world.step(this.queue,this.physicsHooks); this.queue.drainCollisionEvents(() => {}); updateCars(this); processFineCollapses(this); updateShards(this); if(this.time - this.endedAt > ROUND_END.restart){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
   // Wait for at least one raider. An AI giant fills an empty boss seat; it is not a second authority.
   if(this.players.size) this.remaining = Math.max(0, C.MATCH_SECONDS - (this.time - this.startTime)); else this.startTime = this.time;
   this.stream?.update();
@@ -179,7 +181,12 @@ export class Room {
   updateCars(this);updateDebris(this, hits, fractures, crumbles);updateShards(this);
   scheduleFailures(this); processFailures(this); processFineCollapses(this); flushSkinEvents(this);
   for(const [id, r] of this.rags) if(this.time - r.born > 9) removeRag(this, id);
-  if(this.bossHP <= 0 || this.remaining <= 0){ this.missiles.clear(); this.phase = this.bossHP <= 0 ? 1 : 2; this.endedAt = this.time; this.event({type:'end', winner:this.phase === 1 ? 'raiders' : 'giant', players:this.scoreboard()}); }
+  if(this.bossHP <= 0 || this.remaining <= 0){
+   this.missiles.clear();this.phase=this.bossHP<=0?1:2;this.endedAt=this.time;
+   const b=this.boss;
+   this.result={type:'end',winner:this.phase===1?'raiders':'giant',time:this.time,round:this.round,players:this.scoreboard(),pose:{head:arr(b.head),left:arr(b.left),right:arr(b.right),bossYaw:b.yaw,leftQuaternion:[...b.leftQuaternion],rightQuaternion:[...b.rightQuaternion]}};
+   this.event(this.result);
+  }
  }
  scoreboard(){ return [...this.players.values()].map(p => ({id:p.id, name:p.name, bot:p.bot, kills:p.kills, damage:Math.round(p.damage), score:Math.round(p.score)})); }
  snapshot(){

@@ -64,6 +64,15 @@ export class Effects{
   for(let i=0;i<7;i++)this.particle(this.flashes,p,{v:new T.Vector3((Math.random()-.5)*5,1+Math.random()*3,(Math.random()-.5)*5),life:.25+Math.random()*.25,size:2+Math.random()*2,color:new T.Color(i%2?0xff7424:0xffd470),growth:1.7});
   for(let i=0;i<8;i++)this.particle(this.smoke,p,{v:new T.Vector3((Math.random()-.5)*4,2+Math.random()*4,(Math.random()-.5)*4),life:2+Math.random(),size:1.5,color:new T.Color(0x24292c),growth:3,opacity:.75});
  }
+ reactorExplosion(p,power=1){
+  // Downloaded muzzle/fire, smoke and spark sprites, shared with the existing
+  // bounded pools so the finale adds no extra render passes or physics bodies.
+  for(let i=0;i<6;i++)this.particle(this.flashes,p,{reactor:true,v:new T.Vector3((Math.random()-.5)*5,Math.random()*4,(Math.random()-.5)*5),life:.35+Math.random()*.35,size:(2+Math.random()*2)*power,color:new T.Color(i%2?0xff721f:0xffce79),growth:1.5});
+  for(let i=0;i<7;i++)this.particle(this.smoke,p,{reactor:true,v:new T.Vector3((Math.random()-.5)*6,2+Math.random()*5,(Math.random()-.5)*6),life:2.2+Math.random(),size:power*1.3,color:new T.Color(0x353a3e),growth:2,opacity:.55});
+  for(let i=0;i<14;i++){const angle=Math.random()*Math.PI*2;this.particle(this.sparks,p,{reactor:true,v:new T.Vector3(Math.cos(angle)*(5+power*7),3+Math.random()*13,Math.sin(angle)*(5+power*7)),life:.6+Math.random(),size:.22+Math.random()*.25,color:new T.Color(0xffb44e),gravity:-18,drag:.2});}
+  this.particle(this.flares,p,{reactor:true,life:.3,size:6*power,color:new T.Color(0xffba69),growth:1.6});
+ }
+ clearReactor(){for(const pool of [this.smoke,this.dust,this.sparks,this.flashes,this.flares])pool.items=pool.items.filter(p=>!p.reactor);}
  // Low rolling dust ring for collapses and stomps. (this.dust is the pool; hence the name.)
  dustRing(p, power = .5){
   const n = Math.floor(10 + power * 18);

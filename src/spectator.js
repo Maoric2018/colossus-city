@@ -59,7 +59,7 @@ export class SpectatorViews{
    // without JPEG encoding, one per frame and at most ten updates/s per bot.
    const bots=state?.players.filter(p=>p.flags&8)||[];
    if(bots.length){const p=bots[this.botCursor++%bots.length],card=this.cards.get(p.id),pilot=this.players.get(p.id);if(card&&now-card.received>=100){
-    const camera=this.botCamera??=new T.PerspectiveCamera(65,1.6,.05,650);camera.position.set(p.p[0],p.p[1]+.67,p.p[2]);camera.rotation.set(p.pitch||0,p.yaw,0,'YXZ');const visible=pilot?.root.visible;if(pilot)pilot.root.visible=false;
+    const camera=this.botCamera??=new T.PerspectiveCamera(65,1.6,.05,650);camera.position.set(p.p[0],p.p[1]+.67,p.p[2]);camera.rotation.set(p.pitch||0,p.yaw,0,'YXZ');if(state.phase===1)camera.lookAt(state.head[0],state.head[1]-7,state.head[2]);const visible=pilot?.root.visible;if(pilot)pilot.root.visible=false;
     try{this.renderCamera(camera);card.surface.getContext('2d').drawImage(this.canvas,0,0);card.received=now;card.frames++;}finally{if(pilot)pilot.root.visible=visible;}
    }}
    return;
@@ -79,7 +79,7 @@ export class SpectatorViews{
  drawHUD(){
   const state=this.getState();if(!state)return;const p=state.players.find(p=>p.id===this.getPlayerId()),ctx=this.context;
   ctx.fillStyle='#07191bcc';ctx.fillRect(0,369,640,31);ctx.fillStyle='#d3ff9d';ctx.font='12px monospace';ctx.fillText(p?`${Math.round(p.hp)} HP · ${Math.round(p.fuel*100)}% THRUST · ${p.flags&16?'SOARING ∞':'HOVER'} · ${Math.round(Math.hypot(...p.v))} m/s`:`COLOSSUS · ${Math.ceil(bossHealthFraction(state)*100)}% CORE`,14,389);
-  if(p){ctx.strokeStyle='#d8ffb9';ctx.beginPath();ctx.moveTo(315,200);ctx.lineTo(325,200);ctx.moveTo(320,195);ctx.lineTo(320,205);ctx.stroke();}
-  if(this.getPaused()){ctx.fillStyle='#07191b99';ctx.fillRect(0,0,640,45);ctx.fillStyle='white';ctx.fillText('PLAYER MENU OPEN',225,27);}
+  if(p&&!state.phase){ctx.strokeStyle='#d8ffb9';ctx.beginPath();ctx.moveTo(315,200);ctx.lineTo(325,200);ctx.moveTo(320,195);ctx.lineTo(320,205);ctx.stroke();}
+  if(state.phase||this.getPaused()){ctx.fillStyle='#07191b99';ctx.fillRect(0,0,640,45);ctx.fillStyle=state.phase?'#ffc481':'white';ctx.textAlign='center';ctx.fillText(state.phase===1?'COLOSSUS DESTROYED · RAIDERS WIN':state.phase===2?'COLOSSUS SURVIVES':'PLAYER MENU OPEN',320,27);ctx.textAlign='start';}
  }
 }

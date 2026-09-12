@@ -41,7 +41,7 @@ export class HUD {
   }
   const r = renderer.stats;
   $('performance').textContent = `${this.fps || 0} FPS · ${r.frameMs.toFixed(1)}ms · ${net.ping}ms · ${Math.round(net.kbps)} kb/s · ${r.calls} DC · ${Math.round(r.scale * 100)}% RES · ${renderer.cinematic ? 'CINEMATIC' : renderer.tier.name}`;
-  if(s.phase && !state.previousPhase && !renderer.renderer.xr.isPresenting && state.role !== 'spectator'){ document.exitPointerLock?.(); this.showOverlay(s.phase === 1 ? 'THE GIANT HAS FALLEN.' : 'THE COLOSSUS SURVIVES.', `${s.kills} raiders down. ${Math.round(s.damage)}% structural damage, ${s.towersDown} towers down. A new round starts automatically after 20 seconds.`, {renderer:renderer.renderer, net}); }
+  // The round-end presenter reveals results after the visible death sequence.
   state.previousPhase = s.phase;
  }
  // Every frame: essential feedback fades. DOM is only touched when a value changes.

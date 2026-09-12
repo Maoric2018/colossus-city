@@ -42,4 +42,23 @@ export class CameraRig {
   const t = now * .0001, r = env.half * .95;
   this.camera.position.set(Math.sin(t) * r * .55 + 40, 62 + Math.cos(t * .5) * 8, Math.cos(t) * r * .55 + 90); this.camera.lookAt(-10, 34, -20);
  }
+ finale(dt,result){
+  const camera=this.camera,head=new T.Vector3(...result.pose.head),target=head.clone().add(new T.Vector3(0,-9,0));
+  this.rig.position.set(0,0,0);this.rig.rotation.set(0,0,0);this.rig.scale.setScalar(1);
+  if(this.endShot?.round!==result.round){
+   const from=camera.position.clone().sub(target);if(Math.hypot(from.x,from.z)<10)from.set(Math.sin(result.pose.bossYaw||0)*45,0,Math.cos(result.pose.bossYaw||0)*45);
+   const yaw=Math.atan2(from.x,from.z);let best=null;
+   // Find a clear sightline through the nearby streets before pulling back.
+   for(const offset of [0,.55,-.55,1.1,-1.1,Math.PI]){
+    const dir=new T.Vector3(Math.sin(yaw+offset)*48,22,Math.cos(yaw+offset)*48),distance=dir.length();dir.normalize();
+    const safe=this.city.rayDistance(target,dir,distance,.5),score=safe-Math.abs(offset)*3;
+    if(!best||score>best.score)best={score,position:target.clone().addScaledVector(dir,Math.max(8,safe-.8))};
+   }
+   this.endShot={round:result.round,position:best.position};
+  }
+  camera.position.lerp(this.endShot.position,1-Math.exp(-dt*3.5));this.pos.copy(camera.position);
+  const previous=camera.quaternion.clone();camera.lookAt(target);camera.quaternion.copy(previous.slerp(camera.quaternion,1-Math.exp(-dt*5)));
+  camera.fov+=(67-camera.fov)*(1-Math.exp(-dt*5));camera.updateProjectionMatrix();
+  const shake=this.shake.update(dt);camera.rotateX(shake.y);camera.rotateY(shake.x);
+ }
 }

@@ -2,6 +2,7 @@ import * as T from 'three';
 import {C} from '../shared/config.js';
 import {bossHealthFraction} from '../shared/boss-health.js';
 import {clamp} from '../shared/math.js';
+import {ROUND_END} from '../shared/round-end.js';
 const axis = new T.Vector3(0, 1, 0), q = new T.Quaternion(), euler = new T.Euler(0, 0, 0, 'YXZ');
 const HAPTICS = {glass:[.28, .35, 40], brick:[.45, .4, 70], stone:[.55, .4, 90], concrete:[.55, .4, 90], steel:[.8, .2, 120], body:[.6, .3, 80]};
 export class XRControl {
@@ -112,7 +113,8 @@ export class XRControl {
   const hp = bossHealthFraction(s); x.fillStyle = '#31474b'; x.fillRect(35, 80, 955, 13); x.fillStyle = s?.bossStagger > .35 ? '#ffb070' : '#cfff94'; x.fillRect(35, 80, 955 * hp, 13);
   x.font = '27px monospace'; x.fillStyle = '#e2eeee'; const sec = Math.ceil(s?.remaining || 0); x.fillText(`CORE ${Math.ceil(hp * 100)}%    ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}    TAKEDOWNS ${s?.kills || 0}    TOWERS ${s?.towersDown || 0}    CITY ${Math.round(s?.damage || 0)}%`, 35, 144);
   x.font = '20px monospace'; x.fillStyle = tracking ? '#99b7bd' : '#ffbc80';
-  const status = !tracking ? 'CONTROLLER TRACKING LOST · HOLD STILL' : s?.phase === 1 ? 'RAIDERS WIN · NEW ROUND IN 20 SECONDS' : s?.phase === 2 ? 'COLOSSUS WINS · NEW ROUND IN 20 SECONDS' : s?.bossStagger > .35 ? 'STAGGERED · CORE EXPOSED' : 'LEFT: MOVE   RIGHT: TURN   TRIGGERS: MISSILES   SMASH THE BASE OF A TOWER';
+  const end=this.roundEnding,seconds=Math.max(0,Math.ceil(ROUND_END.restart-(end?.elapsed||0)));
+  const status = s?.phase === 1 ? end?.elapsed<ROUND_END.breakApart?'CORE FAILURE · REACTOR UNSTABLE':`COLOSSUS DESTROYED · RAIDERS WIN · NEW ROUND IN ${seconds}s` : s?.phase === 2 ? `COLOSSUS WINS · NEW ROUND IN ${seconds}s` : !tracking ? 'CONTROLLER TRACKING LOST · HOLD STILL' : s?.bossStagger > .35 ? 'STAGGERED · CORE EXPOSED' : 'LEFT: MOVE   RIGHT: TURN   TRIGGERS: MISSILES   SMASH THE BASE OF A TOWER';
   x.fillText(status, 35, 204);
   x.font = '18px monospace'; x.fillStyle = '#99b7bd'; x.fillText(`${this.fps || 0} FPS · ${this.net.ping || 0}ms · REACH ${(this.scale * this.reachGain).toFixed(1)}× · 0.5m → ${(this.scale * this.reachGain * .5).toFixed(1)}m`, 35, 238); this.hudTexture.needsUpdate = true;
  }

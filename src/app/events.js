@@ -3,7 +3,7 @@
 import * as T from 'three';
 import {state} from './state.js';
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, flightFX, giant, addRag, rags, listenerPosition}){
+export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, flightFX, giant, ending, addRag, rags, listenerPosition}){
  const near = (p, range) => 1 - Math.min(1, dist(p, listenerPosition()) / range);
  const vr = () => xr.session;
  return function handle(e){
@@ -41,8 +41,8 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
    case 'closecall': if(e.player === state.localId){ audio.play('closecall'); flightFX.dodge(); } return;
    case 'stomp': audio.play('stomp', {p:e.p}); if(state.role !== 'boss') shake.add(near(e.p, 90) * .35); fx.dustRing(e.p, .8); return;
    case 'kill': if(e.player === state.localId){ audio.play('lose', {power:.4}); } else if(state.role === 'boss'){ audio.play('kill'); xr.haptic(.6, 120); } return;
-   case 'end': missiles.reset(); audio.play((e.winner === 'giant') === (state.role === 'boss') ? 'win' : 'lose'); hud.scoreboard(e.players, e.winner); return;
-   case 'reset': hud.hideOverlay(); return;
+   case 'end': missiles.reset(); ending.start(e); return;
+   case 'reset': ending.reset(); hud.hideOverlay(); return;
   }
  };
 }
