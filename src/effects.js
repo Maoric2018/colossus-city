@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {markRange} from './render/instances.js';
 import {SonicBursts} from './render/soar-vfx.js';
+import {MissileExplosions} from './render/missile-explosion.js';
 const MATERIAL_TINT = {glass:{dust:0xcfe9f2, spark:0xd8f6ff}, brick:{dust:0xa8705f, spark:0xffb27a}, stone:{dust:0xd6c8a6, spark:0xffd9a0}, concrete:{dust:0xb3b0a8, spark:0xffca76}, steel:{dust:0x8d9398, spark:0xffb040}, body:{dust:0x9aa3a6, spark:0xffe0b0}};
 const dummy=new T.Object3D(),up=new T.Vector3(0,1,0);
 class ParticlePool{
@@ -37,7 +38,8 @@ export class Effects{
   this.flares=new ParticlePool(scene,base+'flare.png',16,true);
   this.beams=new T.InstancedMesh(new T.CylinderGeometry(1,1,1,5),new T.MeshBasicMaterial({color:0xe9fbff,toneMapped:false}),48);this.beams.instanceMatrix.setUsage(T.DynamicDrawUsage);this.beams.count=0;this.beams.frustumCulled=false;scene.add(this.beams);
   const beamGeometry=this.beams.geometry;this.beamGlow=new T.InstancedMesh(beamGeometry,new T.MeshBasicMaterial({color:0x42bfff,transparent:true,opacity:.3,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),48);this.bolts=new T.InstancedMesh(beamGeometry,new T.MeshBasicMaterial({color:0xb0f5ff,toneMapped:false}),48);
-  this.sonicBursts=new SonicBursts(scene);this.booms=this.sonicBursts.items;this.boomMesh=this.sonicBursts.mesh;this.ready=this.sonicBursts.ready;
+  this.sonicBursts=new SonicBursts(scene);this.booms=this.sonicBursts.items;this.boomMesh=this.sonicBursts.mesh;
+  this.missileBlasts=new MissileExplosions(scene,{quest:quest||k<.7});this.missileParticleScale=k;this.ready=Promise.all([this.sonicBursts.ready,this.missileBlasts.ready]);
   this.rings=[];this.ringMesh=new T.InstancedMesh(new T.TorusGeometry(1,.045,4,24),new T.MeshBasicMaterial({color:0x7eeaff,transparent:true,opacity:.7,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),24);
   for(const mesh of [this.beamGlow,this.bolts,this.ringMesh]){mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);}
 
@@ -58,6 +60,21 @@ export class Effects{
  }
  sonicBoom(p,direction){
   this.sonicBursts.add(p,direction);
+ }
+ missileExplosion(p){
+  this.missileBlasts.add(p);
+  this.particle(this.flares,p,{life:.2,size:19,color:new T.Color(0xffd49a),growth:.8});
+  const n=Math.max(14,Math.round(32*this.missileParticleScale));
+  for(let i=0;i<n;i++){
+   const direction=new T.Vector3().randomDirection(),speed=13+Math.random()*18;
+   this.particle(this.sparks,p,{v:direction.clone().multiplyScalar(speed),life:.5+Math.random()*.65,size:.22+Math.random()*.3,color:new T.Color(i%3?0xffb24a:0xffefd1),gravity:-12,drag:1.1});
+   if(i%2===0)this.particle(this.smoke,p,{v:direction.multiplyScalar(3+Math.random()*5).add(new T.Vector3(0,3,0)),life:1.7+Math.random()*1.1,size:2.1+Math.random()*1.2,color:new T.Color(i%4?0x41454b:0x6b6560),gravity:.65,drag:1.2,growth:1.7,opacity:.6});
+  }
+  // Ground impacts kick out dust; airbursts keep their spherical silhouette.
+  if(p[1]<5)for(let i=0;i<8;i++){
+   const angle=i/8*Math.PI*2;
+   this.particle(this.dust,[p[0],.4,p[2]],{v:new T.Vector3(Math.cos(angle)*13,.8,Math.sin(angle)*13),life:1.2+Math.random()*.5,size:1.6,color:new T.Color(0x91867a),drag:1.7,growth:2.4,opacity:.4});
+  }
  }
  carExplosion(p){
   this.impact(p,1.2,'steel');
@@ -91,6 +108,7 @@ export class Effects{
  }
  update(dt){
   this.sonicBursts.update(dt);
+  this.missileBlasts.update(dt);
   for(const pool of [this.smoke,this.dust,this.sparks,this.flashes,this.flares])pool.update(dt);
   this.tracers=this.tracers.filter(t=>t.age<.2);this.tracers.forEach((t,i)=>{
    t.age+=dt;const distance=t.a.distanceTo(t.b),direction=t.b.clone().sub(t.a).normalize(),fade=Math.max(0,1-t.age/.2);
