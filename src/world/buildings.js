@@ -21,7 +21,7 @@ const wallLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; retur
 const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .514, 0, -Math.cos(a) * .514), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 function colored(geometry, color){ const c = new T.Color(color), n = geometry.attributes.position.count, colors = new Float32Array(n * 3); for(let i = 0; i < n; i++) c.toArray(colors, i * 3); geometry.setAttribute('color', new T.BufferAttribute(colors, 3)); return geometry; }
 export class Buildings {
- constructor(root, cells, tier, {concrete,resources=null,components=null}){
+ constructor(root, cells, tier, {concrete,resources=null,components=null,deferComponents=false}){
   this.root = root; this.cells = cells; this.tier = tier; this.entries = new Map(); this.dirty = new Set(); this.batches = [];this.slots={frame:[],empire:[],roof:[],walls:{}};this.selectionDirty=true;this.lastViews=[];
   // Columns are open-ended prisms (no caps): 8 triangles each instead of 12, times 2,500 bays.
   const column = () => new T.CylinderGeometry(.039, .039, .925, 4, 1, true).rotateY(Math.PI / 4);
@@ -54,7 +54,8 @@ export class Buildings {
    this.entries.set(c.id, e);
   });
   for(const mesh of this.batches)mesh.count=0;
-  this.components=components||new Components(this,cells,tier,concrete);if(components)components.register(this,cells);
+  this.components=components||new Components(this,cells,tier,concrete);if(components&&!deferComponents)components.register(this,cells);
+  if(deferComponents)for(const e of this.entries.values())e.pending=true;
   for(const c of cells) this.setCell(c.id, null, null, false);
  }
  batch(geometry, material, count){
@@ -70,6 +71,7 @@ export class Buildings {
   if(!moved&&e.hidden===hidden&&!e.skinDirty&&e.initialized)return;
   if(moved||!e.initialized)e.revision++;e.initialized=true;e.skinDirty=false;this.selectionDirty=true;
   if(p) e.p.copy(p); if(q) e.q.copy(q); e.hidden = hidden;
+  e.fine?.update?.();
   this.writeCore(c,e);
   this.shadowView?.write(e);
   this.components?.setCell(c,e);
@@ -135,7 +137,7 @@ export class Buildings {
    if(glass){ matrix.multiplyMatrices(core, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
   }
  }
- commit(){for(const mesh of this.batches)mesh.visible=mesh.count>0;commitInstances(this.dirty);this.shadowView?.commit();}
+ commit(){for(const mesh of this.batches)mesh.visible=mesh.count>0&&!mesh.userData.batchedSource;commitInstances(this.dirty);this.shadowView?.commit();}
  // Current transform of a bay (shared object, do not mutate).
  pose(id){ return this.entries.get(id); }
 }

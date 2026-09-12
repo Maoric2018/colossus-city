@@ -2,6 +2,7 @@ import {modernLandmark} from '../../shared/city/modern-landmarks.js';
 import {catalogLandmark} from '../../shared/city/catalog.js';
 import {componentGeometry} from '../render/component-geometry.js';
 import {CellIndex} from '../render/cell-index.js';
+import {ComponentBatches} from '../render/component-batches.js';
 import * as T from 'three';
 import {mergeParts} from '../art.js';
 import {surface} from '../render/quality.js';
@@ -20,19 +21,28 @@ export class Components{
   this.materials.clearGlass.dispose();this.materials.clearGlass=new T.MeshStandardMaterial({color:0xb7d7e4,roughness:.15,metalness:.2,transparent:true,opacity:.3,depthWrite:false,side:T.DoubleSide});
   this.register(buildings,cells);
  }
- register(buildings,cells){
+ register(buildings,cells){for(const _ of this.prepare(buildings,cells)){} }
+ *prepare(buildings,cells){
   for(const c of cells){const e=buildings.entries.get(c.id);this.nearIndex.set(c.id,e.p.x,e.p.z);if(c.architecture==='wtc'||c.architecture==='empire'||c.architecture==='chrysler'||modernLandmark(c.architecture)||catalogLandmark(c.architecture)||c.roof&&c.catalogRoof&&c.catalogRoof!=='flat'){this.landmarks.add(c.id);this.landmarkIndex.set(c.id,e.p.x,e.p.z);}}
-  for(const c of cells){const e=buildings.entries.get(c.id);this.cells.set(c.id,c);this.poses.set(c.id,e);this.entries.set(c.id,(c.preparedComponents||componentPlacements(c,{interiors:!this.tier.lambert})).map(p=>({...p,index:-1,cell:c,pose:e,signature:COMPONENTS[p.type].signature||p.type.startsWith('wtc')||p.type.startsWith('empire')||p.type.startsWith('chrysler')||(/^hudson(Roof|Edge|Ribbon|SilverLip|KnifeFin)|^vanderbilt(Spandrel|Mullion|VolumeFin|Setback|Crown|Needle)/.test(p.type)),fine:p.type==='vanderbiltFlutes'||p.type==='hudsonPanelSeam'})));delete c.preparedComponents;}
-  for(const c of cells)for(const p of this.entries.get(c.id))if(!this.batches.has(p.type)){this.active.set(p.type,[]);this.reserve(p.type,32);}
+  for(const c of cells){const e=buildings.entries.get(c.id);this.cells.set(c.id,c);this.poses.set(c.id,e);this.entries.set(c.id,(c.preparedComponents||componentPlacements(c,{interiors:!this.tier.lambert})).map(p=>({...p,index:-1,cell:c,pose:e,signature:COMPONENTS[p.type].signature||p.type.startsWith('wtc')||p.type.startsWith('empire')||p.type.startsWith('chrysler')||(/^hudson(Roof|Edge|Ribbon|SilverLip|KnifeFin)|^vanderbilt(Spandrel|Mullion|VolumeFin|Setback|Crown|Needle)/.test(p.type)),fine:p.type==='vanderbiltFlutes'||p.type==='hudsonPanelSeam'})));delete c.preparedComponents;yield;}
+  for(const c of cells)for(const p of this.entries.get(c.id))if(!this.batches.has(p.type)){this.active.set(p.type,[]);this.reserve(p.type,32);yield;}
   this.lastPosition=null;
  }
- unregister(cells){for(const c of cells){for(const part of this.entries.get(c.id))this.remove(part);this.cells.delete(c.id);this.poses.delete(c.id);this.entries.delete(c.id);this.activeCells.delete(c.id);this.nearIndex.delete(c.id);this.landmarkIndex.delete(c.id);this.landmarks.delete(c.id);}this.lastPosition=null;}
+ unregister(cells){for(const c of cells){for(const part of this.entries.get(c.id)||[])this.remove(part);this.cells.delete(c.id);this.poses.delete(c.id);this.entries.delete(c.id);this.activeCells.delete(c.id);this.nearIndex.delete(c.id);this.landmarkIndex.delete(c.id);this.landmarks.delete(c.id);}this.lastPosition=null;}
  reserve(type,count){
   if((this.capacities.get(type)||0)>=count)return;
   const old=this.batches.get(type),spec=COMPONENTS[type],geometry=old?.geometry||mergeParts(spec.parts.map(p=>[componentGeometry(p),p.p,p.r])),capacity=2**Math.ceil(Math.log2(Math.max(32,count)));
   const mesh=this.buildings.batch(geometry,this.materials[spec.material],capacity);mesh.count=this.active.get(type).length;mesh.castShadow=false;mesh.userData.component=true;mesh.visible=mesh.count>0;
   if(old){mesh.instanceMatrix.array.set(old.instanceMatrix.array);old.removeFromParent();old.dispose();this.buildings.dirty.delete(old);this.buildings.batches=this.buildings.batches.filter(b=>b!==old);}
-  this.batches.set(type,mesh);this.capacities.set(type,capacity);
+ this.batches.set(type,mesh);this.capacities.set(type,capacity);
+  if(this.materialBatches){mesh.userData.batchedSource=true;mesh.removeFromParent();}
+ }
+ enableBatching(renderer){
+  if(this.batchingChecked)return;this.batchingChecked=true;
+  if(!renderer.extensions.has('WEBGL_multi_draw'))return;
+  this.materialBatches=new ComponentBatches(this.buildings.root);
+  for(const mesh of this.batches.values()){mesh.userData.batchedSource=true;mesh.removeFromParent();}
+  for(const parts of this.active.values())for(const part of parts)this.write(part);
  }
  select(camera){
   const view=camera.cameras?.[0]||camera,now=performance.now();position.setFromMatrixPosition(view.matrixWorld);rotation.setFromRotationMatrix(rotationMatrix.extractRotation(view.matrixWorld));
@@ -40,9 +50,9 @@ export class Components{
   (this.lastPosition??=new T.Vector3()).copy(position);this.lastRotation.copy(rotation);this.lastUpdate=now;this.selectionDirty=false;
   const radius2=this.radius*this.radius;
   this.candidates.clear();for(const id of this.activeCells)this.candidates.add(id);this.nearIndex.addNear(this.candidates,position.x,position.z,this.radius);this.landmarkIndex.addNear(this.candidates,position.x,position.z,230);
-  for(const id of this.candidates){const c=this.cells.get(id);
+  for(const id of this.candidates){const c=this.cells.get(id);if(!c)continue;
    const e=this.poses.get(c.id),distance2=e.p.distanceToSquared(position),near=distance2<radius2,landmark=this.landmarks.has(id);
-   const eligible=!e.hidden&&e.inView!==false&&(near||(landmark&&distance2<230*230));
+   const eligible=!e.pending&&!e.hidden&&e.inView!==false&&(near||(landmark&&distance2<230*230));
    if(!eligible&&!this.activeCells.has(c.id))continue;let any=false;
    for(const part of this.entries.get(c.id)){
     const mask=part.layer==='glass'?e.glassMask:e.facadeMask;
@@ -52,10 +62,11 @@ export class Components{
    }
    if(any)this.activeCells.add(c.id);else this.activeCells.delete(c.id);
   }
+  this.materialBatches?.trim();
  }
  add(part){const slots=this.active.get(part.type);this.reserve(part.type,slots.length+1);part.index=slots.length;slots.push(part);this.batches.get(part.type).count=slots.length;this.batches.get(part.type).visible=true;this.write(part);}
  remove(part){
-  if(part.index<0)return;const slots=this.active.get(part.type),index=part.index,last=slots.pop();
+  if(part.index<0)return;this.materialBatches?.remove(part);const slots=this.active.get(part.type),index=part.index,last=slots.pop();
   if(last!==part){slots[index]=last;last.index=index;this.write(last);}part.index=-1;this.batches.get(part.type).count=slots.length;this.batches.get(part.type).visible=slots.length>0;
  }
  matrices(c,e){
@@ -65,9 +76,11 @@ export class Components{
  }
  write(part){
   const e=part.pose,mask=part.layer==='glass'?e.glassMask:e.facadeMask,hidden=e.hidden||(part.layer!=='frame'&&!(mask&(1<<part.side)));
-  this.batches.get(part.type).setMatrixAt(part.index,hidden?zero:this.matrices(part.cell,e)[part.side>=0?part.side:4]);
+  const source=this.batches.get(part.type),m=hidden?zero:this.matrices(part.cell,e)[part.side>=0?part.side:4];
+  source.setMatrixAt(part.index,m);this.materialBatches?.write(part,source,m);
  }
  setCell(c,e){
+  if(!this.cells.has(c.id))return;
   this.nearIndex.set(c.id,e.p.x,e.p.z);if(this.landmarks.has(c.id))this.landmarkIndex.set(c.id,e.p.x,e.p.z);
   this.selectionDirty=true;if(!this.activeCells.has(c.id))return;
   for(const part of this.entries.get(c.id))if(part.index>=0)this.write(part);

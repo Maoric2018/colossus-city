@@ -3,9 +3,15 @@
 // cell table and mutable damage state, so server tests and tools can call them directly.
 import {MATERIALS} from './materials.js';
 import {C} from '../config.js';
+const topology=new WeakMap();
+function graph(cells){
+ let cached=topology.get(cells);if(cached?.length===cells.length)return cached;
+ const byId=new Map(),floors=new Map();for(const c of cells){byId.set(c.id,c);if(!floors.has(c.floor))floors.set(c.floor,[]);floors.get(c.floor).push(c);}
+ cached={length:cells.length,byId,floors,levels:[...floors.keys()].sort((a,b)=>b-a)};topology.set(cells,cached);return cached;
+}
 // Return intact cells whose paths to all ground anchors were severed.
 export function unsupportedCells(cells, detached){
- const byId = new Map(cells.map(c => [c.id, c])), supported = new Set(), todo = [];
+ const {byId}=graph(cells), supported = new Set(), todo = [];
  for(const c of cells) if(c.ground && !detached.has(c.id)){ supported.add(c.id); todo.push(c.id); }
  while(todo.length){ const id = todo.pop(); for(const n of byId.get(id).neighbors){ if(!detached.has(n) && !supported.has(n)){ supported.add(n); todo.push(n); } } }
  return cells.filter(c => !detached.has(c.id) && !supported.has(c.id)).map(c => c.id);
@@ -21,14 +27,11 @@ export function capacity(c, hpRatio = 1){
 // Returns Map(cellId -> {carried, capacity}) for intact cells; cells past the span or with no
 // lateral path are reported with capacity 0 (they must fail).
 export function structuralLoads(cells, detached, hpRatio = () => 1, span = C.BUILDING_BRIDGE_SPAN){
- const byId = new Map(cells.map(c => [c.id, c])), result = new Map();
+ const {byId,floors,levels}=graph(cells), result = new Map();
  const intact = id => id && !detached.has(id);
- const floors = new Map();
- for(const c of cells) if(intact(c.id)){ if(!floors.has(c.floor)) floors.set(c.floor, []); floors.get(c.floor).push(c); }
  const incoming = new Map(), carried = new Map();
- const levels = [...floors.keys()].sort((a, b) => b - a);
  for(const f of levels){
-  const row = floors.get(f);
+  const row = floors.get(f).filter(c=>intact(c.id));
   for(const c of row) carried.set(c.id, 1 + (incoming.get(c.id) || 0));
   for(const c of row){
    if(c.ground || intact(c.below)) continue;

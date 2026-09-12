@@ -6,8 +6,10 @@ import {fractureRecipe,pieceAlive,pieceDistance,pieceEnergy,fractureStrength,sha
 import {refreshFineColliders,removeBody,bodyPose} from './destruction.js';
 import {v,vec,arr,seeded} from '../shared/math.js';
 import {axes,box,sweepBox} from '../shared/giant-rig.js';
+import {DeadlineQueue} from './deadline-queue.js';
+import {ShardSupport} from './shard-support.js';
 export const MAX_ACTIVE_SHARDS=96,MAX_RESTING_SHARD_COLLIDERS=256;
-export function initFracture(room){room.shards=new Map();room.activeShards=new Set();room.ballisticShards=new Set();room.shardSolids=new Map();room.restingShards=new Set();room.supportChecks=[];room.fractureEvents=new Map();room.nextShard=1000000;}
+export function initFracture(room){room.shards=new Map();room.activeShards=new Set();room.ballisticShards=new Set();room.shardSolids=new Map();room.restingShards=new Set();room.shardLandings=new DeadlineQueue();room.shardSupport=new ShardSupport();room.world.onColliderRemoved=handle=>room.shardSupport.invalidate(handle);room.fractureEvents=new Map();room.nextShard=1000000;}
 export function chipCell(room,c,point,radius,energy,by=0,direction=[0,0,0],all=false,volume=null,releasing=false){
  if(!c||room.detached.has(c.id))return [];
  const {pieces}=fractureRecipe(c),at=Array.isArray(point)?point:arr(point),local=at.map((n,k)=>n-c.p[k]),gone=new Set(c.skin.parts||[]),damage=c.skin.partHP??={},chosen=[];
@@ -44,11 +46,11 @@ export function spawnShards(room,c,pieces,direction=[0,0,0]){
   room.event(shardMeta(e));
  }
 }
-function supportingHeight(room,p,half){
+function supportingHeight(room,p,half,watchId){
  // A ray starting inside a wall is not support. Only upward-facing surfaces
  // beneath the piece count, and fine rubble cannot support itself in a stack.
- let height=0;const origin=v(p[0],p[1]+.08,p[2]);
- room.world.intersectionsWithRay(new RAPIER.Ray(origin,v(0,-1,0)),Math.max(.2,origin.y+1),false,hit=>{const y=origin.y-hit.timeOfImpact;if(hit.normal.y>.55&&y<=p[1]+.01)height=Math.max(height,y);return true;},undefined,group(C.COLLISION.PLAYER,C.COLLISION.WORLD));return height;
+ let height=0,handle=null;const origin=v(p[0],p[1]+.08,p[2]);
+ room.world.intersectionsWithRay(new RAPIER.Ray(origin,v(0,-1,0)),Math.max(.2,origin.y+1),false,hit=>{const y=origin.y-hit.timeOfImpact;if(hit.normal.y>.55&&y<=p[1]+.01&&y>height){height=y;handle=hit.collider.handle;}return true;},undefined,group(C.COLLISION.PLAYER,C.COLLISION.WORLD));if(watchId!==undefined)room.shardSupport.watch(watchId,handle);return height;
 }
 function verticalHalf(e){const b=box(e.p,e.half,e.q);return b.extent[1];}
 function planFall(room,e){
@@ -62,12 +64,14 @@ function makeBallistic(room,e,plan){
  // server-queried supporting surface rather than freezing or deleting it in air.
  const t=Math.sqrt(Math.max(0,e.p[1])*2/24),x=e.p[0]+e.velocity[0]*t,z=e.p[2]+e.velocity[2]*t;
  e.ground=plan?.ground??supportingHeight(room,[x,e.p[1]-.04,z],e.half)+e.half[1];
- e.duration=plan?.duration??Math.max(.08,(e.velocity[1]+Math.sqrt(e.velocity[1]**2+48*Math.max(0,e.p[1]-e.ground)))/24);room.ballisticShards.add(e.id);
+ e.duration=plan?.duration??Math.max(.08,(e.velocity[1]+Math.sqrt(e.velocity[1]**2+48*Math.max(0,e.p[1]-e.ground)))/24);room.ballisticShards.add(e.id);room.shardLandings.set(e.id,e.born+e.duration);
 }
-export function shardMeta(e){const {body,...meta}=e;return {...meta,...(body?{...bodyPose(body),velocity:arr(body.linvel())}:{})};}
-export function settleShard(room,e){
+export function shardMeta(e,time){const {body,...meta}=e;return {...meta,...(body?{...bodyPose(body),velocity:arr(body.linvel())}:e.ballistic&&!e.settled&&Number.isFinite(time)?shardBallistic(e,time):{})};}
+export function settleShard(room,e,supportKnown=false){
+ if(!supportKnown){if(e.body)Object.assign(e,bodyPose(e.body));else if(e.ballistic)Object.assign(e,shardBallistic(e,room.time));}
+ if(!supportKnown){const ground=supportingHeight(room,e.p,e.half,e.id);if(e.p[1]-verticalHalf(e)>ground+.16)room.shardSupport.dirty.add(e.id);}
  if(e.body){Object.assign(e,bodyPose(e.body));removeBody(room,e.body);e.body=null;}
- e.settled=true;e.ballistic=false;room.activeShards.delete(e.id);room.ballisticShards.delete(e.id);room.restingShards.add(e.id);
+ e.settled=true;e.ballistic=false;room.activeShards.delete(e.id);room.ballisticShards.delete(e.id);room.shardLandings.delete(e.id);room.restingShards.add(e.id);
  attachRestingShard(room,e);room.event(shardMeta(e));
 }
 function attachRestingShard(room,e){
@@ -80,15 +84,15 @@ export function updateShards(room){
  // Query the unchanged supporting world before adding/removing any shard bodies.
  // Otherwise each settling brick invalidates and rebuilds the entire query tree.
  const settle=[],resume=[];const falling=e=>resume.push([e,planFall(room,e)]);
- for(const id of room.activeShards){const e=room.shards.get(id);if(e.body.isSleeping()){Object.assign(e,bodyPose(e.body));if(e.p[1]-verticalHalf(e)<=supportingHeight(room,e.p,e.half)+.16)settle.push(e);else falling(e);}else if(room.time-e.born>8||e.body.translation().y<-.5)falling(e);}
- for(const id of room.ballisticShards){const e=room.shards.get(id);Object.assign(e,shardBallistic(e,room.time));if(room.time-e.born>=e.duration){const ground=supportingHeight(room,e.p,e.half)+verticalHalf(e);if(e.p[1]>ground+.16)falling(e);else{e.p[1]=ground;settle.push(e);}}}
- if(!room.supportChecks.length)room.supportChecks=[...room.restingShards];
- for(let i=0;i<24&&room.supportChecks.length;i++){const id=room.supportChecks.pop(),e=room.shards.get(id);if(e?.settled&&e.p[1]-verticalHalf(e)>supportingHeight(room,e.p,e.half)+.16)falling(e);}
- for(const [e,plan]of resume)resumeFall(room,e,plan);for(const e of settle)settleShard(room,e);
+ for(const id of room.activeShards){const e=room.shards.get(id);if(e.body.isSleeping()){Object.assign(e,bodyPose(e.body));if(e.p[1]-verticalHalf(e)<=supportingHeight(room,e.p,e.half,e.id)+.16)settle.push(e);else falling(e);}else if(room.time-e.born>8||e.body.translation().y<-.5)falling(e);}
+ for(const {id}of room.shardLandings.due(room.time)){const e=room.shards.get(id);if(!e?.ballistic)continue;Object.assign(e,shardBallistic(e,room.time));const ground=supportingHeight(room,e.p,e.half,e.id)+verticalHalf(e);if(e.p[1]>ground+.16)falling(e);else{e.p[1]=ground;settle.push(e);}}
+ for(const id of room.shardSupport.take()){const e=room.shards.get(id);if(e?.settled&&e.p[1]-verticalHalf(e)>supportingHeight(room,e.p,e.half,e.id)+.16)falling(e);}
+ for(const [e,plan]of resume)resumeFall(room,e,plan);for(const e of settle)settleShard(room,e,true);
 }
 function resumeFall(room,e,plan){
+ room.shardSupport.remove(e.id);
  if(e.body){Object.assign(e,bodyPose(e.body));e.velocity=arr(e.body.linvel());removeBody(room,e.body);e.body=null;}else e.velocity=[0,0,0];
  if(room.shardSolids.has(e.id))removeBody(room,room.shardSolids.get(e.id));room.shardSolids.delete(e.id);room.restingShards.delete(e.id);room.activeShards.delete(e.id);e.settled=false;makeBallistic(room,e,plan);room.event(shardMeta(e));
 }
-export function restoreShards(room,meta){const e={...meta,body:null};room.shards.set(e.id,e);room.nextShard=Math.max(room.nextShard,e.id+1);if(e.settled){room.restingShards.add(e.id);attachRestingShard(room,e);}else makeBallistic(room,e);}
-export function removeShards(room,id){const e=room.shards.get(id);if(e?.body)removeBody(room,e.body);if(room.shardSolids.has(id))removeBody(room,room.shardSolids.get(id));room.shardSolids.delete(id);room.restingShards.delete(id);room.activeShards.delete(id);room.ballisticShards.delete(id);room.shards.delete(id);}
+export function restoreShards(room,meta){const e={...meta,body:null};room.shards.set(e.id,e);room.nextShard=Math.max(room.nextShard,e.id+1);if(e.settled){room.restingShards.add(e.id);room.shardSupport.dirty.add(e.id);attachRestingShard(room,e);}else makeBallistic(room,e);}
+export function removeShards(room,id){const e=room.shards.get(id);room.shardSupport.remove(id);room.shardLandings.delete(id);if(e?.body)removeBody(room,e.body);if(room.shardSolids.has(id))removeBody(room,room.shardSolids.get(id));room.shardSolids.delete(id);room.restingShards.delete(id);room.activeShards.delete(id);room.ballisticShards.delete(id);room.shards.delete(id);}

@@ -8,8 +8,9 @@ import {box} from '../shared/giant-rig.js';
 import {sidewalkSlabs} from '../shared/streets.js';
 import {addBuildings,removeBody,bodyPose,debrisMeta,detachCellColliders,restoreSkin,restoreDebris} from './destruction.js';
 import {shardMeta,restoreShards,removeShards} from './fracture.js';
+import {rayBlocks,rayBounds,intersectsRayBounds,archivedRayBounds} from './ray-streaming.js';
 export class CityStreaming{
- constructor(room){this.room=room;this.active=new Map();this.archive=new Map();this.free=[];this.landmarks=new Set();this.lastSpawn=-Infinity;this.lastFocus='';}
+ constructor(room){this.room=room;this.active=new Map();this.archive=new Map();this.free=[];this.landmarks=new Set();this.lastSpawn=-Infinity;this.lastFocus='';this.rayCache=new Map();}
  ensureAround(x,z,wanted=new Set()){
   const [cx,cz]=blockAt(x,z);
   for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)if(!homeBlock(cx+dx,cz+dz)){const key=blockKey(cx+dx,cz+dz);wanted.add(key);if(!this.active.has(key))this.load(cx+dx,cz+dz);}
@@ -79,7 +80,7 @@ export class CityStreaming{
  capture(tile){
   const r=this.room,damage=[];
   for(const c of tile.cells){const s=initialSkin(c);if(c.skin.parts?.length||Object.keys(c.skin.partHP||{}).length||c.skin.hp!==s.hp||c.skin.glass!==s.glass||c.skin.facade!==s.facade||c.skin.facadeHp.some((h,i)=>h!==s.facadeHp[i])||c.skin.glassHp.some((h,i)=>h!==s.glassHp[i]))damage.push([c.id,structuredClone(c.skin)]);}
-  return {x:tile.x,z:tile.z,key:tile.key,landmark:tile.landmark,damage,fineCollapses:[...r.fineCollapses].filter(([id])=>tile.cellIds.has(id)),shards:[...r.shards.values()].filter(e=>tile.cellIds.has(e.cell)).map(shardMeta),detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
+  return {x:tile.x,z:tile.z,key:tile.key,landmark:tile.landmark,damage,fineCollapses:[...r.fineCollapses].filter(([id])=>tile.cellIds.has(id)),shards:[...r.shards.values()].filter(e=>tile.cellIds.has(e.cell)).map(e=>shardMeta(e,r.time)),detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
  }
  meta(tile){const saved=this.capture(tile);return this.publicState(saved,tile.indices);}
  publicState(saved,indices){const inDebris=new Set(saved.entities.flatMap(e=>e.cells));return {key:saved.key,x:saved.x,z:saved.z,landmark:saved.landmark,indices,skins:saved.damage.map(([id,s])=>[id,s.glass,s.facade]),fractures:saved.damage.filter(([,s])=>s.parts?.length).map(([id,s])=>[id,s.parts]),shards:saved.shards||[],clearedCells:saved.detached.filter(id=>!inDebris.has(id)),entities:saved.entities};}
@@ -93,6 +94,19 @@ export class CityStreaming{
   r.cells=r.cells.filter(c=>!tile.cellIds.has(c.id));removeBody(r,tile.ground);r.handWorld.fixed=r.handWorld.fixed.filter(b=>!tile.groundBoxes.includes(b));this.active.delete(key);
  }
  welcome(){return [...this.active.values()].map(t=>this.meta(t)).concat([...this.archive].filter(([key])=>!this.active.has(key)).map(([,s])=>this.publicState(s)));}
- // A long rifle ray may reach beyond the normal physics neighbourhood.
- ensureRay(from,to){const steps=Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)/35);for(let i=0;i<=steps;i++){const t=steps?i/steps:0,[x,z]=blockAt(from.x+(to.x-from.x)*t,from.z+(to.z-from.z)*t);if(!homeBlock(x,z)&&!this.active.has(blockKey(x,z)))this.load(x,z);}}
+ // Stop at an existing obstruction and reject empty air from conservative
+ // authored bounds before constructing new Rapier bodies. Actual hits still
+ // come from the same authoritative collider query after the block is loaded.
+ ensureRay(from,to){
+  const delta={x:to.x-from.x,y:to.y-from.y,z:to.z-from.z},length=Math.hypot(delta.x,delta.y,delta.z);if(!length)return;
+  const direction={x:delta.x/length,y:delta.y/length,z:delta.z/length},ray=new RAPIER.Ray(from,direction),groups=group(C.COLLISION.PLAYER,C.COLLISION.WORLD|C.COLLISION.DEBRIS);
+  const hit=()=>this.room.world.castRay(ray,length,true,undefined,groups)?.timeOfImpact??length;let distance=hit();
+  for(const {x,z,t}of rayBlocks(from,to)){
+   if(t*length>distance)break;const key=blockKey(x,z);if(homeBlock(x,z)||this.active.has(key))continue;
+   const landmark=this.landmarks.has(key)?'chrysler':undefined,cacheKey=key+':'+(landmark||'');let bounds=this.rayCache.get(cacheKey);
+   if(!bounds){bounds=rayBounds(generateBlock(x,z,this.room.env.seed,{landmark}));this.rayCache.set(cacheKey,bounds);if(this.rayCache.size>64)this.rayCache.delete(this.rayCache.keys().next().value);}
+   if(!intersectsRayBounds(bounds,from,direction,distance)&&!intersectsRayBounds(archivedRayBounds(this.archive.get(key),bounds),from,direction,distance))continue;
+   this.load(x,z);distance=hit();
+  }
+ }
 }

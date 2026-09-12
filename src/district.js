@@ -3,18 +3,24 @@ import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
 import {bakedModel, instances, assetStatus} from './assets.js';
 import {roofProp,ROOF_ASSETS} from '../shared/props.js';
 import {seeded} from '../shared/math.js';
+import {cloudSkyMaterial} from './render/cloud-sky.js';
+import {setAtmospherePanorama} from './render/distance-fog.js';
 const base = '/assets/imported/';
 // Downloaded dressing around the destructible district: HDR sky, far skyline, street traffic,
 // rooftop equipment that rides its bay, harbour industry. Nothing here is gameplay collision.
 export async function installDistrict(view, renderer){
  const tier = view.tier, env = view.env, half = env.half;
- const skyURL = base + 'textures/sky-' + (view.quest ? '1k' : '2k') + '.hdr';
+ const skyURL = base + 'textures/sky-' + (view.quest || tier.name==='QUEST' ? '1k' : '2k') + '.hdr';
  const tasks = [], rand = seeded(78021), root = view.root;
  tasks.push(new RGBELoader().loadAsync(skyURL).then(hdr => {
   hdr.mapping = T.EquirectangularReflectionMapping; const pmrem = new T.PMREMGenerator(renderer), envMap = pmrem.fromEquirectangular(hdr); pmrem.dispose();
   view.scene.environment = envMap.texture; view.scene.environmentIntensity = tier.lambert ? .45 : .6; view.scene.background = env.infinite ? null : hdr; view.scene.backgroundIntensity = .8; view.scene.backgroundBlurriness = 0;
   view.scene.backgroundRotation.y = .4; view.scene.environmentRotation.y = .4; view.sky.visible = !!env.infinite; assetStatus.loaded.push(skyURL);
-  if(env.infinite)hdr.dispose(); // Reflections now use the filtered map; the raw panorama is not displayed.
+  if(env.infinite){
+   setAtmospherePanorama(view.scene,hdr,view.scene.environmentRotation.y);
+   const fallback=view.sky.material;
+   view.sky.material=cloudSkyMaterial(hdr,view.scene.fog.color,view.scene.environmentRotation.y);view.sky.frustumCulled=false;fallback.dispose();
+  }
  }).catch(error => { assetStatus.failed.push(skyURL); console.error('Sky panorama failed to load', error); }));
  // Lower tiers lean on the two low-detail models for the ring (they are 10x cheaper) and keep
  // only a few detailed skyscrapers for silhouette.

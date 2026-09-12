@@ -24,7 +24,7 @@ export function buildCity(room){
  addBuildings(room,room.cells,room.env.buildings.map((_,i)=>i));
 }
 export function addBuildings(room,cells,indices){
- for(const i of indices){room.buildingBodies[i]=room.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());room.cellsByBuilding[i]=[];room.floors[i]=[];room.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];room.buildingColumns[i]={merged:true,handles:[]};}
+ for(const i of indices){room.buildingBodies[i]=room.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());room.cellsByBuilding[i]=[];room.floors[i]=[];room.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];room.buildingColumns[i]={handles:[],runs:new Set()};}
  for(const c of cells){
   c.queryHalf=c.size.map(v=>v/2);c.skin = initialSkin(c); c.lastHit = -100; c.entity = 0; c.lastHitBy = 0; c.handles = []; c.wallHandles = [[], [], [], []]; c.structureHandles = []; c.roofHandles = [];
   room.cellsByBuilding[c.building].push(c); room.cellMap.set(c.id, c);
@@ -38,25 +38,26 @@ export function addBuildings(room,cells,indices){
   const b=room.buildingBounds[c.building];for(let k=0;k<3;k++){c.queryHalf[k]=Math.max(c.queryHalf[k],Math.abs(a[k])+a[k+3]);b[k]=Math.min(b[k],c.p[k]+a[k]-a[k+3]);b[k+3]=Math.max(b[k+3],c.p[k]+a[k]+a[k+3]);}
  }
  for(const i of indices) for(const f of room.floors[i]) if(f) mergeFloor(room, f);
- // Intact columns are continuous vertical runs. Split a building's runs only when its
- // first structural bay fails; this keeps the dense undamaged city cheap to simulate.
+ // Intact columns are continuous runs. Retain their floor membership so damage
+ // can split only the affected storey, keeping the other spans and slopes intact.
  indices.forEach(bi=>{
   const floors=room.floors[bi];
   const runs=new Map();
   for(const f of floors)for(const a of floorColumns(f)){
    const key=a.grid+':'+(f.cells[0].columnSection??''),lo=a[1]-a[4],hi=a[1]+a[4];
-   const run=runs.get(key);if(run){run.end=[a[0],hi,a[2]];}else runs.set(key,{start:[a[0],lo,a[2]],end:[a[0],hi,a[2]]});
+   let run=runs.get(key);if(run)run.end=[a[0],hi,a[2]];else runs.set(key,run={start:[a[0],lo,a[2]],end:[a[0],hi,a[2]],floors:[]});run.floors.push(f.floor);
   }
   // Tapered floors move the same column line a little each storey. Merge by its
   // logical grid corner, then rotate the continuous run instead of adding hundreds
   // of separate colliders. A structural failure still splits it into local bays.
-  for(const {start,end} of runs.values()){
-   const delta=end.map((n,k)=>n-start[k]),length=Math.hypot(...delta),q=[delta[2],0,-delta[0],length+delta[1]],ql=Math.hypot(...q),shape=RAPIER.ColliderDesc.cuboid(.15,length/2,.15)
-    .setTranslation(...start.map((n,k)=>(n+end[k])/2)).setRotation({x:q[0]/ql,y:0,z:q[2]/ql,w:q[3]/ql}).setDensity(22).setFriction(1.05).setRestitution(.015)
-    .setCollisionGroups(group(G.WORLD)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-   const co=room.world.createCollider(shape,room.buildingBodies[bi]);room.colliderTags.set(co.handle,{building:bi,column:true});room.buildingColumns[bi].handles.push(co.handle);
-  }
+  for(const run of runs.values())attachColumnRun(room,bi,run);
  });
+}
+function attachColumnRun(room,bi,run){
+ const {start,end}=run,delta=end.map((n,k)=>n-start[k]),length=Math.hypot(...delta),q=[delta[2],0,-delta[0],length+delta[1]],ql=Math.hypot(...q);
+ const shape=RAPIER.ColliderDesc.cuboid(.15,length/2,.15).setTranslation(...start.map((n,k)=>(n+end[k])/2)).setRotation({x:q[0]/ql,y:0,z:q[2]/ql,w:q[3]/ql})
+  .setDensity(22).setFriction(1.05).setRestitution(.015).setCollisionGroups(group(G.WORLD)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+ const co=room.world.createCollider(shape,room.buildingBodies[bi]),columns=room.buildingColumns[bi];run.handle=co.handle;columns.runs.add(run);columns.handles.push(co.handle);room.colliderTags.set(co.handle,{building:bi,column:true});
 }
 function staticCollider(room, body, a, tag){
  const co = room.world.createCollider(RAPIER.ColliderDesc.cuboid(a[3], a[4], a[5]).setTranslation(a[0], a[1], a[2]).setDensity(22).setFriction(1.05).setRestitution(.015)
@@ -104,9 +105,16 @@ function floorColumns(f){
  const ix=Math.min(...f.cells.map(c=>c.ix)),iz=Math.min(...f.cells.map(c=>c.iz));
  for(let x=minX,i=0;x<=maxX+.01;x+=w,i++)for(let z=minZ,j=0;z<=maxZ+.01;z+=d,j++)put(x,z,ix+i,iz+j);return out;
 }
-function unmergeColumns(room,bi){
- const columns=room.buildingColumns[bi];if(!columns.merged)return;removeHandles(room,columns.handles);columns.merged=false;
- for(const f of room.floors[bi])for(const a of floorColumns(f))f.structure.push(staticCollider(room,room.buildingBodies[bi],a,{building:bi,floor:f.floor}));
+function unmergeColumns(room,f){
+ const bi=f.building,columns=room.buildingColumns[bi],c=f.cells[0],lo=c.p[1]-c.size[1]/2,hi=c.p[1]+c.size[1]/2;
+ for(const run of [...columns.runs]){
+  if(!run.floors.includes(f.floor))continue;
+  removeHandles(room,[run.handle]);columns.runs.delete(run);columns.handles.splice(columns.handles.indexOf(run.handle),1);
+  const point=y=>{const t=Math.max(0,Math.min(1,(y-run.start[1])/(run.end[1]-run.start[1])));return run.start.map((n,k)=>n+(run.end[k]-n)*t);};
+  const below=run.floors.filter(n=>n<f.floor),above=run.floors.filter(n=>n>f.floor);
+  if(below.length)attachColumnRun(room,bi,{start:run.start,end:point(lo),floors:below});
+  if(above.length)attachColumnRun(room,bi,{start:point(hi),end:run.end,floors:above});
+ }
 }
 const floorOf = (room, c) => room.floors[c.building][c.floor];
 function attachStructure(room, c){
@@ -119,7 +127,7 @@ function attachWall(room, c, side){
  if(!c.walls[side] || !wallSolid(c.material, c.skin.glass, c.skin.facade, side)) return;
  for(const a of cellColliders(c, c.skin).filter(s => s.kind==='wall' && s.side===side))c.wallHandles[side].push(staticCollider(room, room.buildingBodies[c.building], [c.p[0] + a[0], c.p[1] + a[1], c.p[2] + a[2], a[3], a[4], a[5]], {cell:c.id,side,part:a.part}));
 }
-function unmergeStructure(room, f){ if(!f.structureMerged) return; unmergeColumns(room,f.building); removeHandles(room, f.structure); f.structureMerged = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachStructure(room, c); }
+function unmergeStructure(room, f){ if(!f.structureMerged) return; unmergeColumns(room,f); removeHandles(room, f.structure); f.structureMerged = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachStructure(room, c); }
 function unmergeWall(room, f, side){ if(!f.wallsMerged[side]) return; removeHandles(room, f.walls[side]); f.wallsMerged[side] = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachWall(room, c, side); }
 // Remove every shape a bay owns. A static bay splits its floor first if it was still merged.
 export function detachCellColliders(room, c){

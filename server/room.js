@@ -101,7 +101,7 @@ export class Room {
    missiles:[...this.missiles.values()].map(m => ({...m, time:this.time, p:arr(m.p)})),
    clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity) && !this.settled.has(c.entity)).map(c => c.id),
    skins:damagedSkins(this), collapsed:[...this.collapsed],
-   fractures:this.cells.filter(c=>c.skin.parts?.length).map(c=>[c.id,c.skin.parts]),shards:[...this.shards.values()].map(shardMeta),
+   fractures:this.cells.filter(c=>c.skin.parts?.length).map(c=>[c.id,c.skin.parts]),shards:[...this.shards.values()].map(e=>shardMeta(e,this.time)),
    entities:[...this.debris.values(), ...this.settled.values()].map(e => debrisMeta(e)), rags:[...this.rags.values()].map(r => ragMeta(r)), roster:this.roster()};
  }
  // ---- input ----

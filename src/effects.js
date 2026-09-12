@@ -30,7 +30,7 @@ class ParticlePool{
 }
 export class Effects{
  constructor(scene,{quest=false,tier}={}){
-  this.scene=scene;this.tracers=[];this.audio=null;const base='/assets/imported/effects/',k=tier?.particles??(quest?.45:1);
+  this.scene=scene;this.tracers=[];this.audio=null;const base='/assets/imported/effects/',k=tier?.particles??(quest?.45:1);this.flightParticleScale=k;
   this.smoke=new ParticlePool(scene,base+'smoke.png',Math.round(160*k));
   this.dust=new ParticlePool(scene,base+'dust.png',Math.round(120*k));
   this.sparks=new ParticlePool(scene,base+'spark.png',Math.round(160*k),true);
@@ -59,7 +59,23 @@ export class Effects{
   this.particle(this.flares, p, {life:.25, size:5 * power, color:new T.Color(material === 'glass' ? 0xbfe9ff : 0xffc989), growth:2});
  }
  sonicBoom(p,direction){
-  this.sonicBursts.add(p,direction);
+  this.sonicBursts.add(p,direction);this.flightBurst(p,direction,false);
+ }
+ soarBreach(p,direction){
+  this.sonicBursts.add(p,direction,{breach:true});this.flightBurst(p,direction,true);
+ }
+ flightBurst(p,direction,breach){
+  const forward=new T.Vector3(...direction);if(forward.lengthSq()<.001)forward.set(0,0,-1);forward.normalize();
+  const side=new T.Vector3().crossVectors(forward,Math.abs(forward.y)>.95?new T.Vector3(1,0,0):up).normalize(),vertical=new T.Vector3().crossVectors(side,forward);
+  const center=new T.Vector3(...p).addScaledVector(forward,breach?0:2),n=Math.max(6,Math.round((breach?16:12)*this.flightParticleScale));
+  for(let i=0;i<n;i++){
+   const angle=i/n*Math.PI*2,radial=side.clone().multiplyScalar(Math.cos(angle)).addScaledVector(vertical,Math.sin(angle));
+   const at=center.clone().addScaledVector(radial,(breach?2.1:1.1)+Math.random()*.3).toArray();
+   // The clear center follows the breach opening; fragments and mist move
+   // outward at its rim, so the pilot flies through rather than into a fog card.
+   this.particle(breach?this.dust:this.smoke,at,{v:radial.clone().multiplyScalar(breach?9:7).addScaledVector(forward,breach?3:0),life:breach?.55+Math.random()*.4:.45+Math.random()*.25,size:breach?.55+Math.random()*.55:.35+Math.random()*.25,color:new T.Color(breach?(i%2?0xb9b0a0:0xc5d9e3):0xdaf3ff),gravity:breach?-1.8:.2,drag:1.8,growth:breach?1.5:1.2,opacity:breach?.46:.3});
+   if(breach)this.particle(this.sparks,at,{v:radial.clone().multiplyScalar(12+Math.random()*7).addScaledVector(forward,4),life:.25+Math.random()*.3,size:.12+Math.random()*.16,color:new T.Color(i%3?0xc6eeff:0xffcf8e),gravity:-5,drag:.7,opacity:.9});
+  }
  }
  missileExplosion(p){
   this.missileBlasts.add(p);

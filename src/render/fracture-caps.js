@@ -1,6 +1,6 @@
 // Close only real cross-sections of the authored mesh. Never fill a proxy box:
 // separate members and holes remain separate, and every cap keeps source UV/color.
-import {ShapeUtils,Vector2} from 'three';
+import {ShapeUtils,Vector2} from './fracture-types.js';
 const EPS=1e-6;
 const sectionCache=new WeakMap();
 const key=v=>v.slice(0,3).map(n=>Math.round(n/EPS)).join(',');

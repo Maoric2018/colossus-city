@@ -2,6 +2,8 @@ import {decodeSnapshot} from '../shared/protocol.js';
 import {unpackEvents} from '../shared/event-codec.js';
 import {handQuaternion} from '../shared/giant-rig.js';
 import {SnapshotTiming} from '../shared/snapshot-timing.js';
+import {FractureDeltas} from '../shared/fracture-deltas.js';
+import {ShardDeltas} from '../shared/shard-deltas.js';
 const mix = (a, b, t) => a + (b - a) * t;
 const angle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 function vectorInto(out, a, b, t){ out[0] = mix(a[0], b[0], t); out[1] = mix(a[1], b[1], t); out[2] = mix(a[2], b[2], t); return out; }
@@ -14,7 +16,7 @@ function quatInto(out, a, b, t){
 export class Connection {
  constructor(onMessage, onClose){
   this.onMessage = onMessage; this.onClose = onClose; this.snapshots = []; this.ping = 0; this.bytes = 0; this.kbps = 0; this.lastBytes = 0; this.receivedAt = 0; this.ws = null;
-  this.timing=new SnapshotTiming();
+  this.timing=new SnapshotTiming();this.fractures=new FractureDeltas();this.shards=new ShardDeltas();
   this.scratch = {players:new Map(), bodies:new Map(), state:{head:[0, 0, 0], left:[0, 0, 0], right:[0, 0, 0], players:[], bodies:[]}};
   this.timer = setInterval(() => { if(this.ws?.readyState === 1){ this.send({type:'ping', t:performance.now()}); this.kbps = (this.bytes - this.lastBytes) * 8 / 2000; this.lastBytes = this.bytes; } }, 2000);
  }
@@ -23,7 +25,7 @@ export class Connection {
   return new Promise((resolve, reject) => {
    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`); this.ws = ws; ws.binaryType = 'arraybuffer'; let joined = false;
    const timeout = setTimeout(() => { if(!joined){ reject(Error('Connection timed out. Make sure the server is running.')); ws.close(); } }, 10000);
-   ws.onopen = () => this.send({type:'join', ...join, eventFormat:1});
+   ws.onopen = () => this.send({type:'join', ...join, eventFormat:1,fractureDeltas:1,shardDeltas:1,snapshotInterest:1});
    ws.onmessage = e => {
     if(e.data instanceof ArrayBuffer){
      this.bytes += e.data.byteLength;
@@ -32,9 +34,11 @@ export class Connection {
     this.bytes += e.data.length;
     try{ const m = JSON.parse(e.data);
      if(m.type === 'pong'){ this.ping = Math.round(performance.now() - m.t); return; }
-     if(m.type === 'welcome'){ joined = true; clearTimeout(timeout); this.snapshots = [];this.timing=new SnapshotTiming();this.scratch.players.clear();this.scratch.bodies.clear(); this.id = m.id; this.room = m.room; this.role = m.role; resolve(m); }
+     if(m.type === 'welcome'){ joined = true; clearTimeout(timeout); this.snapshots = [];this.timing=new SnapshotTiming();this.fractures.seed(m);this.shards.seed(m);this.scratch.players.clear();this.scratch.bodies.clear(); this.id = m.id; this.room = m.room; this.role = m.role; resolve(m); }
      if(m.type === 'error' && !joined){ clearTimeout(timeout); reject(Error(m.message)); ws.close(); return; }
      if(m.type==='events'&&m.eventFormat===1)m.events=unpackEvents(m.events);
+     if(m.type==='events')m.events=this.fractures.unpack(m.events,id=>this.send({type:'fracture-sync',cell:id}));
+     if(m.type==='events'){const missing=[];m.events=this.shards.unpack(m.events,id=>missing.push(id));for(let i=0;i<missing.length;i+=128)this.send({type:'shard-sync',ids:missing.slice(i,i+128)});}
      this.onMessage(m);
     }catch(err){ console.error(err); }
    };

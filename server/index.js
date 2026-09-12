@@ -13,6 +13,11 @@ import {Room,physicsReady} from './room.js';
 import {C} from '../shared/config.js';
 import {encodeSnapshot} from '../shared/protocol.js';
 import {packEvents} from '../shared/event-codec.js';
+import {FractureDeltas} from '../shared/fracture-deltas.js';
+import {snapshotForClient} from './snapshot-interest.js';
+import {ShardDeltas} from '../shared/shard-deltas.js';
+import {shardMeta} from './fracture.js';
+import {EventPackets} from './event-packets.js';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PORT=Number(process.env.PORT)||8080,rooms=new Map();
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.bin':'application/octet-stream'};
@@ -66,8 +71,14 @@ wss.on('connection',ws=>{
     if(m.create){if(rooms.size>=C.MAX_ROOMS)throw Error('Server is full. Try again after a room closes.');room=new Room(freshCode(),{practice:!!m.practice});rooms.set(room.code,room);}
     else{const code=String(m.room||'').toUpperCase();if(!/^[A-F0-9]{6}$/.test(code)||!rooms.has(code))throw Error('Room not found. Ask the host for its six-character code.');room=rooms.get(code);}
     if(room.clients.size>=16)throw Error('This room is full.');
-    client=room.attach(ws,role,name);client.eventFormat=m.eventFormat===1?1:0;clearTimeout(joinTimeout);send(ws,room.welcome(client));
+    client=room.attach(ws,role,name);client.eventFormat=m.eventFormat===1?1:0;client.snapshotInterest=m.snapshotInterest===1;client.fractureDeltas=m.fractureDeltas===1?new FractureDeltas():null;client.shardDeltas=m.shardDeltas===1?new ShardDeltas():null;clearTimeout(joinTimeout);const welcome=room.welcome(client);client.fractureDeltas?.seed(welcome);client.shardDeltas?.seed(welcome);send(ws,welcome);
     broadcast(room,{type:'roster',players:room.roster(),bossPresent:!!room.bossClient,host:room.hostId()});return;
+   }
+   if(m.type==='fracture-sync'&&client.fractureDeltas&&Number.isSafeInteger(m.cell)){
+    const cell=room.cellMap.get(m.cell);if(cell){const event={type:'fracture',cell:cell.id,parts:cell.skin.parts||[]};client.fractureDeltas.set(cell.id,event.parts);send(ws,{type:'events',events:[event]});}return;
+   }
+   if(m.type==='shard-sync'&&client.shardDeltas&&Array.isArray(m.ids)&&m.ids.length<=128){
+    const events=[];for(const id of new Set(m.ids))if(Number.isSafeInteger(id)){const e=room.shards.get(id);if(e){const meta=shardMeta(e,room.time);client.shardDeltas.set(meta);events.push(meta);}}if(events.length)send(ws,{type:'events',events});return;
    }
    room.input(client,m);
   }catch(e){send(ws,{type:'error',message:e.message||'Invalid request'});}
@@ -88,14 +99,13 @@ const interval=setInterval(()=>{
    // Hits and broken skins leave on the current physics tick; pose snapshots keep
    // their lower bandwidth cadence. Destruction need not wait another 50 ms.
    const events=room.drainEvents();
-   if(events.some(e=>e.type==='reset'))for(const c of room.clients.values())send(c.ws,room.welcome(c));
-   if(events.length){let legacy,packed;for(const c of room.clients.values()){
-    if(c.eventFormat===1){packed??=JSON.stringify({type:'events',eventFormat:1,events:packEvents(events)});send(c.ws,packed);}
-    else{legacy??=JSON.stringify({type:'events',events});send(c.ws,legacy);}
+   if(events.some(e=>e.type==='reset'))for(const c of room.clients.values()){const welcome=room.welcome(c);c.fractureDeltas?.seed(welcome);c.shardDeltas?.seed(welcome);send(c.ws,welcome);}
+   if(events.length){const packets=new EventPackets();for(const c of room.clients.values()){
+    let next=c.fractureDeltas?c.fractureDeltas.pack(events):events;if(c.shardDeltas)next=c.shardDeltas.pack(next);send(c.ws,packets.get(next,c.eventFormat));
    }}
    if(room.tick%C.SNAPSHOT_EVERY===0){
-    const snapshot=Buffer.from(encodeSnapshot(room.snapshot()));
-    for(const c of room.clients.values())if(c.ws.readyState===WebSocket.OPEN&&c.ws.bufferedAmount<128*1024)c.ws.send(snapshot);
+    const snapshot=room.snapshot();let full;
+    for(const c of room.clients.values())if(c.ws.readyState===WebSocket.OPEN&&c.ws.bufferedAmount<128*1024){const relevant=snapshotForClient(snapshot,c,room);c.ws.send(relevant===snapshot?(full??=Buffer.from(encodeSnapshot(snapshot))):Buffer.from(encodeSnapshot(relevant)));}
    }
   }
   maxStepMS=Math.max(maxStepMS,performance.now()-t);accumulator-=C.TICK;

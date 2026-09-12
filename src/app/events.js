@@ -15,8 +15,8 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
    case 'missile': missiles.add(e); audio.play('missile', {p:e.p}); if(state.role === 'boss') xr.haptic(.25, 60); return;
    case 'detonate': missiles.remove(e.id); fx.missileExplosion(e.p); audio.play('explosion', {p:e.p}); if(vr())xr.haptic(near(e.p,60)*.55,140);else shake.add(near(e.p,60)*.8); return;
    case 'dodge': fx.particle(fx.flares, e.p, {life:.25, size:2, color:new T.Color(0x8beaff), growth:2}); if(e.player === state.localId){ flightFX.dodge(); audio.play('dodge'); } return;
-   case 'soar-start':fx.sonicBoom(e.p,e.direction);audio.play('sonicboom',{p:e.p});if(e.player===state.localId){flightFX.sonicBoom();if(!vr())shake.add(.1);}return;
-   case 'soar-breach': audio.play('heavy',{p:e.p,power:.5});if(e.player===state.localId){flightFX.breach();shake.add(.035);}return;
+   case 'soar-start':fx.sonicBoom(e.p,e.direction);audio.play('sonicboom',{p:e.p});if(e.player===state.localId){flightFX.sonicBoom();if(!vr())shake.add(.8,2);}return;
+   case 'soar-breach': fx.soarBreach(e.p,e.direction);audio.play('heavy',{p:e.p,power:.5});if(e.player===state.localId){flightFX.breach();if(!vr())shake.add(.28);}return;
    case 'skin': for(const [id, glass, facade] of e.cells) city.setSkin(id, glass, facade); city.commit(); return;
    case 'fracture': city.setFracture(e.cell,e.parts);return;
    case 'shards': city.addShards(e);return;

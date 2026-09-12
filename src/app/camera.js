@@ -33,7 +33,8 @@ export class CameraRig {
   }
   camera.position.copy(this.pos); camera.rotation.order = 'YXZ';
   const fast = state.role === 'raider' && !!(pilot?.flags & F.SOAR), dodging = state.role === 'raider' && !!(pilot?.flags & F.DODGE), charge = state.role === 'raider' ? input.charge : 0;
-  camera.fov += ((dodging ? 94 : fast ? 86 : 72) - charge * 8 - camera.fov) * (1 - Math.exp(-dt * 6)); camera.updateProjectionMatrix();
+  const flightFov = fast ? 100 : 72, targetFov = dodging ? Math.max(94, flightFov + 8) : flightFov;
+  camera.fov += (targetFov - charge * 8 - camera.fov) * (1 - Math.exp(-dt * 6)); camera.updateProjectionMatrix();
   const bank = fast && pilot ? clamp((pilot.v[0] * Math.cos(yaw) - pilot.v[2] * Math.sin(yaw)) * .006, -.11, .11) : 0;
   const shake = this.shake.update(dt);
   camera.rotation.set(pitch + shake.y, yaw + shake.x, -bank + shake.roll, 'YXZ');

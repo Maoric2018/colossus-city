@@ -20,25 +20,40 @@ export const atlasShader=`
  }
 `;
 
-// Up to eight simultaneous entries share one draw call and one atlas texture.
+// Real expanding toroidal pressure fronts, aligned with flight direction and
+// depth-tested against the city. The downloaded smoke animates their surface.
 export class SonicBursts{
  constructor(scene){
   this.items=[];const {map,ready}=vfxTexture(BOOM_SHEET);this.ready=ready;
-  const geometry=new T.PlaneGeometry(1,1);this.frames=new T.InstancedBufferAttribute(new Float32Array(8),1).setUsage(T.DynamicDrawUsage);this.alpha=new T.InstancedBufferAttribute(new Float32Array(8),1).setUsage(T.DynamicDrawUsage);geometry.setAttribute('frame',this.frames);geometry.setAttribute('opacity',this.alpha);
-  const material=new T.ShaderMaterial({uniforms:{spriteMap:{value:map}},transparent:true,depthWrite:false,side:T.DoubleSide,
-   vertexShader:`attribute float frame;attribute float opacity;varying vec2 vUV;varying float vFrame;varying float vAlpha;void main(){vUV=uv;vFrame=frame;vec3 center=(modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.)).xyz;float size=length((modelMatrix*instanceMatrix)[0].xyz);vAlpha=opacity*smoothstep(.25,.9,distance(cameraPosition,center)/size);gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`,
-   fragmentShader:`uniform sampler2D spriteMap;varying vec2 vUV;varying float vFrame;varying float vAlpha;${atlasShader}void main(){vec4 tex=texture2D(spriteMap,atlasUV(vUV,vFrame,vec2(9.),vec2(2556.)));if(tex.a<.005)discard;gl_FragColor=vec4(tex.rgb,tex.a*vAlpha);\n#include <colorspace_fragment>\n}`});
-  this.mesh=new T.InstancedMesh(geometry,material,8);this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);this.mesh.count=0;this.mesh.visible=false;this.mesh.frustumCulled=false;this.mesh.renderOrder=3;scene.add(this.mesh);this.dummy=new T.Object3D();
+  const geometry=new T.TorusGeometry(1,.075,8,64);this.frames=new T.InstancedBufferAttribute(new Float32Array(16),1).setUsage(T.DynamicDrawUsage);this.alpha=new T.InstancedBufferAttribute(new Float32Array(16),1).setUsage(T.DynamicDrawUsage);geometry.setAttribute('frame',this.frames);geometry.setAttribute('opacity',this.alpha);
+  const material=new T.ShaderMaterial({uniforms:{spriteMap:{value:map}},transparent:true,depthTest:true,depthWrite:false,toneMapped:false,
+   vertexShader:`attribute float frame;attribute float opacity;varying vec2 vUV;varying float vFrame;varying float vAlpha;varying vec3 vNormal;varying vec3 vView;
+    void main(){vUV=uv;vFrame=frame;vAlpha=opacity;vec4 view=modelViewMatrix*instanceMatrix*vec4(position,1.);vView=-view.xyz;vNormal=normalMatrix*mat3(instanceMatrix)*normal;gl_Position=projectionMatrix*view;}`,
+   fragmentShader:`uniform sampler2D spriteMap;varying vec2 vUV;varying float vFrame;varying float vAlpha;varying vec3 vNormal;varying vec3 vView;${atlasShader}
+    void main(){
+     float angle=vUV.x*6.2831853;
+     // Follow the animated sheet's annulus to retain its wispy breakup on a
+     // curved surface, rather than projecting a flat ring over the camera.
+     float radius=mix(.23,.43,clamp((vFrame-16.)/14.,0.,1.));
+     vec2 smokeUV=.5+vec2(cos(angle),sin(angle))*(radius+.035*cos(vUV.y*6.2831853));
+     float mist=texture2D(spriteMap,atlasUV(smokeUV,vFrame,vec2(9.),vec2(2556.))).a;
+     float facing=abs(dot(normalize(vNormal),normalize(vView)));
+     float alpha=vAlpha*(.18+mist*.65)*(.2+.8*pow(1.-facing,1.5));
+     if(alpha<.005)discard;gl_FragColor=vec4(mix(vec3(.55,.8,1.),vec3(1.),mist),alpha);
+     #include <colorspace_fragment>
+    }`});
+  this.mesh=new T.InstancedMesh(geometry,material,16);this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);this.mesh.count=0;this.mesh.visible=false;this.mesh.frustumCulled=false;this.mesh.renderOrder=3;scene.add(this.mesh);this.dummy=new T.Object3D();
  }
- add(p,direction){
-  if(this.items.length>=8)this.items.shift();const axis=new T.Vector3(...direction).normalize();
-  this.items.push({p:new T.Vector3(...p),q:new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,1),axis),age:0});
+ add(p,direction,{breach=false}={}){
+  if(this.items.length>=16)this.items.shift();const axis=new T.Vector3(...direction);if(axis.lengthSq()<.001)axis.set(0,0,-1);axis.normalize();
+  // The entry front starts just ahead of the pilot, who then flies through it.
+  this.items.push({p:new T.Vector3(...p).addScaledVector(axis,breach?0:2),q:new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,1),axis),age:0,life:breach?.55:.8,breach});
  }
  update(dt){
   let count=0;const d=this.dummy;
-  for(const b of this.items){b.age+=dt;if(b.age>=.8)continue;const t=b.age/.8;
-   d.position.copy(b.p);d.quaternion.copy(b.q);d.scale.setScalar(9+t*7);d.updateMatrix();this.mesh.setMatrixAt(count,d.matrix);
-   this.frames.setX(count,BOOM_SHEET.first+Math.min(67,Math.floor(t*68)));this.alpha.setX(count,.5*(1-t*.45));this.items[count++]=b;
+  for(const b of this.items){b.age+=dt;if(b.age>=b.life)continue;const t=b.age/b.life;
+   d.position.copy(b.p);d.quaternion.copy(b.q);d.scale.setScalar(b.breach?1.8+t*3.4:1.1+t*7);d.updateMatrix();this.mesh.setMatrixAt(count,d.matrix);
+   this.frames.setX(count,16+Math.min(44,Math.floor(t*45)));this.alpha.setX(count,Math.min(1,b.age/.045)*(1-t)*.9);this.items[count++]=b;
   }
   this.items.length=count;this.mesh.count=count;this.mesh.visible=count>0;
   if(count)for(const a of [this.mesh.instanceMatrix,this.frames,this.alpha]){a.clearUpdateRanges();a.addUpdateRange(0,count*a.itemSize);a.needsUpdate=true;}
