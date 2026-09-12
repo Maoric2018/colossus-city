@@ -7,6 +7,7 @@ process.env.PLAYWRIGHT_BROWSERS_PATH??=path.join(root,'.cache/ms-playwright');
 const {chromium}=await import('playwright');
 const args=process.argv.slice(2),stills=args.includes('--stills'),width=Number(args.find(a=>a.startsWith('--width='))?.split('=')[1]||(stills?1280:1920));
 const only=args.find(a=>a.startsWith('--shot='))?.split('=')[1];
+const times=args.find(a=>a.startsWith('--times='))?.split('=')[1].split(',').map(Number);
 const extendedMode=args.includes('--extended'),actionMode=args.includes('--action')||extendedMode,noText=args.includes('--no-text')||actionMode;
 const output=path.join(root,'artifacts/cinematic-demo',extendedMode?'extended':actionMode?'action':noText?'no-text':'');await mkdir(output,{recursive:true});
 const {server,url}=await serve();let browser,encoder;const errors=[];
@@ -19,6 +20,8 @@ try{
  console.log('Director ready',await page.evaluate(()=>director.diagnostics()));
  const shots=await page.evaluate(()=>director.shots);
  if(stills){
+  if(times){for(const t of times){const b64=await page.evaluate(async t=>{await director.frame(t);return director.png();},t);await writeFile(path.join(output,`still-at-${t}.png`),Buffer.from(b64,'base64'));console.log('Contact',t);}}
+  else
   for(const shot of shots.filter(s=>!only||s.id===only)){
    const t=shot.start+(shot.end-shot.start)*.48;
    const b64=await page.evaluate(async t=>{await director.frame(t);return director.png();},t);

@@ -61,7 +61,7 @@ export async function createAction(c){
   }else{p=ragFrame(t-2.5);once('fist',true,()=>smallHit(hit.contact));}
   if(mode==='windup')cam([-13,22,-31],[-35,19,-5],49,.015);
   else if(mode==='hit')cam([-17,19,-30],[-32,17,-8],43,-.01);
-  else{cam([p.x+5,p.y+3,p.z+8],p.toArray(),53,.025);impact('landing',p.y<1.3,[p.x,.2,p.z],.7,'concrete');}
+  else{cam([-35,p.y+3.5,p.z+6],p.toArray(),53,.025);impact('landing',p.y<1.3,[p.x,.2,p.z],.7,'concrete');}
  }
  function tower(t,mode,dt){
   const k=keys(t,[[0,0],[2.3,0],[2.65,1],[3.05,1],[4.3,0],[9.5,0]]);
@@ -69,8 +69,8 @@ export async function createAction(c){
   play(collapse,(t-2.15)*1.2);impact('tower-hit',t>2.65,[61,6,70],1.3,'brick');
   if(mode==='flank'){const p=fly(0,a=>V([41,19,102-a*9]),t,{bank:.18});fire(0,[49,18,70],t);cam([35,14,108],[60,18,70],57,.015);}
   else if(mode==='swat')cam([35,13,100],[67,16,70],59,-.015);
-  else if(mode==='fall')cam([105,17+t,90],[76+t,17,70],62,-.025);
-  else{const p=fly(0,a=>V([75+(a-7)*19,9+Math.sin(a)*2,105]),t,{bank:.35,tuck:.3});cam([p.x-6,p.y+2,109],[p.x+7,p.y-1,101],65,.025);}
+  else if(mode==='fall')cam([105,38,110],[78+t*.4,17,70],60,-.025);
+  else{const p=fly(0,a=>V([75+(a-7)*19,9+Math.sin(a)*2,105]),t,{bank:.35,tuck:.3});cam([p.x+7,p.y+3,109],[p.x-8,p.y-1,97],65,.025);}
  }
  const finalAt=[-105,0,105];
  function finalPose(){return {head:[-105,24,105],left:[-111,15,100],right:[-99,15,100],bossYaw:0};}
