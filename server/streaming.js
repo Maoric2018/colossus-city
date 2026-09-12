@@ -5,6 +5,7 @@ import {C,group} from '../shared/config.js';
 import {generateCells,initialSkin} from '../shared/environment.js';
 import {generateBlock,blockAt,blockKey,homeBlock,cellBlock} from '../shared/city/layout.js';
 import {box} from '../shared/giant-rig.js';
+import {sidewalkSlabs} from '../shared/streets.js';
 import {addBuildings,removeBody,bodyPose,debrisMeta,detachCellColliders,restoreSkin,restoreDebris} from './destruction.js';
 import {shardMeta,restoreShards,removeShards} from './fracture.js';
 export class CityStreaming{
@@ -39,7 +40,9 @@ export class CityStreaming{
   r.cells.push(...cells);addBuildings(r,cells,indices);r.handWorld.addCells(cells);
   const ground=r.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x*70,-.3,z*70));r.world.createCollider(RAPIER.ColliderDesc.cuboid(35,.3,35).setFriction(.82).setCollisionGroups(group(C.COLLISION.WORLD)),ground);
   const groundBox=box([x*70,-.3,z*70],[35,.3,35]);r.handWorld.fixed.push(groundBox);
-  const tile={key:env.key,x,z,landmark:env.landmark,indices,cells,cellIds:new Set(cells.map(c=>c.id)),ground,groundBox};this.active.set(tile.key,tile);
+  const groundBoxes=[groundBox];
+  for(const slab of sidewalkSlabs(env)){const half=slab.boxes[0].slice(3);r.world.createCollider(RAPIER.ColliderDesc.cuboid(...half).setTranslation(0,slab.position[1]+.3,0).setFriction(.82).setCollisionGroups(group(C.COLLISION.WORLD)),ground);const b=box(slab.position,half);groundBoxes.push(b);r.handWorld.fixed.push(b);}
+  const tile={key:env.key,x,z,landmark:env.landmark,indices,cells,cellIds:new Set(cells.map(c=>c.id)),ground,groundBox,groundBoxes};this.active.set(tile.key,tile);
   const saved=this.archive.get(tile.key);
   if(saved){
    for(const [id,kick]of saved.fineCollapses||[])r.fineCollapses.set(id,kick);
@@ -87,7 +90,7 @@ export class CityStreaming{
   for(const e of saved.shards||[])removeShards(r,e.id);
   for(const i of tile.indices){removeBody(r,r.buildingBodies[i]);r.buildingBodies[i]=null;r.cellsByBuilding[i]=[];r.floors[i]=[];r.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];r.buildingColumns[i]=null;r.env.buildings[i]=null;r.dirtyBuildings.delete(i);r.lastCreak.delete(i);r.collapsed.delete(i);this.free.push(i);}
   for(const c of tile.cells){r.fineCollapses.delete(c.id);r.cellMap.delete(c.id);r.handWorld.setCell(c.id,null,undefined,true);r.handWorld.cells.delete(c.id);r.detached.delete(c.id);r.pendingFailures.delete(c.id);}
-  r.cells=r.cells.filter(c=>!tile.cellIds.has(c.id));removeBody(r,tile.ground);r.handWorld.fixed=r.handWorld.fixed.filter(b=>b!==tile.groundBox);this.active.delete(key);
+  r.cells=r.cells.filter(c=>!tile.cellIds.has(c.id));removeBody(r,tile.ground);r.handWorld.fixed=r.handWorld.fixed.filter(b=>!tile.groundBoxes.includes(b));this.active.delete(key);
  }
  welcome(){return [...this.active.values()].map(t=>this.meta(t)).concat([...this.archive].filter(([key])=>!this.active.has(key)).map(([,s])=>this.publicState(s)));}
  // A long rifle ray may reach beyond the normal physics neighbourhood.

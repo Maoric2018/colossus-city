@@ -4,10 +4,15 @@ import * as T from 'three';
 import {mergeParts, mesh, box, labelTexture} from '../art.js';
 import {surface} from '../render/quality.js';
 import {buildingFootprint} from '../../shared/city/layout.js';
+import {STREET} from '../../shared/streets.js';
+import {streetMaterial} from './street-material.js';
 export function buildGround(root, env, tier, textures){
  const half = env.half, span = half * 2 + 30, {avenues, streets, avenueWidth, streetWidth} = env.roads;
  const concrete = surface(tier, {map:textures.concrete, normalMap:textures.concreteNormal, normalScale:new T.Vector2(.2, .2), roughnessMap:textures.concreteRoughness, roughness:.9, color:0xcfc9bb});
  const asphalt = surface(tier, {map:textures.asphalt, normalMap:textures.asphaltNormal, normalScale:new T.Vector2(.3, .3), roughnessMap:textures.asphaltRoughness, roughness:.92, color:0x9ea6a7});
+ // The infinite city has one continuous road surface and shared block sidewalks.
+ // Legacy crossing road boxes and per-building pads must not be layered over it.
+ if(!env.infinite){
  const base = new T.Mesh(new T.PlaneGeometry(span, span), concrete); base.rotation.x = -Math.PI / 2; base.position.y = .012; base.receiveShadow = true; root.add(base);
  const roads = [];
  for(const x of avenues) roads.push([new T.BoxGeometry(avenueWidth, .02, span), [x, .03, 0]]);
@@ -19,15 +24,18 @@ export function buildGround(root, env, tier, textures){
  for(const x of avenues) for(const z of streets) for(let i = -3; i <= 3; i++) for(const side of [-1, 1]){ walks.push([new T.BoxGeometry(.7, .014, 2.6), [x + i * 1.3, .05, z + side * (streetWidth / 2 + 1.6)]]); walks.push([new T.BoxGeometry(2.6, .014, .7), [x + side * (avenueWidth / 2 + 1.6), .05, z + i * 1.3]]); }
  mesh(mergeParts(marks), marking, root).castShadow = false; mesh(mergeParts(yellows), yellow, root).castShadow = false; mesh(mergeParts(walks), marking, root).castShadow = false;
  // Raised sidewalk slab per tower.
- const dark = surface(tier, {color:0x293d42, metalness:.65, roughness:.61}), pads = [];
+ const pads = [];
  for(const b of env.buildings){ const [x0, z0, x1, z1] = buildingFootprint(b); pads.push([new T.BoxGeometry(x1 - x0 + 4, .18, z1 - z0 + 4), [b.x, .09, b.z]]);
  }
  mesh(mergeParts(pads), concrete, root).castShadow = false;
- const plaza = new T.Mesh(new T.CircleGeometry(env.plaza, 48), surface(tier, {map:textures.concrete, color:0xa4b3af, roughness:.65})); plaza.rotation.x = -Math.PI / 2; plaza.position.y = .1; root.add(plaza);
- const ring = new T.Mesh(new T.RingGeometry(env.plaza - 1.6, env.plaza - 1.4, 64), new T.MeshBasicMaterial({color:0x7addcd})); ring.rotation.x = -Math.PI / 2; ring.position.y = .11; root.add(ring);
+ }
+ const plazaY=env.infinite?STREET.curb+.025:.1;
+ const plazaMaterial=env.infinite?streetMaterial(tier,textures,true):surface(tier,{map:textures.concrete,color:0xa4b3af,roughness:.65});
+ const plaza = new T.Mesh(new T.CircleGeometry(env.plaza, 48), plazaMaterial); plaza.rotation.x = -Math.PI / 2; plaza.position.y = plazaY; root.add(plaza);
+ const ring = new T.Mesh(new T.RingGeometry(env.plaza - 1.6, env.plaza - 1.4, 64), new T.MeshBasicMaterial({color:0x7addcd,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1})); ring.rotation.x = -Math.PI / 2; ring.position.y = plazaY+.012; root.add(ring);
  for(const p of env.spawns){ const pad = new T.Mesh(new T.CircleGeometry(3.8, 40), surface(tier, {color:0x234348, metalness:.55, roughness:.6})); pad.rotation.x = -Math.PI / 2; pad.position.set(p[0], .06, p[2]); root.add(pad); const t = new T.Mesh(new T.PlaneGeometry(5, 5), new T.MeshBasicMaterial({map:labelTexture('H', {bg:'#25494b', fg:'#b8efad', w:256, h:256})})); t.rotation.x = -Math.PI / 2; t.position.set(p[0], .08, p[2]); root.add(t); }
  // Street lamps along every avenue.
- const lamps = [], bulbs = [];
+ const dark = surface(tier, {color:0x293d42, metalness:.65, roughness:.61}), lamps = [], bulbs = [];
  for(const x of avenues) for(let z = -half + 8; z <= half - 8; z += 24) for(const side of [-1, 1]){ if(streets.some(s=>Math.abs(z-s)<streetWidth/2+2))continue;const lx = x + side * (avenueWidth / 2 + .8); lamps.push([new T.CylinderGeometry(.07, .1, 6, 5), [lx, 3, z]], [new T.BoxGeometry(1.6, .1, .1), [lx - side * .7, 6.1, z]]); bulbs.push([new T.BoxGeometry(.8, .05, .3), [lx - side * 1.2, 6.03, z]]); }
  mesh(mergeParts(lamps), dark, root).castShadow = false; mesh(mergeParts(bulbs), new T.MeshBasicMaterial({color:0xffd998, toneMapped:false}), root).castShadow = false;
  if(env.infinite)return {update(){}};
