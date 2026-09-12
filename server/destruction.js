@@ -41,7 +41,7 @@ export function addBuildings(room,cells,indices){
   const floors=room.floors[bi];
   const runs=new Map();
   for(const f of floors)for(const a of floorColumns(f)){
-   const key=a.grid,lo=a[1]-a[4],hi=a[1]+a[4];
+   const key=a.grid+':'+(f.cells[0].columnSection??''),lo=a[1]-a[4],hi=a[1]+a[4];
    const run=runs.get(key);if(run){run.end=[a[0],hi,a[2]];}else runs.set(key,{start:[a[0],lo,a[2]],end:[a[0],hi,a[2]]});
   }
   // Tapered floors move the same column line a little each storey. Merge by its

@@ -31,6 +31,7 @@
     "test:chrysler": "node scripts/chrysler-smoke.mjs",
     "test:city": "node scripts/city-smoke.mjs",
     "test:catalog": "node scripts/catalog-smoke.mjs",
+    "test:world-landmarks": "node scripts/catalog-smoke.mjs --world",
     "test:streaming": "node scripts/streaming-smoke.mjs",
     "test:cars": "node scripts/car-smoke.mjs",
     "test:flight-animation": "node scripts/flight-animation-smoke.mjs",

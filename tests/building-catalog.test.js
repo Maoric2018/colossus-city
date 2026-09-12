@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NEW_BUILDING_STYLES,STYLE_BY_ID,catalogBuilding} from '../shared/city/catalog.js';
+import {NEW_BUILDING_STYLES,CATALOG_STYLES,WORLD_BUILDING_STYLES,STYLE_BY_ID,catalogBuilding} from '../shared/city/catalog.js';
 import {CATALOG_COMPONENTS,catalogRoofTypes,catalogRoofColliders} from '../shared/city/catalog-components.js';
 import {COMPONENTS,componentPlacements} from '../shared/city/components.js';
 import {generateBlock,BUILDING_STYLES,buildingFootprint,midtown} from '../shared/city/layout.js';
@@ -11,10 +11,10 @@ import {Room,physicsReady} from '../server/room.js';
 import {v} from '../shared/math.js';
 await physicsReady;
 const envFor=(s,variant=0)=>({...midtown,id:'catalog-test',infinite:false,buildings:[catalogBuilding(s,0,-30,{variant,random:()=>variant%2?.99:0})]});
-test('52 additional recipes have distinct designs, at least 30 actually placed component types, and stable structures',()=>{
- assert.equal(NEW_BUILDING_STYLES.length,52);assert.equal(BUILDING_STYLES.length,68);assert.equal(NEW_BUILDING_STYLES.filter(s=>s.landmark).length,8);
+test('the urban and world catalogs have distinct designs, at least 30 actually placed component types, and stable structures',()=>{
+ assert.equal(NEW_BUILDING_STYLES.length,52);assert.equal(BUILDING_STYLES.length,68+WORLD_BUILDING_STYLES.length);assert.equal(NEW_BUILDING_STYLES.filter(s=>s.landmark).length,8);
  const designs=new Set(),used=new Set();
- for(const s of NEW_BUILDING_STYLES){
+ for(const s of CATALOG_STYLES){
   const design=JSON.stringify([s.footprint,s.massing,s.facade,s.entry,s.roof]);assert.ok(!designs.has(design),s.id+' copied design');designs.add(design);
   for(const variant of [0,1,2,3]){
    const cells=generateCells(envFor(s,variant)),byId=new Map(cells.map(c=>[c.id,c]));
@@ -36,7 +36,7 @@ test('all new component geometry has finite positions, normals and texture coord
 });
 test('distant addresses vary by seed, preserve reload identities, and cover every type without plot collisions',()=>{
  const styles=new Set(),districts=new Set(),counts=[];
- for(let n=0;n<512;n++){
+ for(let n=0;n<1024;n++){
   const x=n%2?-(n+3):n+3,z=(n*41)%127-63,env=generateBlock(x,z);districts.add(env.buildings[0].district);
   assert.deepEqual(env,generateBlock(x,z));assert.notDeepEqual(env.buildings,generateBlock(x,z,91234).buildings);
   assert.equal(new Set(env.buildings.slice(0,8).map(b=>b.architecture)).size,8,'avoid identical neighbors');

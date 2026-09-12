@@ -1,10 +1,10 @@
 # Infinite city building catalog
 
-The generator adds 52 building recipes: 44 ordinary building types and eight New York landmarks. There are now 68 ordinary/landmark recipes in the infinite street-address catalog, plus the existing special Chrysler courtyard and home landmarks. The new kit adds 101 modeled component types, bringing the shared component registry to 315. Each new recipe actually places 33–56 distinct types on the Quest detail tier. Counts below are component **types**, not repeated bricks or instances.
+This urban/New York expansion adds 52 building recipes: 44 ordinary building types and eight New York landmarks, with 101 modeled component types. Each recipe actually places 33–56 distinct types on the Quest detail tier. The subsequent [world landmark expansion](WORLD_LANDMARKS.md) adds another 18 recipes and 100 components. The current infinite street-address catalog contains 86 recipes and the shared component registry contains 415 types, plus the existing special Chrysler courtyard and home landmarks. Counts below are component **types**, not repeated bricks or instances.
 
 ## Generation
 
-Six neighborhood mixes—residential, industrial, civic, arts, office and market—bias nearby blocks toward related uses. Each block independently randomizes its building selections, ordinary building heights, bay widths, story heights, setback directions and material variation. Eight different street-address types are selected per block; approximately one block in three includes one of the eight new landmarks. Existing occasional Chrysler courtyards still work, including manual host spawning.
+Six neighborhood mixes—residential, industrial, civic, arts, office and market—bias nearby blocks toward related uses. Each block independently randomizes its building selections, ordinary building heights, bay widths, story heights, setback directions and material variation. Eight different street-address types are selected per block; approximately one block in three includes one of the 26 New York/world catalog landmarks. Existing occasional Chrysler courtyards still work, including manual host spawning.
 
 All random choices derive from the world seed and block coordinates. The server, every player and late-joining spectators generate the same buildings regardless of exploration order. Reloading a district preserves its geometry, damage and resting debris. The original home buildings retain their previous geometry, IDs and architecture assignments.
 
@@ -88,7 +88,7 @@ Close components use global instance batches allocated only when a type appears.
 
 ## Verification
 
-- 512 generated blocks: every type appears; deterministic reloads, seed variation, unique neighbors, clear streets/plots and bounded cell counts.
+- 1,024 generated blocks: every type appears; deterministic reloads, seed variation, unique neighbors, clear streets/plots and bounded cell counts.
 - Every new recipe at four variants and both detail tiers: 30+ distinct placed components, finite geometry, reciprocal support links, no pristine collapse or overload.
 - Real server collision checks: open mechanical floors, cathedral gaps, roof contacts and detached roof colliders.
 - Browser model gallery: all 52 recipes, moving roof attachment matrices and valid distant meshes. Gallery inspection enables full detail; gameplay uses the normal distance limits.

@@ -1,4 +1,5 @@
 import {STYLE_BY_ID} from './catalog.js';
+import {WORLD_COMPONENTS,worldRoofTypes,worldPlacements,worldColliders} from './world-landmarks.js';
 // Reusable functional assemblies, not individual bricks counted as component types.
 // Roof geometry and its stepped collision proxies share the same height profile.
 const box=(s,p=[0,0,0],r=[0,0,0])=>({s,p,r});
@@ -12,6 +13,7 @@ const portico=[...[-.34,.34].map(x=>box([.08,.8,.21],[x,-.025,-.58])),box([.92,.
 const pyramid=(width,height,y=.51)=>({shape:'cone',segments:4,s:[width*Math.SQRT2,height,width*Math.SQRT2],p:[0,y+height/2,0],r:[0,Math.PI/4,0]});
 const roofLoft=(low,high)=>({shape:'loft',s:[1,1,1],p:[0,0,0],r:[0,0,0],corners:[[-.5,.51,-.5],[.5,.51,-.5],[.5,.51,.5],[-.5,.51,.5],[-.5,high,-.5],[.5,high,-.5],[.5,low,.5],[-.5,low,.5]]});
 export const CATALOG_COMPONENTS={
+ ...WORLD_COMPONENTS,
  urbanStoop:kit('Townhouse stoop steps and iron rails','stone',[...row(5,i=>box([.53,.055,.1],[0,-.43+i*.045,-.78+i*.06])),...[-.28,.28].map(x=>box([.025,.5,.028],[x,-.15,-.64],[-.65,0,0]))]),
  urbanDutchGable:kit('Dutch stepped gable masonry','terracotta',row(5,i=>box([.95-i*.17,.085,.09],[0,.47+i*.085,-.49]))),
  urbanFanlight:kit('Federal fanlight spokes','bronze',[...arch(.3,.05),...row(7,i=>{const a=i*Math.PI/6;return box([.018,.3,.03],[Math.cos(a)*.14,.05+Math.sin(a)*.14,-.58],[0,0,a-Math.PI/2]);})]),
@@ -117,6 +119,7 @@ Object.freeze(CATALOG_COMPONENTS);
 
 export function catalogRoofTypes(c){
  const style=STYLE_BY_ID.get(c.architecture);if(!style||!c.roof||style.roof==='flat')return [];
+ if(style.world)return worldRoofTypes(c);
  if(style.landmark&&!c.topFloor)return [];
  if(style.roof==='citi')return [`citiRoof${c.iz}`];
  return [`roof_${style.roof}`];
@@ -141,11 +144,13 @@ export function catalogPlacements(c,put,{interiors=true}={}){
  if(c.openSkin){if(c.architecture==='park432')put('parkMechanicalCore');else put(style.entry);}
  for(const type of catalogRoofTypes(c))put(type);
  if(c.architecture==='woolworth'&&c.topFloor)put('woolworthPinnacle');
+ worldPlacements(c,put);
 }
 
 // Conservative stepped roof boxes track the visible roof profile. This avoids the
 // invisible full-height bounding cube around a pyramid or the low end of a wedge.
 export function catalogRoofColliders(c){
+ if(STYLE_BY_ID.get(c.architecture)?.world)return worldColliders(c);
  const out=[],[w,h,d]=c.size;
  for(const type of catalogRoofTypes(c)){
   const id=type.replace('roof_','');

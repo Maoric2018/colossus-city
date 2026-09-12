@@ -1,5 +1,6 @@
 import {chryslerLODGeometry} from '../render/chrysler-lod.js';
 import {CatalogLOD,catalogTint} from '../render/catalog-lod.js';
+import {WORLD_STYLE_BY_ID} from '../../shared/city/world-landmarks.js';
 import * as T from 'three';
 import {CityView} from './city.js';
 import {surface} from '../render/quality.js';
@@ -70,11 +71,16 @@ export class StreamedBlocks{
   this.catalogLOD.reset();
   for(const env of this.previews.values()){
    if(this.views.has(env.key))continue;const record=this.records.get(env.key),gone=new Set([...(record?.cleared||[]),...[...(record?.entities.values()||[])].flatMap(e=>e.cells)]),collapsed=new Set();
-   const damaged=new Map();if(gone.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i),broken=mine.filter(c=>gone.has(c.id));damaged.set(i,broken);if(broken.length>mine.length*.45)collapsed.add(i);}}
+   const damaged=new Map(),surviving=new Map();if(gone.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i),broken=mine.filter(c=>gone.has(c.id));damaged.set(i,broken);if(WORLD_STYLE_BY_ID.has(env.buildings[i].architecture))surviving.set(i,mine.filter(c=>!gone.has(c.id)));if(broken.length>mine.length*.45)collapsed.add(i);}}
    for(const [i,b]of env.buildings.entries()){
     if(collapsed.has(i))continue;
     if(!damaged.get(i)?.length&&this.catalogLOD.building(b))continue;
     this.catalogLOD.roofs(b,damaged.get(i)||[]);
+    // Damaged landmarks keep their tapered bays and genuine portals in the
+    // skyline; a rectangular tier would fill the openings and restore broken bays.
+    if(WORLD_STYLE_BY_ID.has(b.architecture)&&surviving.has(i)){
+     for(const c of surviving.get(i)){if(index>=this.lod.instanceMatrix.count)break;dummy.position.set(...c.p);dummy.rotation.set(0,0,0);dummy.scale.set(...c.size);if(c.openSkin){dummy.position.y+=c.size[1]/2-.08;dummy.scale.y=.16;}dummy.updateMatrix();this.lod.setMatrixAt(index,dummy.matrix);this.lod.setColorAt(index++,new T.Color(catalogTint(b.architecture)));}continue;
+    }
     if(b.architecture==='chrysler'&&!collapsed.has(i)&&landmarks<this.landmarkLOD.instanceMatrix.count){
      const crown=gone.size?generateCells(env).find(c=>c.building===i&&c.chryslerCrown):null;
      if(!crown||!gone.has(crown.id)){dummy.position.set(b.x,.15+(b.tiers.reduce((n,t)=>n+t.floors,0)-.5)*b.story,b.z);dummy.rotation.set(0,0,0);dummy.scale.set(b.bay,b.story,b.bay);dummy.updateMatrix();this.landmarkLOD.setMatrixAt(landmarks++,dummy.matrix);}

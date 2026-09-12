@@ -1,5 +1,7 @@
 // Building recipes, shared by the server, close geometry and distant skyline.
 // Dimensions are gameplay-scaled; landmark proportions and identifying details are fixed.
+import {WORLD_BUILDING_STYLES,worldTiers,shapeWorldCell} from './world-landmarks.js';
+export {WORLD_BUILDING_STYLES};
 const recipe=(id,name,material,floors,footprint,massing,neighborhood,facade,entry,roof)=>
  Object.freeze({id,name,material,floors,footprint,massing,neighborhood,facade,entry,roof});
 export const NEW_BUILDING_STYLES=Object.freeze([
@@ -58,11 +60,13 @@ export const NEW_BUILDING_STYLES=Object.freeze([
   ['hearst','Hearst Tower','glass',[21,21],[3,2],'hearst-tower',['hearstDiagrid','hearstNode'],'hearstPortal','hearst']
  ].map(([id,name,material,floors,footprint,massing,facade,entry,roof])=>Object.freeze({...recipe(id,name,material,floors,footprint,massing,'office',facade,entry,roof),landmark:true}))
 ]);
-export const STYLE_BY_ID=new Map(NEW_BUILDING_STYLES.map(s=>[s.id,s]));
+export const CATALOG_STYLES=Object.freeze([...NEW_BUILDING_STYLES,...WORLD_BUILDING_STYLES]);
+export const STYLE_BY_ID=new Map(CATALOG_STYLES.map(s=>[s.id,s]));
 export const catalogLandmark=id=>!!STYLE_BY_ID.get(id)?.landmark;
 export const NEIGHBORHOODS=Object.freeze(['residential','industrial','civic','arts','office','market']);
 const box=(nx,nz,floors,ix=0,iz=0,voids)=>({nx,nz,floors,ix,iz,...(voids?{voids}:{})});
 export function catalogTiers(s,floors,variant=0){
+ if(s.world)return worldTiers(s.id);
  const [nx,nz]=s.footprint,high=Math.max(1,floors-2),ox=variant%2,oz=(variant>>>1)%2;
  switch(s.massing){
   case 'setback':return [box(nx,nz,high),box(Math.max(1,nx-1),Math.max(1,nz-1),2,ox,oz)];
@@ -84,8 +88,8 @@ export function catalogTiers(s,floors,variant=0){
 export function catalogBuilding(style,x,z,{variant=0,random=()=>.5,district=style.neighborhood}={}){
  const max=Math.max(...style.footprint),floors=style.floors[0]+Math.floor(random()*(style.floors[1]-style.floors[0]+1));
  return {x,z,name:style.name,architecture:style.id,material:style.material,variant,district,streamed:true,
-  bay:style.landmark?(style.id==='park432'?3.65:4.2):max===3?4.05+random()*.65:4.5+random()*.9,
-  story:style.landmark?3.4:3.1+random()*.6,tiers:catalogTiers(style,floors,variant),
+  bay:style.bay??(style.landmark?(style.id==='park432'?3.65:4.2):max===3?4.05+random()*.65:4.5+random()*.9),
+  story:({'grande-arche':1.65,'marina-bay':.8,'ferry-building':1.4,'elizabeth-tower':2.2,'petronas':1.8,'emirates-towers':2.5,'transamerica':2.5}[style.id])??(style.landmark?3.4:3.1+random()*.6),tiers:catalogTiers(style,floors,variant),
   waterTower:['loft-conversion','textile-mill','shipping-warehouse'].includes(style.id)};
 }
 // Only intended open mechanical floors / pilotis lack skins. Their structural bays
@@ -96,6 +100,7 @@ export function shapeCatalogCell(c,b){
  if(b.architecture==='citigroup'&&c.floor<2)c.openSkin=true;
  if(b.architecture==='lever-house'&&c.ground)c.openSkin=true;
  c.catalogRoof=STYLE_BY_ID.get(b.architecture)?.roof;
+ shapeWorldCell(c,b);
 }
 export function finishCatalogCells(cells,b){
  const style=STYLE_BY_ID.get(b.architecture);if(!style)return;

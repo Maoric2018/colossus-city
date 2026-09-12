@@ -4,6 +4,7 @@
 // Core batches plus the instanced architectural kit; count is independent of city size.
 import * as T from 'three';
 import {Components} from './components.js';
+import {WORLD_STYLE_BY_ID} from '../../shared/city/world-landmarks.js';
 import {partialInstanceUpdates,commitInstances} from '../render/instances.js';
 import {mergeParts} from '../art.js';
 import {MATERIALS, sideBit} from '../../shared/city/materials.js';
@@ -12,7 +13,7 @@ import {facadeMaps, roofTexture} from './textures.js';
 const temp = new T.Object3D(), matrix = new T.Matrix4(), local = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0);
 const sphere=new T.Sphere(),projection=new T.Matrix4(),eyePosition=new T.Vector3();
 const white=new T.Color(0xffffff),wtcGlass=new T.Color(0x718087);
-const skinKey=c=>['empire','chrysler','hudson30','vanderbilt'].includes(c.architecture)?c.architecture:c.material;
+const skinKey=c=>WORLD_STYLE_BY_ID.has(c.architecture)&&c.material==='glass'?'worldGlass':['empire','chrysler','hudson30','vanderbilt'].includes(c.architecture)?c.architecture:c.material;
 const wallLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .5, 0, -Math.cos(a) * .5), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 // Masonry window panes sit just outside the facade box (which spans ±.011 around the wall plane).
 const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .514, 0, -Math.cos(a) * .514), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
@@ -32,18 +33,21 @@ export class Buildings {
   this.roof = this.batch(roofGeometry, resources?.roof.material || surface(tier, {map:roofTexture(), color:0x8a8884, roughness:1}), cells.filter(c => c.roof).length);
   this.facade = {}; this.glass = {}; this.wallCount = {}; this.paneCount = {};
   const size = tier.textureSize;
-  for(const name of [...Object.keys(MATERIALS),'empire','chrysler','hudson30','vanderbilt']){
-   const walls = cells.reduce((s, c) => s + (skinKey(c) === name ? c.walls.filter(Boolean).length : 0), 0); if(!walls) continue;
-   const maps = resources?.glass[name]?null:facadeMaps(name, size), m = MATERIALS[['empire','chrysler'].includes(name)?'stone':['hudson30','vanderbilt'].includes(name)?'glass':name];
+  for(const name of [...Object.keys(MATERIALS),'empire','chrysler','hudson30','vanderbilt','worldGlass']){
+   // Keep one empty world-glass resource on the home owner. Streamed districts
+   // share its texture/material instead of allocating a new set on every revisit.
+   const walls = cells.reduce((s, c) => s + (skinKey(c) === name ? c.walls.filter(Boolean).length : 0), 0); if(!walls&&(name!=='worldGlass'||resources)) continue;
+   const maps = resources?.glass[name]?null:facadeMaps(name, size), m = MATERIALS[['empire','chrysler'].includes(name)?'stone':['hudson30','vanderbilt','worldGlass'].includes(name)?'glass':name];
    this.wallCount[name] = 0; this.paneCount[name] = 0;
    if(m.facadeHP > 0) this.facade[name] = this.batch(resources?.facade[name]?.geometry||new T.BoxGeometry(1, .925, .022), resources?.facade[name]?.material||surface(tier, {map:maps.map, color:['empire','chrysler'].includes(name)?0xf7f4ee:m.tint, roughness:.9}), walls);
-   this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * .45, color:['hudson30','vanderbilt'].includes(name)?0xe4f0f4:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02,...(['hudson30','vanderbilt'].includes(name)?{transparent:false,opacity:1,depthWrite:true,side:T.DoubleSide,metalness:.5,roughness:.24,envMapIntensity:.9}: {})}), walls);
+   this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * (name==='worldGlass'?.08:.45), color:name==='worldGlass'?0xffffff:['hudson30','vanderbilt'].includes(name)?0xe4f0f4:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02,...(['hudson30','vanderbilt','worldGlass'].includes(name)?{transparent:false,opacity:1,depthWrite:true,side:T.DoubleSide,metalness:.5,roughness:.24,envMapIntensity:.9}: {})}), walls);
    this.glass[name].castShadow = false;
   }
 
   cells.forEach((c, i) => {
    const e = {cell:c,index:i,frameIndex:-1,empireIndex:-1,walls:[],size:new T.Vector3(...c.size),roofIndex:-1,radius:Math.hypot(...(c.queryHalf||c.size.map(v=>v/2)))+1,revision:0, glassMask:0, facadeMask:0, hidden:false, p:new T.Vector3(...c.p), q:new T.Quaternion()};
    e.tint=new T.Color().setHSL(((c.variant%29)-14)*.001+.08,.06+(c.variant%5)*.015,.79+(c.variant%7)*.025);
+   const worldStyle=WORLD_STYLE_BY_ID.get(c.architecture);if(worldStyle){e.tint.setHex(worldStyle.tint);e.glassTint=new T.Color(worldStyle.tint);}
    c.walls.forEach((exterior, side) => { if(exterior) e.walls.push({side,index:-1,owner:e}); });
    this.entries.set(c.id, e);
   });
@@ -118,7 +122,7 @@ export class Buildings {
   for(const w of e.walls){
    if(w.index<0)continue;
    const bit = sideBit(w.side);
-   if(glass)glass.setColorAt(w.index,c.architecture==='wtc'?wtcGlass:white);
+   if(glass)glass.setColorAt(w.index,e.glassTint??(c.architecture==='wtc'?wtcGlass:white));
    if(facade){ facade.setColorAt(w.index,e.tint);matrix.multiplyMatrices(m, wallLocal[w.side]); facade.setMatrixAt(w.index, (hidden || !(e.facadeMask & bit)) ? zero : matrix); this.dirty.add(facade); }
    if(glass){ matrix.multiplyMatrices(m, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
   }

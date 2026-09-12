@@ -1,6 +1,6 @@
 import {hudsonBuilding,vanderbiltBuilding} from './modern-landmarks.js';
 import {chryslerBuilding} from './chrysler.js';
-import {NEW_BUILDING_STYLES,NEIGHBORHOODS,catalogBuilding} from './catalog.js';
+import {CATALOG_STYLES,NEIGHBORHOODS,catalogBuilding} from './catalog.js';
 // The only authoritative map definition. Visual assets never decide collisions.
 // MIDTOWN: a Manhattan-style grid of avenues (north-south) and streets (east-west) with
 // Dense blocks, landmark towers and street-front infill. Integer bay grids keep
@@ -99,8 +99,8 @@ const LEGACY_BUILDING_STYLES=Object.freeze([
  {id:'copper',name:'COPPER COURT',material:'stone',floors:[7,12]},
  {id:'modern',name:'DESIGN STUDIOS',material:'concrete',floors:[5,10]}
 ]);
-export const BUILDING_STYLES=Object.freeze([...LEGACY_BUILDING_STYLES,...NEW_BUILDING_STYLES]);
-const newUrban=NEW_BUILDING_STYLES.filter(s=>!s.landmark),landmarks=NEW_BUILDING_STYLES.filter(s=>s.landmark);
+export const BUILDING_STYLES=Object.freeze([...LEGACY_BUILDING_STYLES,...CATALOG_STYLES]);
+const newUrban=CATALOG_STYLES.filter(s=>!s.landmark),landmarks=CATALOG_STYLES.filter(s=>s.landmark);
 const ordinary=[...LEGACY_BUILDING_STYLES,...newUrban];
 const districtPools=new Map(NEIGHBORHOODS.map(n=>[n,newUrban.filter(s=>s.neighborhood===n)]));
 const zig=n=>n>=0?n*2:-n*2-1,unzig=n=>n%2?-(n+1)/2:n/2;

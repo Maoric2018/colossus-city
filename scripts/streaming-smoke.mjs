@@ -44,6 +44,13 @@ try{
   const restored=city.stream.views.get('4,0');city.poseDebris(event.id,[0,100,0],[0,0,0,1]);
   const a=restored.buildings.pose(c.id).p;return {unloaded,pose:a.toArray(),original,glass:restored.skins.get(c.id).glass,facade:restored.skins.get(c.id).facade,fragments:restored.fragments.pieces.size,originalFragments:fragments,handBoxes:[...city.handWorld.near([a.x-5,a.y,a.z],[a.x+5,a.y,a.z])].filter(b=>b.cell===c.id).length};
  });assert.ok(persistence.unloaded);assert.deepEqual(persistence.pose,persistence.original);assert.equal(persistence.glass,0);assert.equal(persistence.facade,0);assert.equal(persistence.fragments,persistence.originalFragments);assert.ok(persistence.handBoxes>0);
+ const worldDamage=await page.evaluate(async()=>{
+  const T=await import('three'),{generateBlock}=await import('/shared/city/layout.js'),{generateCells}=await import('/shared/city/cells.js'),g=window.__COLOSSUS;let env,b;
+  for(let x=8;x<2000;x++){env=generateBlock(x,3,g.city.env.seed);b=env.buildings.find(b=>b.architecture==='swfc');if(b)break;}
+  const cells=generateCells(env).filter(c=>c.architecture==='swfc'),hit=cells.find(c=>c.floor===8&&c.ix===1&&c.iz===0);g.city.hideCells([hit.id]);g.camera.position.set(b.x,55,b.z+150);g.camera.lookAt(b.x,55,b.z);g.camera.updateMatrixWorld(true);for(let i=0;i<12;i++){g.renderer.render(g.scene,g.camera);await new Promise(r=>requestAnimationFrame(r));}
+  const mesh=g.city.stream.lod,m=new T.Matrix4(),p=new T.Vector3(),q=new T.Quaternion(),s=new T.Vector3(),contains=point=>{for(let i=0;i<mesh.count;i++){mesh.getMatrixAt(i,m);m.decompose(p,q,s);if(point.every((v,k)=>Math.abs(v-p.getComponent(k))<s.getComponent(k)/2-.001))return true;}return false;};
+  const aperture=[b.x,.15+26.5*b.story,b.z-b.bay*.5*(1-.24*26/30)];return {distant:!g.city.stream.views.has(env.key),missingBay:!contains(hit.p),openPortal:!contains(aperture),sharedGlass:[...g.city.stream.views.values()].every(v=>!v.buildings.glass.worldGlass||v.buildings.glass.worldGlass.material===g.city.buildings.glass.worldGlass.material)};
+ });assert.ok(worldDamage.distant&&worldDamage.missingBay&&worldDamage.openPortal&&worldDamage.sharedGlass,JSON.stringify(worldDamage));
  await page.close();
  const headset=await browser.newContext({viewport:{width:1200,height:800}});
  await headset.addInitScript({content:await readFile('node_modules/iwer/build/iwer.js','utf8')+`\nwindow.questDevice=new IWER.XRDevice(IWER.metaQuest2,{stereoEnabled:true});questDevice.installRuntime({forceInstall:true});questDevice.position.set(0,1.7,0);questDevice.controllers.left.position.set(-.4,1.2,-.3);questDevice.controllers.right.position.set(.4,1.2,-.3);`});
@@ -53,5 +60,21 @@ try{
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,-1));await quest.waitForFunction(()=>window.__COLOSSUS.state.bossZ < -190);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,0));await quest.waitForTimeout(400);await quest.screenshot({path:'artifacts/infinite-quest-stereo.png'});
  const xr=await quest.evaluate(()=>{const g=window.__COLOSSUS;return {x:g.state.bossX,z:g.state.bossZ,eyes:g.renderer.xr.getCamera().cameras.length,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls,fogNear:g.scene.fog.near,fogFar:g.scene.fog.far};});assert.equal(xr.eyes,2);assert.ok(xr.blocks>0);assert.ok(xr.z < -190);assert.equal(xr.fogFar,230);
- assert.deepEqual(errors,[]);const report={result:'PASS',stats,culling,persistence,xr,browserErrors:errors};console.log(JSON.stringify(report,null,2));await writeFile('artifacts/streaming-report.json',JSON.stringify(report,null,2));
+ // Visit naturally generated world landmarks through the actual stereo streaming
+ // path. Physics traversal above uses game controls; this section isolates rendering.
+ const worldTours=await quest.evaluate(async()=>{
+  const {generateBlock}=await import('/shared/city/layout.js'),g=window.__COLOSSUS,found=[];
+  for(const [id,type]of [['swfc','swfcAperture'],['marina-bay','marinaSkyGarden']]){
+   for(let x=5;x<2000;x++){const env=generateBlock(x,3,g.city.env.seed),b=env.buildings.find(b=>b.architecture===id);if(b){found.push({id,type,p:[b.x+10,b.story*b.tiers.reduce((n,t)=>n+t.floors,0)*.7,b.z+30],target:[b.x,b.story*b.tiers.reduce((n,t)=>n+t.floors,0)*.58,b.z]});break;}}
+  }
+  g.renderer.setAnimationLoop(null);g.rig.position.set(0,0,0);g.rig.quaternion.identity();g.rig.scale.setScalar(1);g.giant.root.visible=false;return found;
+ });assert.equal(worldTours.length,2);const worldXR=[];
+ for(const tour of worldTours){
+  await quest.evaluate(async({p,target})=>{const T=await import('three'),g=window.__COLOSSUS,head=new T.Object3D();head.position.set(...p);head.lookAt(...target);head.rotateY(Math.PI);questDevice.position.set(...p);questDevice.quaternion.set(...head.quaternion.toArray());g.renderer.setAnimationLoop(()=>{g.renderer.info.reset();g.renderer.render(g.scene,g.camera);});},tour);
+  await quest.waitForFunction(type=>window.__COLOSSUS.city.buildings.components.batches.get(type)?.count>0,tour.type);
+  worldXR.push(await quest.evaluate(({id,type})=>{const g=window.__COLOSSUS;return {id,eyes:g.renderer.xr.getCamera().cameras.length,tier:g.city.tier.name,instances:g.city.buildings.components.batches.get(type).count,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};},tour));
+  await quest.screenshot({path:`artifacts/${tour.id}-quest-stereo.png`});
+ }
+ for(const f of worldXR){assert.equal(f.eyes,2);assert.equal(f.tier,'QUEST');assert.ok(f.instances>0&&f.blocks<=9);}
+ assert.deepEqual(errors,[]);const report={result:'PASS',stats,culling,persistence,worldDamage,xr,worldXR,browserErrors:errors};console.log(JSON.stringify(report,null,2));await writeFile('artifacts/streaming-report.json',JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill('SIGTERM');}
