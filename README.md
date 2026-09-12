@@ -173,7 +173,7 @@ Do not treat a syntax check, unit test, server benchmark or emulated browser ses
 
 ## Source guide
 
-Read [docs/MODULES.md](docs/MODULES.md) first. In short: `shared/` is pure logic used by both sides (config, math, protocol, flight model, city layout/materials/cells/structure); `server/` is the authoritative simulation (room, boss, players, combat, abilities, destruction); `src/app` is the client app layer (state, input, prediction, camera, shake, HUD, events, lobby); `src/render` picks quality and owns the renderer; `src/world` renders the district (city, buildings, ground, textures, rubble). [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) covers authority, transport, the destruction model and rendering budgets.
+Start with the [architecture diagrams](docs/ARCHITECTURE_DIAGRAM.md) for the shape of the system, then [docs/MODULES.md](docs/MODULES.md) for the file-by-file map. In short: `shared/` is pure logic used by both sides (config, math, protocol, flight model, city layout/materials/cells/structure); `server/` is the authoritative simulation (room, boss, players, combat, abilities, destruction); `src/app` is the client app layer (state, input, prediction, camera, shake, HUD, events, lobby); `src/render` picks quality and owns the renderer; `src/world` renders the district (city, buildings, ground, textures, rubble). [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) covers authority, transport, the destruction model and rendering budgets.
 
 Original source and generated textures use the MIT license. Bundled Kenney, Quaternius and Poly Haven assets retain their own (CC0) licenses; see `LICENSE` and `public/assets/README.md`.
 
