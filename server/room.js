@@ -108,10 +108,9 @@ export class Room {
  event(e){ this.events.push(e); }
  drainEvents(){ const e = this.events; this.events = []; return e; }
  hurtBoss(damage, info = {}){
-  if(this.phase || damage <= 0) return;
+  if(this.phase || damage <= 0 || info.kind === 'debris') return;
   this.bossHP = Math.max(0, this.bossHP - damage);
-  if(info.kind === 'debris' || info.kind === 'heavy') this.boss.stagger = Math.min(1, this.boss.stagger + damage / 260);
-  if(info.by > 0 && info.kind === 'debris'){ const p = this.players.get(info.by); if(p) p.score += damage; }
+  if(info.kind === 'heavy') this.boss.stagger = Math.min(1, this.boss.stagger + damage / 260);
   if(info.kind !== 'shot') this.event({type:'gianthit', kind:info.kind, p:info.p, power:info.power || .3, damage:Math.round(damage)});
  }
  // ---- simulation ----

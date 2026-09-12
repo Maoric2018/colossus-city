@@ -12,8 +12,6 @@ export const C = Object.freeze({
   SHOT_RANGE: 160, GRAVITY: -9.81, CHUNK_LIFETIME: 35, INVULNERABLE_SECONDS: 2.5,
   // Raider breach shot: a charged bolt that cracks structure and staggers the giant.
   HEAVY_DAMAGE: 42, HEAVY_STRUCTURE: 70, HEAVY_COOLDOWN: 3, HEAVY_FUEL: .22, HEAVY_RANGE: 190, HEAVY_CHARGE_SECONDS: .7,
-  // Debris landing on the giant's head or core hurts it; towers are the raiders' heaviest weapon.
-  DEBRIS_GIANT_DAMAGE: .9, DEBRIS_GIANT_MIN_SPEED: 7,
   // Overloaded bays fail after a short creak so cascades read as progressive collapse.
   COLLAPSE_DELAY: .65, COLLAPSE_JITTER: .35, CRUMBLE_SPEED: 11, SPLIT_SPEED: 7,
   COLLISION: {WORLD: 1, DEBRIS: 2, PLAYER: 4, GIANT: 8, RAGDOLL: 16}

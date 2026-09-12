@@ -322,20 +322,11 @@ export function updateDebris(room, hits, fractures, crumbles){
  // One secondary fracture per tick keeps collider churn bounded during a cascade.
  for(const id of [...fractures].slice(0, 1)) splitDebris(room, id);
  for(const id of crumbles) crumble(room, id);
- const b = room.boss;
+ // Debris retains its physics and lifetime, but never damages the colossus.
  for(const [id, e] of room.debris){
   const pos = e.body.translation();
   if(pos.y < -30){ removeBody(room, e.body); room.debris.delete(id); room.event({type:'remove', id}); continue; }
-  if(room.time-e.born>2 && e.body.isSleeping()){settleDebris(room,id);continue;}
-  // Falling structure crushes the giant when it lands on the head or core.
-  const speed = len(e.body.linvel());
-  if(speed < C.DEBRIS_GIANT_MIN_SPEED || room.time - (e.hitGiantAt || -10) < .5 || room.phase) continue;
-  const core = v(b.head.x, b.head.y - 7.2, b.head.z);
-  const near = dist(pos, b.head) < C.HEAD_RADIUS + e.radius || dist(pos, core) < 4.5 + e.radius;
-  if(!near) continue;
-  e.hitGiantAt = room.time;
-  const damage = Math.min(420, Math.sqrt(e.cells.length) * speed * C.DEBRIS_GIANT_DAMAGE);
-  room.hurtBoss(damage, {kind:'debris', p:arr(pos), power:Math.min(1, damage / 200), by:room.cellMap.get(e.cells[0]).lastHitBy});
+  if(room.time-e.born>2 && e.body.isSleeping())settleDebris(room,id);
  }
 }
 export function wallOpen(c, side){ return !wallSolid(c.material, c.skin.glass, c.skin.facade, side); }

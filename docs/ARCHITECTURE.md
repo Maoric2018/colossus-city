@@ -42,7 +42,7 @@ history and instances. Remote interpolation targets ~100 ms behind the newest st
 
 Step order per tick: giant (locomotion, hand sweeps, torso shove) → raiders (flight, rifle,
 breach) → missiles → `world.step` → collision events (debris↔raider knockdowns, debris↔bay
-damage, secondary fracture, crumble) → debris lifecycle and debris↔giant damage → due structural
+damage, secondary fracture, crumble) → debris lifecycle → due structural
 failures → new failure scheduling for dirty buildings → batched skin events → ragdoll expiry →
 end-of-round check.
 
@@ -64,7 +64,7 @@ client at 20 Hz before overhead. Sleeping bodies are still included until remove
 Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
 `skin` (batched `[id, glassMask, facadeMask]` changes), `strike` (a bay was hit; material,
 power, whether its frame failed), `creak` (a building has overloaded columns), `towerdown`,
-`combo`, `stomp`, `closecall`, `gianthit` (kind `debris`/`heavy`, damage), `shot`, `heavy`,
+`combo`, `stomp`, `closecall`, `gianthit` (kind `heavy`, damage), `shot`, `heavy`,
 `missile`, `detonate`, `dodge`, `rag`, `kill`, `impact`, `end` (with scoreboard), `reset`.
 Welcome packets carry cleared cells, damaged skins, live chunks, ragdolls, missiles and the
 roster so late joiners see the same city.
@@ -114,9 +114,7 @@ carry less. Overloaded bays are scheduled to fail after `COLLAPSE_DELAY` (+ jitt
 Detachment: kicked bays fly as single chunks; a severed section becomes **one rigid island per
 building** (floors when small) so towers topple and pancake. Islands receive an angular velocity
 about the far edge of whatever still stands beneath them (`topple`). On a hard landing an island
-splits into floor bands, bands into bays, and a lone bay that lands hard gains damping and emits impact effects without disappearing. Once asleep after two seconds, debris becomes a fixed body, leaves the active snapshot list, and sends its final `settled` pose. Welcome state includes settled entities; clients ignore stale interpolated poses for them. Falling chunks damage bays they hit (domino collapses) and hurt the
-giant when they land on its head or core (`DEBRIS_GIANT_DAMAGE`, capped), which staggers it and
-exposes the core (+60 % rifle/breach damage while staggered). The giant slides along intact bays at torso height. Walking chips one contacted bay every 0.7 seconds, capped at 5% frame wear, and cannot demolish its way through. The COL5 blocked flag stops desktop camera dead reckoning at walls.
+splits into floor bands, bands into bays, and a lone bay that lands hard gains damping and emits impact effects without disappearing. Once asleep after two seconds, debris becomes a fixed body, leaves the active snapshot list, and sends its final `settled` pose. Welcome state includes settled entities; clients ignore stale interpolated poses for them. Falling chunks can damage bays (domino collapses) and raiders, but never damage or stagger the colossus. Heavy weapon hits still stagger it and expose the core (+60 % rifle/breach damage while staggered). The giant slides along intact bays at torso height. Walking chips one contacted bay every 0.7 seconds, capped at 5% frame wear, and cannot demolish its way through. The COL5 blocked flag stops desktop camera dead reckoning at walls.
 
 Budgets: 144 chunk bodies (coarse per-building islands under pressure, deferred breaks at the
 cap), eight ragdolls. Limits: graph/load are still a game model, not FEA — no bending moments,

@@ -71,7 +71,7 @@ async function start(create = false, practice = false, spectator = false){
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
   else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. Hold Shift for fast soaring; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant. Topple a tower onto the colossus for massive damage.', {renderer, net});
   const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u); localStorage.setItem('colossus-name', $('name').value);
-  setTimeout(() => hud.feed(role === 'boss' ? 'OBJECTIVE · LEVEL THE CITY · SMASH TOWER BASES' : role === 'raider' ? 'OBJECTIVE · BREACH COLUMNS · DROP TOWERS ON THE COLOSSUS' : 'OBSERVING MIDTOWN', 'big'), 400);
+  setTimeout(() => hud.feed(role === 'boss' ? 'OBJECTIVE · LEVEL THE CITY · SMASH TOWER BASES' : role === 'raider' ? 'OBJECTIVE · DODGE MISSILES · ATTACK THE COLOSSUS CORE' : 'OBSERVING MIDTOWN', 'big'), 400);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
  finally{ $('create').disabled = $('join').disabled = false; }
 }

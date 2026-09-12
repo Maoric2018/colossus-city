@@ -78,7 +78,7 @@ Raiders start in first person. Press **V** or use the pause-menu camera button f
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode on scenery or raiders and blow a hole through most bays. Shared 0.8 s cooldown, eight-projectile cap.
 
-**Winning:** raiders win by reducing the core to zero within four minutes; the giant wins by surviving. Kills, towers down and city damage are tracked; the round-end scoreboard ranks raiders by score. **Dropping a tower on the colossus is the raiders' heaviest weapon**: falling structure that lands on its head or core deals up to 420 damage and staggers it.
+**Winning:** raiders win by reducing the core to zero within four minutes; the giant wins by surviving. Kills, towers down and city damage are tracked; the round-end scoreboard ranks raiders by score. Building debris does not damage or stagger the colossus. Raiders damage it with their weapons.
 
 **Spectator video:** Live Views shows each human player over WebRTC at up to 30 fps on desktop / 24 fps from the headset’s actual left-eye view. Failed video links use a bounded 15 fps image fallback. AI cameras are labeled simulated. Use one spectator for the demo; keep each player’s game visible on its device.
 
@@ -113,7 +113,7 @@ Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs suc
 ```sh
 npm run check          # Syntax and local import existence, no packages needed
 npm test               # Dependency-free unit tests (map, loads, codec, flight model)
-npm run test:physics   # Real Rapier: layers, cascades, islands, crumble, giant crush
+npm run test:physics   # Real Rapier: layers, cascades, islands, persistent rubble, debris immunity
 npm run test:network   # Real multiplayer + spectator channel integration
 npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three math)
 npm run test:all       # All Node tests

@@ -4,7 +4,7 @@
 
 Built on main's merged Midtown overhaul. Local environment: macOS, Apple M5 Pro, Node 22.19.0. No physical headset attached. The map has 169 buildings, 5,452 structural bays and a 45-type architectural kit, with at least 30 modeled component types used by each building.
 
-- **87 Node tests: PASS.** Includes real Rapier and WebSocket tests, city packing and support, minor walking wear, no passive-hand grinding, 30 Hz tracked locomotion without false punches, deliberate strikes, persistent/settled debris, late joins, bounded homing and COL5 replication.
+- **87 Node tests: PASS.** Includes real Rapier and WebSocket tests, city packing and support, minor walking wear, no passive-hand grinding, 30 Hz tracked locomotion without false punches, deliberate strikes, persistent/settled debris, colossus immunity to debris at the head/core, late joins, bounded homing and COL5 replication.
 - **Syntax/import checks and 59 assets: PASS.** Existing asset files verify against the download manifest; runtime dependency versions are unchanged.
 - **Multiplayer/browser smoke: PASS.** Real multiplayer server, first/third-person cameras, held Shift and focus loss, Quest stereo/turn/reach, missiles, authenticated WebRTC feeds, fallback/reconnect and XR lifecycle.
 - **Rendered giant, visual, XR-view and ragdoll checks: PASS.** Hand/forearm alignment, actual city contact, roof movement/removal/reset, solid props, laser effects and the matching pilot ragdoll.
@@ -28,7 +28,7 @@ Visible Chromium on the Mac sustained 120 fps in the sampled Quest/performance r
 ## Still not validated
 
 - Physical Quest 2 stereo/optics, tracking accuracy, haptics, comfort, sustained frame rate and thermal throttling. The `quest` tier (Lambert shading, 0.8 framebuffer scale, low-poly skyline, small pools) has not been timed on a headset with the new dense district.
-- Eight real humans, weak Wi-Fi, long sessions, and gameplay balance of the new breach shot / stagger / tower-drop loop.
+- Eight real humans, weak Wi-Fi, long sessions, and gameplay balance of the new breach shot / stagger / collapse loop.
 - USB forwarding on a connected headset; Docker/Fly deployment with trusted HTTPS on a headset.
 
 ## First connected-machine checks
@@ -44,11 +44,11 @@ npm start
 
 ## Two-laptop acceptance
 
-Create a giant room in one browser and join from a second laptop as a raider. Confirm matching room/round, the raider's own movement is immediate (prediction) while remote players interpolate, mouse aim, core/head damage, occlusion behind buildings, fuel, hold-Shift soar/release-to-hover, E dodge, the breach shot (charge ring, cooldown, cracked bay), first/third-person cameras and spectator feeds. Shatter windows with rifle fire and confirm the opening lets you fly inside. Break a brick base bay and watch the creak → delayed failure → cascade. Knock out enough of a tower base for it to tip as one island, split on landing and keep its rubble. Join late and confirm the same wreckage remains. Drop structure on the giant and confirm the stagger, the exposed-core bonus and the announcer feed on both screens. Reset rounds after collapses; no building should return on join.
+Create a giant room in one browser and join from a second laptop as a raider. Confirm matching room/round, the raider's own movement is immediate (prediction) while remote players interpolate, mouse aim, core/head damage, occlusion behind buildings, fuel, hold-Shift soar/release-to-hover, E dodge, the breach shot (charge ring, cooldown, cracked bay), first/third-person cameras and spectator feeds. Shatter windows with rifle fire and confirm the opening lets you fly inside. Break a brick base bay and watch the creak → delayed failure → cascade. Knock out enough of a tower base for it to tip as one island, split on landing and keep its rubble. Join late and confirm the same wreckage remains. Drop structure on the giant and confirm its health and stagger do not change. Use a charged weapon hit to check stagger and the exposed-core bonus. Reset rounds after collapses; no building should return on join.
 
 ## Quest 2 acceptance
 
-Follow `QUEST2_TESTING.md`. In addition to the previous checks: confirm the dust/haptic tick when a hand crosses a bay is immediate and the server-side strike follows shortly; confirm material haptics differ (glass tinkle vs stone thud); confirm the red vignette on being crushed is comfortable and the camera never shakes; confirm walking stops against a tower with minor wear, holding a hand still causes no continuing damage, and deliberate punches break exposed framing; record delivered FPS with `?quality=quest` during a full tower collapse with eight raiders and rubble on screen, both with Live Views closed and open.
+Follow `QUEST2_TESTING.md`. In addition to the previous checks: confirm the dust/haptic tick when a hand crosses a bay is immediate and the server-side strike follows shortly; confirm material haptics differ (glass tinkle vs stone thud); confirm the red vignette on a weapon hit is comfortable and the camera never shakes; confirm walking stops against a tower with minor wear, holding a hand still causes no continuing damage, and deliberate punches break exposed framing; record delivered FPS with `?quality=quest` during a full tower collapse with eight raiders and rubble on screen, both with Live Views closed and open.
 
 ## Network/failure acceptance
 

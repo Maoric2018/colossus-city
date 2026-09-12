@@ -87,13 +87,17 @@ test('secondary fracture splits an island into bands, bands into bays, keeping m
 test('destruction budget cannot exceed the configured rigid-body count', () => {
  const r = room(); try{ r.breakCells(r.cells.filter(c => c.ground).map(c => c.id), v()); assert.ok(r.debris.size <= C.MAX_ACTIVE_CHUNKS); for(const e of [...r.debris.values()]) r.splitDebris(e.id); assert.ok(r.debris.size <= C.MAX_ACTIVE_CHUNKS); ticks(r, 120); assert.ok(r.debris.size <= C.MAX_ACTIVE_CHUNKS); }finally{ r.dispose(); }
 });
-test('falling structure crushes the giant when it lands on its head', () => {
- const r = room(); try{
-  r.attach(socket, 'boss', 'still'); r.attach(socket, 'raider', 'pilot'); const hp = r.bossHP;
-  const roof = r.cells.find(c => c.building === 1 && c.roof); r.breakCells([roof.id], v());
-  const e = [...r.debris.values()][0]; e.body.setTranslation(v(r.boss.head.x, r.boss.head.y + 6, r.boss.head.z), true); e.body.setLinvel(v(0, -20, 0), true);
-  ticks(r, 3); assert.ok(r.bossHP < hp); assert.ok(r.boss.stagger > 0); assert.ok(r.drainEvents().some(ev => ev.type === 'gianthit'));
- }finally{ r.dispose(); }
+test('falling building debris cannot damage or stagger the colossus at its head or core', () => {
+ for(const offset of [6,-1.2]){
+  const r = room(); try{
+   r.attach(socket, 'boss', 'still');const pilot=r.attach(socket,'raider','pilot'),p=r.players.get(pilot.id),hp=r.bossHP,score=p.score;
+   const roof = r.cells.find(c => c.building === 1 && c.roof);roof.lastHitBy=p.id;r.breakCells([roof.id],v());
+   const e=[...r.debris.values()][0];e.body.setTranslation(v(r.boss.head.x,r.boss.head.y+offset,r.boss.head.z),true);e.body.setLinvel(v(0,-20,0),true);
+   ticks(r,3);assert.equal(r.bossHP,hp);assert.equal(r.boss.stagger,0);assert.equal(p.score,score);assert.ok(!r.drainEvents().some(ev=>ev.type==='gianthit'));
+   assert.ok(e.body.isValid(),'Debris still exists and simulates');assert.ok(e.body.linvel().y<0);
+   r.hurtBoss(420,{kind:'debris',by:p.id});assert.equal(r.bossHP,hp);assert.equal(r.boss.stagger,0);assert.equal(p.score,score);
+  }finally{r.dispose();}
+ }
 });
 test('round reset never reuses freed WASM body wrappers', () => {
  const r = room(); try{ const c = r.attach(socket, 'raider', 'pilot'); r.step(); r.initWorld(); ticks(r, 5); assert.ok(r.players.get(c.id).body.isValid()); assert.equal(r.detached.size, 0); }finally{ r.dispose(); }

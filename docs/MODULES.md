@@ -24,7 +24,7 @@ server/            authoritative simulation (Node + Rapier). Nothing here render
   combat.js        rifle + breach shot, knockdowns, ragdolls
   abilities.js     flight (calls shared/flight.js), missiles
   destruction.js   layered damage (glass -> facade -> frame), collapse scheduling, islands,
-                   topple, secondary fracture, crumble, debris vs buildings / giant
+                   topple, secondary fracture, crumble, debris vs buildings / raiders
   views.js         spectator image channel (/views)
 
 src/               browser client (Three.js). Reads snapshots/events; never decides gameplay.
