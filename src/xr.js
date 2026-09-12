@@ -82,10 +82,10 @@ export class XRControl{
   const aim=side=>{const r=aims[side];return r?new T.Vector3(0,0,-1).applyQuaternion(new T.Quaternion(r.x,r.y,r.z,r.w).premultiply(turnQ)).toArray():[0,0,-1];};
   const handQ=side=>{const r=handQuaternions[side];return r?new T.Quaternion(r.x,r.y,r.z,r.w).premultiply(turnQ).toArray():turnQ.toArray();};
   const rot=viewer.transform.orientation;q.set(rot.x,rot.y,rot.z,rot.w);q.premultiply(new T.Quaternion().setFromAxisAngle(axis,this.turn));euler.setFromQuaternion(q,'YXZ');
-  const local={...(snapshot||{}),head,bossYaw:euler.y,bossX:this.rig.position.x,bossZ:this.rig.position.z,left:poses.left?hand(poses.left):(this.local?.left||[head[0]-5,head[1]-7,head[2]-4]),right:poses.right?hand(poses.right):(this.local?.right||[head[0]+5,head[1]-7,head[2]-4])};local.leftQuaternion=handQ('left');local.rightQuaternion=handQ('right');this.local=local;
+  const local={...(snapshot||{}),head,bossYaw:euler.y,bossX:this.rig.position.x,bossZ:this.rig.position.z,left:poses.left?hand(poses.left):(this.local?.left||[head[0]-5,head[1]-7,head[2]-4]),right:poses.right?hand(poses.right):(this.local?.right||[head[0]+5,head[1]-7,head[2]-4])};local.leftQuaternion=handQ('left');local.rightQuaternion=handQ('right');local.resetHands=this.poseReset;this.local=local;
   if(!poses.left||!poses.right)this.stopTracking();
   else if(now-this.lastSend>1000/C.INPUT_HZ){
-   if(this.net.send({type:'pose',head:local.head,left:local.left,right:local.right,yaw:local.bossYaw,leftAim:aim('left'),rightAim:aim('right'),fireLeft:triggers.left,fireRight:triggers.right,turnDelta:this.pendingTurn,moveX:Math.abs(mx)>.15?mx:0,moveZ:Math.abs(mz)>.15?mz:0,reset:this.poseReset===true})){this.lastSend=now;this.pendingTurn=0;this.poseReset=false;this.trackingStopped=false;}
+   if(this.net.send({type:'pose',head:local.head,left:local.left,right:local.right,yaw:local.bossYaw,leftQuaternion:local.leftQuaternion,rightQuaternion:local.rightQuaternion,leftAim:aim('left'),rightAim:aim('right'),fireLeft:triggers.left,fireRight:triggers.right,turnDelta:this.pendingTurn,moveX:Math.abs(mx)>.15?mx:0,moveZ:Math.abs(mz)>.15?mz:0,reset:this.poseReset===true})){this.lastSend=now;this.pendingTurn=0;this.poseReset=false;this.trackingStopped=false;}
   }
   if(now-this.hudTime>120){this.paintHUD(latest,!!poses.left&&!!poses.right);this.hudTime=now;}return local;
  }

@@ -2,6 +2,7 @@ import * as T from 'three';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {raiderParts} from '../shared/raider-rig.js';
 import {armElbow} from './arm-rig.js';
+import {GIANT,handQuaternion,resolveHand} from '../shared/giant-rig.js';
 import {loadModel,bakedModel} from './assets.js';
 import {TEAM_COLORS} from '../shared/config.js';
 import {rounded,mesh,glow,coloredGeometry,up} from './art.js';
@@ -43,44 +44,53 @@ export class GiantView{
   for(const s of [-1,1]){mesh(rounded(.48,2,2.6,.09),trim,this.head,[s*2,.35,.1]);mesh(rounded(.25,1.9,.5,.05),dark,this.head,[s*1.65,2.7,.7]);}
   this.eyeGlow=glow(this.head,0xbeff9e,5,[0,.35,-2.15]);
   this.arms=[-1,1].map(s=>({upper:segment(this.root,null,null,1.8,2),lower:segment(this.root,null,null,2.2,2.25),fist:this.fist()}));
-  for(const arm of this.arms){arm.upper.rigidLength=6;arm.lower.rigidLength=6;arm.lower.anchorEnd=true;arm.elbow=mesh(new T.SphereGeometry(1.05,12,8),dark,this.root);arm.piston=mesh(new T.CylinderGeometry(.5,.5,1,10),trim,this.root);}
+  for(const arm of this.arms){arm.upper.rigidLength=GIANT.upperLength;arm.lower.rigidLength=GIANT.lowerLength;arm.lower.anchorEnd=true;arm.wrist=mesh(new T.SphereGeometry(.65,12,8),dark,this.root);arm.shoulder=mesh(new T.SphereGeometry(1.15,12,8),dark,this.root);arm.cuff=mesh(new T.CylinderGeometry(.56,.65,1.55,12),trim,arm.fist,[0,0,2.125]);arm.cuff.rotation.x=Math.PI/2;arm.elbow=mesh(new T.SphereGeometry(1.05,12,8),dark,this.root);arm.piston=mesh(new T.CylinderGeometry(.5,.5,1,10),trim,this.root);}
   this.ready=this.loadArmor();
-  this.legs=[-1,1].map(s=>({thigh:segment(this.root,null,null,2.3,2.5),shin:segment(this.root,null,null,2.1,2.35),foot:mesh(rounded(2.65,1.3,4,.15),dark,this.root)}));
+  this.legs=[-1,1].map(s=>({thigh:segment(this.root,null,null,2.3,2.5),shin:segment(this.root,null,null,2.1,2.35),hip:mesh(new T.SphereGeometry(.95,12,8),dark,this.root),knee:mesh(new T.SphereGeometry(.85,12,8),dark,this.root),ankle:mesh(new T.SphereGeometry(.7,12,8),dark,this.root),foot:mesh(rounded(2.65,1.3,4,.15),dark,this.root)}));
  }
  async loadArmor(){
   try{
-   const model=await loadModel('/assets/imported/mechs/colossus.glb');
+   const model=await loadModel('/assets/imported/mechs/colossus.glb?v=89cc8138');
    const replace=(parent,name,size)=>{const source=model.getObjectByName(name);if(!source)return;parent.traverse(o=>{if(o.isMesh)o.geometry.dispose();});parent.clear();const armor=new T.Mesh(source.geometry,source.material);armor.scale.set(...size);armor.castShadow=true;armor.receiveShadow=true;parent.add(armor);return armor;};
-   replace(this.body,'body',[8.8,9.5,4.7]);replace(this.head,'head',[4.5,4.3,3.8]);
+   replace(this.body,'body',GIANT.bodySize);replace(this.head,'head',GIANT.headSize);
+   mesh(new T.CylinderGeometry(.9,1.05,.9,12),dark,this.body,[0,5.02,0]);
    // Weak points retain their exact gameplay positions and stay visible at a distance.
    mesh(new T.TorusGeometry(1.42,.18,8,24),dark,this.body,[0,.05,-2.38]);
    mesh(new T.SphereGeometry(1.08,16,10),reactor,this.body,[0,.05,-2.35]);this.coreGlow=glow(this.body,0xc3ff98,6,[0,.05,-2.95]);
    this.eyeGlow=glow(this.head,0xc3ff98,1.2,[-1.13,.66,-1.98]);glow(this.head,0xc3ff98,1.2,[1.13,.66,-1.98]);
-   for(const [i,side]of ['R','L'].entries()){
+   for(const [i,side]of ['L','R'].entries()){
     const arm=this.arms[i],leg=this.legs[i];
     for(const [segment,name,width,depth]of [[arm.upper,'upper',2.7,2.8],[arm.lower,'lower',2.7,2.7],[leg.thigh,'thigh',2.8,3],[leg.shin,'shin',2.15,2.6]]){
      const replacement=replace(segment.g,name+side,[width,1,depth]);if(replacement){segment.armor=replacement;segment.joint=new T.Object3D();}
     }
     // The imported articulated fingers are closed around the tracked impact point.
-    replace(arm.fist,'fist'+side,[2.9,2.5,2.8]);
+    replace(arm.fist,'fist'+side,GIANT.handSize);arm.cuff=mesh(new T.CylinderGeometry(.56,.65,1.55,12),trim,arm.fist,[0,0,2.125]);arm.cuff.rotation.x=Math.PI/2;
    }
   }catch(error){console.error('Mech armor failed to load',error);}
  }
  fist(){const g=new T.Group();this.root.add(g);mesh(rounded(2.7,1.9,2.6,.25),metal,g);for(let i=0;i<4;i++)mesh(rounded(.53,.85,1.25,.12),trim,g,[(i-1.5)*.64,-.55,-.95]);mesh(rounded(.25,.3,2.2,.04),reactor,g,[1.38,.25,0]);return g;}
- update(s,{local=false}={}){
+ update(s,{local=false,collisionWorld=null}={}){
   const head=new T.Vector3(...s.head),q=new T.Quaternion().setFromAxisAngle(up,s.bossYaw||0);this.head.position.copy(head);this.head.quaternion.copy(q);this.head.visible=!local;
   // The decorative halo is for other players. From inside the giant it can
   // cover the pilot's view when looking down or leaning toward the reactor.
   this.coreGlow.visible=!local;
-  const chest=head.clone().add(new T.Vector3(0,-7.2,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
+  const chest=head.clone().add(new T.Vector3(0,-GIANT.chestDrop,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
   [-1,1].forEach((sign,i)=>{
-   const shoulder=new T.Vector3(sign*4.2,3.1,0).applyQuaternion(q).add(chest),hand=new T.Vector3(...(i?s.right:s.left));
-   const center=armElbow(shoulder,hand,q,sign),arm=this.arms[i];arm.elbow.position.copy(center);
-   const reach=center.distanceTo(hand),extension=Math.max(0,reach-arm.lower.rigidLength);arm.piston.visible=extension>.02;
-   if(arm.piston.visible){const direction=hand.clone().sub(center).normalize();arm.piston.position.copy(center).addScaledVector(direction,extension/2);arm.piston.quaternion.setFromUnitVectors(up,direction);arm.piston.scale.set(1,extension+.2,1);}
-   this.arms[i].upper.set(shoulder,center,q);this.arms[i].lower.set(center,hand,q);this.arms[i].fist.position.copy(hand);this.arms[i].fist.quaternion.copy(q);if(s[i?'rightQuaternion':'leftQuaternion'])this.arms[i].fist.quaternion.fromArray(s[i?'rightQuaternion':'leftQuaternion']);
-   const hip=new T.Vector3(sign*1.6,-4.3,0).applyQuaternion(q).add(chest),foot=new T.Vector3(sign*2.1,1,1.1).applyQuaternion(q);foot.x+=head.x;foot.z+=head.z;
-   const knee=hip.clone().lerp(foot,.52).add(new T.Vector3(0,0,-1.3).applyQuaternion(q));this.legs[i].thigh.set(hip,knee,q);this.legs[i].shin.set(knee,foot,q);this.legs[i].foot.position.copy(foot);this.legs[i].foot.quaternion.copy(q);
+   const arm=this.arms[i],side=i?'right':'left',rotation=handQuaternion(s[side+'Quaternion'],s.bossYaw||0),target=s[side];
+   const contact=collisionWorld&&!s.resetHands?resolveHand(arm.lastHand||target,target,rotation,collisionWorld):{position:target,contacts:[]};
+   const hand=new T.Vector3(...contact.position);arm.lastHand=contact.position;arm.contacts=contact.contacts;
+   arm.fist.position.copy(hand);arm.fist.quaternion.fromArray(rotation);
+   // A controller tracks the palm. The forearm attaches behind it at the wrist,
+   // never at the palm center or at the tips of the fingers.
+   const wrist=new T.Vector3(...GIANT.wrist).applyQuaternion(arm.fist.quaternion).add(hand),shoulder=new T.Vector3(sign*GIANT.shoulder[0],GIANT.shoulder[1],0).applyQuaternion(q).add(chest);
+   arm.wrist.position.copy(wrist);arm.shoulder.position.copy(shoulder);
+   const center=armElbow(shoulder,wrist,q,sign,GIANT.upperLength,GIANT.lowerLength);arm.elbow.position.copy(center);
+   const reach=center.distanceTo(wrist),extension=Math.max(0,reach-arm.lower.rigidLength);arm.piston.visible=extension>.02;
+   if(arm.piston.visible){const direction=wrist.clone().sub(center).normalize();arm.piston.position.copy(center).addScaledVector(direction,extension/2);arm.piston.quaternion.setFromUnitVectors(up,direction);arm.piston.scale.set(1,extension+.2,1);}
+   arm.upper.set(shoulder,center,q);arm.lower.set(center,wrist,q);
+   const hip=new T.Vector3(sign*1.6,-4.3,0).applyQuaternion(q).add(chest),foot=new T.Vector3(sign*2.1,1,-.65).applyQuaternion(q);foot.x+=head.x;foot.z+=head.z;
+   const ankle=foot.clone().add(new T.Vector3(0,.55,.65).applyQuaternion(q)),leg=this.legs[i];leg.hip.position.copy(hip);leg.ankle.position.copy(ankle);
+   const knee=hip.clone().lerp(ankle,.52).add(new T.Vector3(0,0,-1.3).applyQuaternion(q));this.legs[i].thigh.set(hip,knee,q);this.legs[i].shin.set(knee,ankle,q);leg.knee.position.copy(knee);this.legs[i].foot.position.copy(foot);this.legs[i].foot.quaternion.copy(q);
   });
  }
 }

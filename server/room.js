@@ -3,11 +3,13 @@
 import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {fly,launchMissile,updateMissiles} from './abilities.js';
+import {HandWorld} from '../shared/hand-world.js';
+import {GIANT,identity,handQuaternion,resolveHand,handRay} from '../shared/giant-rig.js';
 import {staticProps} from '../shared/props.js';
 import {raiderParts,raiderLinks,raiderGear} from '../shared/raider-rig.js';
 import {C,group} from '../shared/config.js';
 import {activeEnvironment as city,generateCells,unsupportedCells,cellColliders} from '../shared/environment.js';
-import {v,add,sub,mul,len,norm,dist,arr,vec,clamp,quatYaw,quatEuler,rotateYaw,segmentDistance,segmentAABB,raySphere,lookDir,finiteVector,sanitizeInput} from '../shared/math.js';
+import {v,add,sub,mul,len,norm,dist,arr,vec,clamp,quatYaw,quatEuler,rotateYaw,raySphere,lookDir,finiteVector,sanitizeInput} from '../shared/math.js';
 export const physicsReady=RAPIER.init();
 const G=C.COLLISION;
 const noInput=()=>({x:0,z:0,up:0,boost:false,fire:false,soar:false,missile:false,dodge:0,yaw:0,pitch:0,seq:0});
@@ -29,7 +31,7 @@ export class Room {
   this.queue=new RAPIER.EventQueue(true);this.colliderTags=new Map();this.cells=generateCells(this.env);
   this.cellMap=new Map();this.detached=new Set();this.debris=new Map();this.nextDebris=1000;this.missiles=new Map();this.nextMissile=20000;this.rags=new Map();this.events=[];
   this.phase=0;this.remaining=C.MATCH_SECONDS;this.bossHP=C.BOSS_HP;this.kills=0;this.startTime=this.time;
-  this.boss={x:0,z:0,yaw:0,head:v(0,23.8,0),left:v(-5.6,16,-4),right:v(5.6,16,-4),lastPose:-100,input:noInput(),lastInput:-100,missileReady:0};
+  this.boss={x:0,z:0,yaw:0,head:v(0,23.8,0),left:v(-5.6,16,-4),right:v(5.6,16,-4),lastPose:-100,input:noInput(),lastInput:-100,missileReady:0,leftQuaternion:[...identity],rightQuaternion:[...identity],pressed:{}};
   this.ground=this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0,-.3,0));
   this.world.createCollider(RAPIER.ColliderDesc.cuboid(220,.3,220).setFriction(.82).setCollisionGroups(group(G.WORLD)),this.ground);
   for(const c of this.cells){
@@ -45,9 +47,10 @@ export class Room {
    const off=prop.collider.offset||[0,0,0];
    this.world.createCollider(RAPIER.ColliderDesc.cuboid(...half.map(x=>x*scale)).setTranslation(...off.map(x=>x*scale)).setCollisionGroups(group(G.WORLD)),b);
   }
+  this.handWorld=new HandWorld(this.env,this.cells);
   this.handBodies=['left','right'].map(side=>{
    const p=this.boss[side],body=this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(p.x,p.y,p.z));
-   this.world.createCollider(RAPIER.ColliderDesc.ball(C.HAND_RADIUS).setFriction(.4).setCollisionGroups(group(G.GIANT,G.DEBRIS|G.RAGDOLL)),body);return body;
+   this.world.createCollider(RAPIER.ColliderDesc.cuboid(...GIANT.handHalf).setFriction(.4).setCollisionGroups(group(G.GIANT,G.DEBRIS|G.RAGDOLL)),body);return body;
   });
   for(const p of this.players.values()){p.kills=0;p.damage=0;this.spawn(p);}
  }
@@ -96,6 +99,7 @@ export class Room {
    if(m.tracking===false){this.boss.desktop=false;this.boss.lastPose=-100;this.boss.moveX=0;this.boss.moveZ=0;return;}
    if(!finiteVector(m.head)||!finiteVector(m.left)||!finiteVector(m.right)||!Number.isFinite(m.yaw))return;
    const b=this.boss,head=vec(m.head),l=vec(m.left),r=vec(m.right);
+   for(const side of ['left','right'])if(m[side+'Quaternion']!==undefined&&(!finiteVector(m[side+'Quaternion'],4,1.1)||Math.hypot(...m[side+'Quaternion'])<.5))return;
    if(head.y<5||head.y>38||Math.hypot(head.x-b.x,head.z-b.z)>18||dist(head,l)>64||dist(head,r)>64)return;
    // Session entry, recentering and recovered tracking are teleports,
    // not swings. Rebase collision bodies and suppress contact briefly.
@@ -103,7 +107,7 @@ export class Room {
    b.turnDelta=clamp((b.turnDelta||0)+clamp(Number(m.turnDelta)||0,-.8,.8),-Math.PI,Math.PI);
    b.triggers={left:!!m.fireLeft,right:!!m.fireRight};
    b.aims={};for(const side of ['left','right'])if(finiteVector(m[side+'Aim'],3,1.1)&&len(vec(m[side+'Aim']))>.8)b.aims[side]=norm(vec(m[side+'Aim']));
-   b.target={head,left:l,right:r};b.yaw=clamp(m.yaw,-1e5,1e5);b.lastPose=this.time;b.desktop=false;
+   b.target={head,left:l,right:r,leftQuaternion:handQuaternion(m.leftQuaternion,m.yaw),rightQuaternion:handQuaternion(m.rightQuaternion,m.yaw)};b.yaw=clamp(m.yaw,-1e5,1e5);b.lastPose=this.time;b.desktop=false;
    b.moveX=clamp(Number(m.moveX)||0,-1,1);b.moveZ=clamp(Number(m.moveZ)||0,-1,1);
   }
   if(m.type==='restart'&&client.id===this.hostId()&&this.phase!==0){this.round++;this.initWorld();this.event({type:'reset'});}
@@ -169,9 +173,10 @@ export class Room {
   if(!p.body||p.hp<=0)return;p.lastShot=this.time;
   const origin=add(p.body.translation(),v(0,.5,0)),direction=lookDir(p.input.aimYaw??p.input.yaw,p.input.aimPitch??p.input.pitch),b=this.boss;
   let distance=C.SHOT_RANGE,damage=0,weak=false;
-  for(const [center,radius,mult] of [[b.head,C.HEAD_RADIUS,1.8],[v(b.head.x,b.head.y-7.2,b.head.z),4.1,1],[b.left,C.HAND_RADIUS,.55],[b.right,C.HAND_RADIUS,.55]]){
+  for(const [center,radius,mult] of [[b.head,C.HEAD_RADIUS,1.8],[v(b.head.x,b.head.y-7.2,b.head.z),4.1,1]]){
    const t=raySphere(origin,direction,center,radius);if(t<distance){distance=t;damage=C.SHOT_DAMAGE*mult;weak=mult>1;}
   }
+  for(const side of ['left','right']){const t=handRay(arr(origin),arr(direction),arr(b[side]),b[side+'Quaternion'],distance);if(t<distance){distance=t;damage=C.SHOT_DAMAGE*.55;weak=false;}}
   const ray=new RAPIER.Ray(origin,direction);
   const obstruction=this.world.castRayAndGetNormal(ray,distance,true,undefined,group(G.PLAYER,G.WORLD|G.DEBRIS));
   if(obstruction){distance=obstruction.timeOfImpact??obstruction.toi;damage=0;weak=false;}
@@ -179,11 +184,12 @@ export class Room {
   this.event({type:'shot',player:p.id,from:arr(origin),to:arr(add(origin,mul(direction,distance))),hit:damage>0,impact:!!obstruction||damage>0,normal:obstruction?arr(obstruction.normal):arr(mul(direction,-1)),weak});
  }
  updateBoss(){
-  const b=this.boss,prevL={...b.left},prevR={...b.right};
+  const b=this.boss,prevL={...b.left},prevR={...b.right},rawPrevious={left:b.rawLeft||prevL,right:b.rawRight||prevR};
+
   if(this.bossClient&&this.time-b.lastPose<.4&&!b.desktop){
    const d=rotateYaw(v(b.moveX||0,0,b.moveZ||0),b.yaw),step=mul(len(d)>1?norm(d):d,C.GIANT_SPEED*C.TICK);
    b.x=clamp(b.x+step.x,-48,48);b.z=clamp(b.z+step.z,-48,48);
-   for(const key of ['head','left','right'])b[key]={...b.target[key]};
+   for(const key of ['head','left','right'])b[key]={...b.target[key]};for(const side of ['left','right'])b[side+'Quaternion']=b.target[side+'Quaternion'];
   }else if(this.bossClient&&b.desktop){
    const i=this.time-b.lastInput<.45?b.input:noInput();b.yaw=i.yaw;
    let dir=rotateYaw(v(i.x,0,i.z),b.yaw);if(len(dir)>1)dir=norm(dir);b.x=clamp(b.x+dir.x*C.GIANT_SPEED*C.TICK,-48,48);b.z=clamp(b.z+dir.z*C.GIANT_SPEED*C.TICK,-48,48);
@@ -200,6 +206,7 @@ export class Room {
    b.left=add(v(b.x,0,b.z),rotateYaw(v(-5+Math.sin(this.time*.7)*7,13+Math.sin(this.time*1.1)*7,-7),b.yaw));
    b.right=add(v(b.x,0,b.z),rotateYaw(v(5+Math.sin(this.time*1.25)*9,12+Math.cos(this.time*1.6)*9,-8),b.yaw));
   }
+  if(b.desktop||!this.bossClient)for(const side of ['left','right'])b[side+'Quaternion']=handQuaternion(null,b.yaw);
   if(this.bossClient&&!b.desktop&&this.time-b.lastPose<.4&&!b.resetPose){for(const side of ['left','right'])if(b.triggers?.[side]&&b.aims?.[side])launchMissile(this,side,b.aims[side]);}
   if(this.bossClient&&b.desktop&&this.time-b.lastInput<.45&&b.input.missile)launchMissile(this,'right',lookDir(b.yaw,b.input.pitch));
   const canAttack=(!this.bossClient||(b.desktop?this.time-b.lastInput<.45:this.time-b.lastPose<.4))&&!(this.time<b.noContactUntil);
@@ -213,21 +220,31 @@ export class Room {
   for(const [idx,key,prev] of [[0,'left',prevL],[1,'right',prevR]]){
    const hand=this.handBodies[idx];
    for(let i=0;i<hand.numColliders();i++)hand.collider(i).setEnabled(canAttack);
-   if(b.resetPose){hand.setTranslation(b[key],true);hand.setNextKinematicTranslation(b[key]);continue;}
+   const rotation=b[key+'Quaternion'],q={x:rotation[0],y:rotation[1],z:rotation[2],w:rotation[3]},raw={...b[key]};
+   const previousRaw=rawPrevious[key],rawPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(previousRaw,b.head),b.turnDelta)):previousRaw;
+   const displacement=sub(raw,rawPrev),speed=Math.min(C.MAX_HAND_SPEED,len(displacement)/C.TICK);
+   b[idx?'rawRight':'rawLeft']=raw;
+   if(b.resetPose||!canAttack){b.pressed[key]=false;hand.setTranslation(raw,true);hand.setRotation(q,true);hand.setNextKinematicTranslation(raw);hand.setNextKinematicRotation(q);continue;}
    const collisionPrev=!b.desktop&&b.turnDelta?add(b.head,rotateYaw(sub(prev,b.head),b.turnDelta)):prev;
-   const displacement=sub(b[key],collisionPrev),speed=Math.min(C.MAX_HAND_SPEED,len(displacement)/C.TICK);
-   if(!b.desktop&&Math.abs(b.turnDelta||0)>.001)hand.setTranslation(collisionPrev,true);
-   hand.setNextKinematicTranslation(b[key]);
-   if(!canAttack)continue;
-   for(const p of this.players.values())if(p.body&&len(sub(mul(displacement,1/C.TICK),p.body.linvel()))>4&&segmentDistance(p.body.translation(),collisionPrev,b[key])<C.HAND_RADIUS+.65){
-    const direction=speed>3?norm(displacement):norm(sub(p.body.translation(),b[key]));const kick=add(mul(direction,clamp(speed*.65,8,35)),v(0,6,0));this.knockdown(p,kick,25+speed*1.15);
+   const contact=resolveHand(arr(prev),arr(raw),rotation,this.handWorld);b[key]=vec(contact.position);
+   if(!b.desktop&&Math.abs(b.turnDelta||0)>.001)hand.setTranslation(speed>.2?collisionPrev:b[key],true);
+   hand.setNextKinematicTranslation(b[key]);hand.setNextKinematicRotation(q);
+   const stoppedDisplacement=sub(b[key],collisionPrev);
+   for(const p of this.players.values())if(p.body&&!(b.turnDelta&&speed<.2)&&len(sub(mul(displacement,1/C.TICK),p.body.linvel()))>4){
+    // Sweep the same oriented fist against the raider's actual capsule shape.
+    const hit=p.body.collider(0).castShape(v(),new RAPIER.Cuboid(...GIANT.handHalf),collisionPrev,q,stoppedDisplacement,0,1,true);
+    if(hit){const direction=speed>3?norm(displacement):norm(sub(p.body.translation(),b[key]));const kick=add(mul(direction,clamp(speed*.65,8,35)),v(0,6,0));this.knockdown(p,kick,25+speed*1.15);}
    }
-   // Swept volume avoids tunnelling through storeys between network pose samples.
-   if(speed>=3){const hit=[];
-    for(const c of this.cells)if(!this.detached.has(c.id)&&this.time-c.lastHit>.28&&segmentAABB(collisionPrev,b[key],vec(c.p),mul(vec(c.size),.5),C.HAND_RADIUS*.8)){
-     c.lastHit=this.time;c.hp-=speed*1.6+18;if(c.hp<=0)hit.push(c.id);if(hit.length>=5)break;
+   const blocked=dist(raw,b[key])>.025;
+   if(!blocked)b.pressed[key]=false;else if(speed>.2)b.pressed[key]=true;
+   if(contact.contacts.length&&b.pressed[key]){
+    const hit=[],touched=new Set();
+    for(const point of contact.contacts){const c=this.cellMap.get(point.cell);if(!c||touched.has(c.id)||this.detached.has(c.id)||this.time-c.lastHit<=.28)continue;touched.add(c.id);
+     c.lastHit=this.time;c.hp-=speed*1.6+22;
+     if(c.hp<=0)hit.push(c.id);else this.event({type:'impact',p:point.point,power:.15});
+     if(hit.length>=5)break;
     }
-    if(hit.length)this.breakCells(hit,mul(norm(displacement),Math.min(16,speed*.28)));
+    if(hit.length)this.breakCells(hit,mul(norm(displacement),Math.min(16,Math.max(2,speed*.28))));
    }
   }
   b.resetPose=false;b.turnDelta=0;
@@ -246,7 +263,7 @@ export class Room {
   }
   for(const ids of batches){
    let origin=v();for(const id of ids)origin=add(origin,vec(this.cellMap.get(id).p));origin=mul(origin,1/ids.length);
-   for(const id of ids){const c=this.cellMap.get(id);this.removeBody(c.body);this.detached.add(id);}
+   for(const id of ids){const c=this.cellMap.get(id);this.removeBody(c.body);this.detached.add(id);this.handWorld.setCell(id,c.p,identity,true);}
    const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(origin.x,origin.y,origin.z).setLinearDamping(.1).setAngularDamping(.45).setCcdEnabled(true));
    const id=this.nextDebris++,entity={id,body,cells:ids,origin:arr(origin),born:this.time};
    for(const cid of ids){const c=this.cellMap.get(cid);c.entity=id;c.colliders=this.addCellColliders(c,body,sub(vec(c.p),origin),G.DEBRIS);}
@@ -304,7 +321,7 @@ export class Room {
  removeRag(id){const r=this.rags.get(id);if(!r)return;for(const part of r.parts){this.removeBody(part.body);this.event({type:'remove',id:part.id});}this.rags.delete(id);}
  snapshot(){
   const b=this.boss;
-  return {tick:this.tick,time:this.time,bossHP:this.bossHP,remaining:this.remaining,kills:this.kills,head:arr(b.head),left:arr(b.left),right:arr(b.right),bossYaw:b.yaw,bossX:b.x,bossZ:b.z,
+  return {tick:this.tick,time:this.time,bossHP:this.bossHP,remaining:this.remaining,kills:this.kills,head:arr(b.head),left:arr(b.left),right:arr(b.right),bossYaw:b.yaw,bossX:b.x,bossZ:b.z,leftQuaternion:b.leftQuaternion,rightQuaternion:b.rightQuaternion,
    damage:this.detached.size/this.cells.length*100,phase:this.phase,round:this.round,
    players:[...this.players.values()].map(p=>{const rb=p.body||this.rags.get(p.rag)?.parts[0].body;return {id:p.id,flags:(p.rag?2:0)|(p.hp<=0?1:0)|(this.time<p.invulnerable?4:0)|(p.bot?8:0)|(p.soaring?16:0)|(this.time<p.dodgeUntil?32:0),p:rb?arr(rb.translation()):[0,-20,0],v:rb?arr(rb.linvel()):[0,0,0],yaw:p.input.yaw,hp:p.hp,fuel:p.fuel,seq:p.input.seq,pitch:p.input.pitch,dodgeCooldown:Math.max(0,p.dodgeReady-this.time)};}),
    bodies:[...[...this.debris.values()].map(e=>({id:e.id,...bodyPose(e.body)})),...[...this.rags.values()].flatMap(r=>r.parts.map(p=>({id:p.id,...bodyPose(p.body)})))]

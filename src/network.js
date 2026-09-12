@@ -1,5 +1,6 @@
 import {decodeSnapshot} from '../shared/protocol.js';
 import {C} from '../shared/config.js';
+import {handQuaternion} from '../shared/giant-rig.js';
 const mix=(a,b,t)=>a+(b-a)*t;
 const vector=(a,b,t)=>a.map((x,i)=>mix(x,b[i],t));
 const qmix=(a,b,t)=>{const sign=a.reduce((s,x,i)=>s+x*b[i],0)<0?-1:1,q=a.map((x,i)=>mix(x,b[i]*sign,t)),n=Math.hypot(...q)||1;return q.map(x=>x/n);};
@@ -40,6 +41,7 @@ export class Connection{
   for(let i=1;i<this.snapshots.length;i++){if(this.snapshots[i].time>=target){a=this.snapshots[i-1];b=this.snapshots[i];break;}a=this.snapshots[i];}
   const t=Math.max(0,Math.min(1,(target-a.time)/(b.time-a.time||1))),pm=new Map(a.players.map(p=>[p.id,p])),bm=new Map(a.bodies.map(p=>[p.id,p]));
   const s={...b,head:vector(a.head,b.head,t),left:vector(a.left,b.left,t),right:vector(a.right,b.right,t),bossYaw:angle(a.bossYaw,b.bossYaw,t),bossX:mix(a.bossX,b.bossX,t),bossZ:mix(a.bossZ,b.bossZ,t)};
+  for(const side of ['left','right'])s[side+'Quaternion']=qmix(handQuaternion(a[side+'Quaternion'],a.bossYaw),handQuaternion(b[side+'Quaternion'],b.bossYaw),t);
   s.players=b.players.map(p=>{const q=pm.get(p.id);return q?{...p,p:vector(q.p,p.p,t),v:vector(q.v,p.v,t),yaw:angle(q.yaw,p.yaw,t),pitch:mix(q.pitch||0,p.pitch||0,t)}:p;});
   s.bodies=b.bodies.map(p=>{const q=bm.get(p.id);return q?{...p,p:vector(q.p,p.p,t),q:qmix(q.q,p.q,t)}:p;});return s;
  }

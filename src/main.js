@@ -4,6 +4,7 @@ import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {C} from '../shared/config.js';
+import {handRay,handQuaternion} from '../shared/giant-rig.js';
 import {activeEnvironment as city} from '../shared/environment.js';
 import {clamp,raySphere,vec,lookDir} from '../shared/math.js';
 import {installDistrict} from './district.js';
@@ -106,7 +107,8 @@ function input(){
   const player=(net.latest||current).players.find(p=>p.id===net.id);
   if(player){
    const dir=lookDir(yaw,pitch),origin=camera.position;let distance=C.SHOT_RANGE;
-   for(const [p,r] of [[current.head,C.HEAD_RADIUS],[[current.head[0],current.head[1]-7.2,current.head[2]],4.1],[current.left,C.HAND_RADIUS],[current.right,C.HAND_RADIUS]])distance=Math.min(distance,raySphere(origin,dir,vec(p),r));
+   for(const [p,r] of [[current.head,C.HEAD_RADIUS],[[current.head[0],current.head[1]-7.2,current.head[2]],4.1]])distance=Math.min(distance,raySphere(origin,dir,vec(p),r));
+   for(const side of ['left','right'])distance=Math.min(distance,handRay(origin.toArray(),[dir.x,dir.y,dir.z],current[side],handQuaternion(current[side+'Quaternion'],current.bossYaw),distance));
    distance=cityView.rayDistance(origin,new T.Vector3(dir.x,dir.y,dir.z),distance);
    const target=new T.Vector3(dir.x,dir.y,dir.z).multiplyScalar(Math.max(1,distance+.04)).add(origin),aim=target.sub(new T.Vector3(player.p[0],player.p[1]+.5,player.p[2]));
    m.aimYaw=Math.atan2(-aim.x,-aim.z);m.aimPitch=Math.atan2(aim.y,Math.hypot(aim.x,aim.z));
@@ -154,7 +156,7 @@ function frame(now,xrFrame){
  if(playing&&s){
   current=s;
   const local=xr.update(xrFrame,s,now);
-  giant.update(local||s,{local:renderer.xr.isPresenting||role==='boss'});
+  giant.update(local||s,{local:renderer.xr.isPresenting||role==='boss',collisionWorld:renderer.xr.isPresenting?cityView.handWorld:null});
   if(!renderer.xr.isPresenting){desktopCamera(dt,s);if(now-lastInput>1000/C.INPUT_HZ){net.send(paused?{...input(),x:0,z:0,up:0,fire:false,boost:false,soar:false,missile:false,dodge:0}:input());lastInput=now;}}
   const ids=new Set();for(const p of s.players){ids.add(p.id);if(!players.has(p.id))players.set(p.id,new RaiderView(scene,p.id));players.get(p.id).update(p,p.id===net.id,firstPerson);}
   for(const [id,p] of players)if(!ids.has(id)){p.dispose();players.delete(id);}

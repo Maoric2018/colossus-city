@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {HandWorld} from '../shared/hand-world.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {staticProps,roofProp} from '../shared/props.js';
 import {generateCells,cellColliders} from '../shared/environment.js';
@@ -9,7 +10,7 @@ const skyVertex=`varying vec3 vDir; void main(){vDir=position;vec4 p=projectionM
 const skyFragment=`varying vec3 vDir;uniform vec3 topColor;uniform vec3 horizon;void main(){vec3 d=normalize(vDir);float h=max(d.y,0.);vec3 c=mix(horizon,topColor,pow(h,.42));vec3 sun=normalize(vec3(-.8,.22,-.65));float s=max(dot(d,sun),0.);c+=vec3(1.,.51,.22)*pow(s,18.)*.37;c+=vec3(1.,.82,.48)*smoothstep(.9986,.9995,s)*2.;float cloud=sin(d.x*15.+sin(d.z*9.))*sin(d.z*20.+d.x*8.);c+=vec3(.035)*smoothstep(.2,.8,cloud)*smoothstep(0.,.25,h)*(1.-smoothstep(.3,.6,h));gl_FragColor=vec4(c,1.);}`;
 export class CityView{
  constructor(scene,env,{quest=false}={}){
-  this.scene=scene;this.env=env;this.quest=quest;this.root=new T.Group();scene.add(this.root);this.cells=generateCells(env);this.byId=new Map(this.cells.map(c=>[c.id,c]));this.entries=new Map();this.moving=new Map();this.batches=[];this.assetCells=new Map();this.attachments=new Map();this.dirty=new Set();this.transforms=new Map();this.props=staticProps(env);this.colliderCache=new Map(this.cells.map(c=>[c.id,cellColliders(c)]));
+  this.scene=scene;this.env=env;this.quest=quest;this.root=new T.Group();scene.add(this.root);this.cells=generateCells(env);this.handWorld=new HandWorld(env,this.cells);this.byId=new Map(this.cells.map(c=>[c.id,c]));this.entries=new Map();this.moving=new Map();this.dynamicCells=new Set();this.batches=[];this.assetCells=new Map();this.attachments=new Map();this.dirty=new Set();this.transforms=new Map();this.props=staticProps(env);this.colliderCache=new Map(this.cells.map(c=>[c.id,cellColliders(c)]));
   this.loader=new T.TextureLoader();this.materials=[];this.makeWorld();this.makeBuildings();this.makeDetails();this.ready=this.loadCustomAssets();
  }
  texture(url,repeat=1,srgb=true){const t=this.loader.load(url);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(repeat,repeat);t.anisotropy=4;if(srgb)t.colorSpace=T.SRGBColorSpace;return t;}
@@ -75,7 +76,7 @@ export class CityView{
  cellMatrix(c){temp.position.set(...c.p);temp.rotation.set(0,0,0);temp.scale.set(...c.size);temp.updateMatrix();return temp.matrix;}
  setCell(id,p,q,hidden=false){
   const c=this.byId.get(id),e=this.entries.get(id);if(!e)return;
-  this.transforms.set(id,{p:p.clone(),q:q.clone(),hidden});
+  this.transforms.set(id,{p:p.clone(),q:q.clone(),hidden});this.handWorld.setCell(id,p.toArray(),q.toArray(),hidden||this.dynamicCells.has(id));
   temp.position.copy(p);temp.quaternion.copy(q);temp.scale.copy(e.size);temp.updateMatrix();const m=(hidden||this.assetCells.has(id))?zero:temp.matrix;
   this.structural.setMatrixAt(e.index,m);this.dirty.add(this.structural);
   const s=new T.Matrix4();for(const w of e.walls){
@@ -87,13 +88,13 @@ export class CityView{
  }
  commit(){for(const b of this.dirty)b.instanceMatrix.needsUpdate=true;this.dirty.clear();}
  update(dt){this.waterTime.value+=dt;}
- addDebris(e){this.moving.set(e.id,{cells:e.cells,origin:new T.Vector3(...e.origin)});this.poseDebris(e.id,e.p,e.q);}
+ addDebris(e){for(const id of e.cells)this.dynamicCells.add(id);this.moving.set(e.id,{cells:e.cells,origin:new T.Vector3(...e.origin)});this.poseDebris(e.id,e.p,e.q);}
  poseDebris(id,p,q){const e=this.moving.get(id);if(!e)return;const pos=new T.Vector3(...p),rot=new T.Quaternion(...q);
   for(const cId of e.cells){const c=this.byId.get(cId),off=new T.Vector3(...c.p).sub(e.origin).applyQuaternion(rot).add(pos);this.setCell(cId,off,rot);}
  }
  removeDebris(id){const e=this.moving.get(id);if(!e)return;for(const c of e.cells)this.setCell(c,new T.Vector3(),new T.Quaternion(),true);this.moving.delete(id);this.commit();}
  hideCells(ids){for(const id of ids)this.setCell(id,new T.Vector3(),new T.Quaternion(),true);this.commit();}
- reset(){this.moving.clear();for(const c of this.cells)this.setCell(c.id,new T.Vector3(...c.p),new T.Quaternion());this.commit();}
+ reset(){this.moving.clear();this.dynamicCells.clear();for(const c of this.cells)this.setCell(c.id,new T.Vector3(...c.p),new T.Quaternion());this.commit();}
  makeDetails(){
   const dark=new T.MeshStandardMaterial({color:0x293d42,metalness:.65,roughness:.61});
   // Pavement, steps, and signboards. Fixed collision proxies are defined in shared/props.js.

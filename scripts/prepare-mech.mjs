@@ -36,10 +36,14 @@ for(const [name,part]of parts){
  let rotation=new T.Quaternion(),center,size;
  const match=name.match(/^(upper|lower|thigh|shin)(L|R)$/);
  if(match){const [,kind,side]=match,pairs={upper:['UpperArm','LowerArm'],lower:['LowerArm','PalmP'],thigh:['UpperLeg','LowerLeg'],shin:['LowerLeg','Foot']},[a,b]=pairs[kind].map(n=>bonePosition(n+side));center=a.clone().lerp(b,.5);rotation.setFromUnitVectors(b.clone().sub(a).normalize(),new T.Vector3(0,1,0));size=new T.Vector3(1,a.distanceTo(b),1);}
- else {const box=new T.Box3();for(let i=0;i<part.p.length;i+=3)box.expandByPoint(new T.Vector3(...part.p.slice(i,i+3)));center=box.getCenter(new T.Vector3());size=box.getSize(new T.Vector3());}
+ else {
+  if(name.startsWith('fist')){const side=name.at(-1),wrist=bonePosition('PalmP'+side),forward=new T.Vector3();for(const digit of ['Pinky1','Ring1','Index1'])forward.add(bonePosition(digit+side));forward.multiplyScalar(1/3).sub(wrist).normalize();const y=bonePosition('Thumb1'+side).sub(wrist);y.addScaledVector(forward,-y.dot(forward)).normalize();const z=forward.negate(),x=new T.Vector3().crossVectors(y,z).normalize();y.crossVectors(z,x).normalize();rotation.setFromRotationMatrix(new T.Matrix4().makeBasis(x,y,z)).invert();for(let i=0;i<part.p.length;i+=3){new T.Vector3(...part.p.slice(i,i+3)).applyQuaternion(rotation).toArray(part.p,i);new T.Vector3(...part.n.slice(i,i+3)).applyQuaternion(rotation).toArray(part.n,i);}rotation.identity();}
+  const box=new T.Box3();for(let i=0;i<part.p.length;i+=3)box.expandByPoint(new T.Vector3(...part.p.slice(i,i+3)));center=box.getCenter(new T.Vector3());size=box.getSize(new T.Vector3());}
  for(let i=0;i<part.p.length;i+=3){const p=new T.Vector3(...part.p.slice(i,i+3)).sub(center).applyQuaternion(rotation);if(match)p.y/=size.y;else p.divide(size);p.toArray(part.p,i);new T.Vector3(...part.n.slice(i,i+3)).applyQuaternion(rotation).multiply(size).normalize().toArray(part.n,i);}
- // Segment cross-sections normalized independently, retaining their joint positions.
- if(match){const xs=part.p.filter((_,i)=>i%3===0),zs=part.p.filter((_,i)=>i%3===2),w=Math.max(...xs)-Math.min(...xs),d=Math.max(...zs)-Math.min(...zs);for(let i=0;i<part.p.length;i+=3){part.p[i]/=w;part.p[i+2]/=d;new T.Vector3(part.n[i]*w,part.n[i+1],part.n[i+2]*d).normalize().toArray(part.n,i);}}
+ // Fit the actual shell into its joint span. The source forearm extends to
+ // 1.09 joint lengths beyond its center; treating that as a unit shell buried
+ // the entire hand. Leave exposed joint clearance at both ends of every limb.
+ if(match){const bounds=[0,1,2].map(k=>{const values=part.p.filter((_,i)=>i%3===k);return [Math.min(...values),Math.max(...values)];});const scale=bounds.map(([lo,hi],k)=>(hi-lo)/(k===1?.88:1));for(let i=0;i<part.p.length;i+=3){for(let k=0;k<3;k++)part.p[i+k]=(part.p[i+k]-(bounds[k][0]+bounds[k][1])/2)/scale[k];new T.Vector3(part.n[i]*scale[0],part.n[i+1]*scale[1],part.n[i+2]*scale[2]).normalize().toArray(part.n,i);}}
  doc.scenes[0].nodes.push(doc.nodes.length);doc.nodes.push({name,mesh:doc.meshes.length});doc.meshes.push({primitives:[{attributes:{POSITION:attribute(part.p,'VEC3'),NORMAL:attribute(part.n,'VEC3'),TEXCOORD_0:attribute(part.uv,'VEC2')},material:0}]});
  console.log(name,part.p.length/9,'triangles');
 }

@@ -3,9 +3,9 @@
 
 Asymmetric multiplayer source prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders the city; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
-**Validation status (September 11, 2026):** dependencies installed and locked; **61 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
+**Validation status (September 11, 2026):** dependencies installed and locked; **68 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
 
-The latest update replaces the spectator slideshow with direct WebRTC video and starts raiders in first person. Press **V**, or use the pause-menu camera button, to switch to the wider third-person shoulder view. The matching armored ragdoll, solid props and articulated giant arms remain in place.
+The latest update aligns the colossus’s hand hitboxes with its visible armor, adds solid hand contact and sustained pushing against buildings, and fixes forearm/wrist placement. Wrist rotation now matches on every player’s screen. Raiders still start in first person (**V** switches views), and the spectator panel retains direct low-latency video.
 
 ## 1. Start on a laptop
 
@@ -80,6 +80,8 @@ The server supports local TLS when both `TLS_CERT` and `TLS_KEY` are set. A cert
 
 **Giant reach:** the default 14× world scale maps a physical 0.5 m controller movement to 7 m in the city. The server now preserves that full reach without a slow positional catch-up. Before entering VR, open **Quest Controls** to adjust turn speed (30–180°/s) or reach gain (0.5–1.5×). A calibration adjusts the giant scale for your standing height; the headset HUD shows the resulting reach. Smooth turning pivots around your head, and artificial rotation is excluded from hand-strike velocity.
 
+**Hand contact:** the visible palm stops and slides at intact walls and fixed props. Gentle contact produces feedback, and holding pressure against a destructible wall breaks it; fast punches apply stronger impacts. The raw controller target stays unchanged, so the hand follows your reach again as soon as you pull back or clear the obstruction. The elbow, wrist and hand have separate attachment points. Reload every client after this update because wrist orientation adds fields to the network snapshots.
+
 **Flight:** hold Space to take off, then hold either Shift key to soar. Release Shift to return to hover. The pilot flies prone, mouse aim steers the flight path, and S brakes. Normal flight stays at 11 m/s; holding Shift soars at up to 32 m/s. The giant walks at 13 m/s (about 18% faster than normal raider flight), with the same speed on Quest and keyboard. E dodges in your held WASD/Space/C direction, or forward when no direction is held. Dodges use 12% thrust and have a 1.2-second cooldown. Speed streaks, a wider field of view and banking communicate acceleration.
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode against scenery/raiders, damage nearby raiders and destroy building bays. The server enforces a shared 0.8-second firing cooldown and an eight-projectile cap.
@@ -133,7 +135,7 @@ The refresh checks source hashes before replacing files. Models, textures and so
 
 Physics is targeted at **60 fixed steps/s**, snapshots at **20/s**, inputs/poses at **30/s**. Remote objects are interpolated over ~100 ms. The local raider camera uses bounded extrapolation, not a second authoritative solver. WebSockets are reliable and ordered; poor Wi-Fi can introduce head-of-line delay. This is a hackathon networking choice, not a rollback/lag-compensated competitive netcode stack.
 
-Caps: 144 debris bodies, eight ragdolls, eight raiders. Under pressure, new collapses are coarsened; at full capacity additional damage waits rather than deleting a falling tower. Rigid-body caps do not imply only 144 colliders: hollow bays have multiple collision shapes. The maximum configured binary snapshot example is 7,964 bytes, or ~159 KB/s per receiving client at 20 Hz, **before** event/WS/TLS overhead. This is a calculated budget, not a network measurement.
+Caps: 144 debris bodies, eight ragdolls, eight raiders. Under pressure, new collapses are coarsened; at full capacity additional damage waits rather than deleting a falling tower. Rigid-body caps do not imply only 144 colliders: hollow bays have multiple collision shapes. The maximum configured binary snapshot example is 7,996 bytes, or ~160 KB/s per receiving client at 20 Hz, **before** event/WS/TLS overhead. This is a calculated budget, not a network measurement.
 
 Rendering uses instanced building pieces, merged detail geometry, shared materials, bounded particles, and no bloom/shadow pass by default on Quest. XR uses a 0.85 framebuffer scale request and foveation where supported. None of these settings proves that your Quest achieves 72 FPS. Profile the full eight-player collapse, not just the lobby.
 
