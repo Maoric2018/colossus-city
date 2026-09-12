@@ -1,5 +1,12 @@
 # Validation record and acceptance gates
 
+## Colossus look-down visibility — September 12, 2026
+
+- **97 Node tests and 91 JavaScript modules: PASS.** The local torso/leg material copies preserve shared hand materials and other avatars. Fade timing matches at 30 and 144 fps; looking up restores opacity.
+- **Emulated Quest stereo and exact camera mirror: PASS.** Looking down reaches 18% body opacity with every arm/hand material still opaque. Nonlocal rendering restores the original materials immediately. The rendered mirror changes across 80,921 pixels of its 640 × 400 image when the body fades; both-eye screenshot inspected at `artifacts/xr-self-body-faded.png`.
+- **Multiplayer/browser regression: PASS.** Controls, live video, fallback/reconnect and repeated XR entry/exit pass without browser errors. The local harness explicitly resolves localhost to IPv4 and uses direct local ICE connections, avoiding the failed localhost requests and public-STUN connection timeouts observed during this run. Production network discovery settings are unchanged; this run does not verify external STUN or cross-device networking.
+- Full joystick turns, short/extended/overhead reaches and the hidden self-reactor halo still pass. Report: `artifacts/xr-view-report.json`. Physical headset comfort and rendering performance remain unmeasured.
+
 ## Articulated soaring — September 12, 2026
 
 - **95 Node tests, 89 JavaScript modules and 64 bundled assets: PASS.** Shared pose tests cover individual limb motion and connected joint anchors across hover, flight transitions, banking and dodges. The real physics knockdown stays connected while tumbling.

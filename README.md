@@ -70,6 +70,8 @@ fly status --app YOUR-UNIQUE-APP
 
 **Giant reach:** the 14× world scale maps a physical 0.5 m controller move to 7 m in the city. Open **Quest Controls** in the lobby to adjust turn speed or reach gain; A calibrates the scale for your standing height.
 
+Looking down smoothly makes your own torso, hips and legs translucent, clearing the ground view while your arms and hands stay solid. Looking up restores the body. Raiders and free-camera spectators see an opaque robot; the live colossus feed matches the pilot's view.
+
 Raiders start in first person. Press **V** or use the pause-menu camera button for the wider third-person shoulder view.
 
 **Flight:** hold Space to take off, hold Shift to soar. Soaring flies prone at 32 m/s along the mouse; S brakes. Hover is 11 m/s. The giant walks at 13 m/s so it can catch a hovering raider. A full tank of hover thrust climbs about 115 m; soaring with the nose up climbs cheaper. E dodges (12 % thrust, 1.2 s cooldown). Passing within a few metres of a swinging hand without being hit is a **close call** that refills thrust.
@@ -127,7 +129,7 @@ npm run test:cars      # Moving cars, crushed models, explosions, collision quer
 npm run test:visual    # Imported art, roof movement, props and lasers
 npm run test:ragdoll   # Matching pilot/ragdoll skin and physics
 npm run test:flight-animation # Soaring limbs, transitions, nozzles and animation preview
-npm run test:xr-view   # Smooth yaw, hand orientation and rigid armor
+npm run test:xr-view   # Smooth yaw, rigid armor and local look-down body fade
 npm run bench          # Server physics: intact city, staged collapses, active hand contact
 npm run profile        # Real GPU frame times in a visible Chromium, per quality tier
 ```

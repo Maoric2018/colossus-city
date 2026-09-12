@@ -133,6 +133,7 @@ function frame(now, xrFrame){
    cameraRig.update(dt, s, {input, net});
    if(now - lastInput > 1000 / C.INPUT_HZ){ net.send(input.packet(aim)); lastInput = now; }
   }
+  giant.selfBody.update({local:state.role==='boss',lookDown:presenting?(xr.local?.headLookDown||0):-Math.sin(camera.rotation.x),dt});
   const ids = new Set();
   for(const p of s.players){
    ids.add(p.id); if(!players.has(p.id)) players.set(p.id, new RaiderView(scene, p.id));

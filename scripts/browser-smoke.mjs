@@ -10,12 +10,13 @@ process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.resolve('.cache/ms-playwright');
 const {chromium}=await import('playwright');
 await mkdir('artifacts',{recursive:true});
 const port=18000+Math.floor(Math.random()*1000),url=`http://localhost:${port}`;
-const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:String(port)},stdio:['ignore','pipe','pipe']});
+// These peers share this machine; keep the regression independent of public STUN/DNS.
+const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:String(port),VIEW_ICE_SERVERS:'[]'},stdio:['ignore','pipe','pipe']});
 let serverLog='',browser;server.stdout.on('data',d=>serverLog+=d);server.stderr.on('data',d=>serverLog+=d);
 const errors=[],checks=[],poses=[];let videoMeasurements;
 try{
  for(let i=0;i<100;i++){if(await fetch(`${url}/healthz`).then(r=>r.ok).catch(()=>false))break;if(i===99)throw Error(serverLog);await delay(100);}
- browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
+ browser=await chromium.launch({headless:process.env.HEADED!=='1',channel:'chromium',args:['--enable-webgl','--enable-unsafe-swiftshader','--host-resolver-rules=MAP localhost 127.0.0.1','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});
  async function pageFor(context){
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));

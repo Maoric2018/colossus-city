@@ -17,10 +17,11 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 
 ## What passed locally
 
-- 95 automated Node tests, including real server physics and multiplayer.
+- 97 automated Node tests, including real server physics and multiplayer.
 - Movable-car checks: gentle pushes, hard strikes, missile blasts, matching crushed collision/rendering, persistent wrecks, sleeping pose traffic, late spectators and round reset.
 - Real Chromium rendering, mouse capture and keyboard movement with the downloaded visual upgrade.
 - Focused Quest rendering regression: arms and fists stay aligned in headset space through a complete joystick turn, including tilted head/wrists and an offset standing position. The giant’s own decorative reactor halo is hidden in its view and its spectator mirror.
+- Looking down fades only the pilot's torso, hips and legs, with solid arms/hands in emulated stereo and the exact spectator mirror. Looking up and nonlocal rendering restore opacity; the fade rate matches across 30 and 144 fps.
 - All 64 bundled asset files pass hash verification. Downloaded roof equipment follows real Rapier collapse, removal and reset; smoke/impact sprites render without errors.
 - Dense-city emulated stereo smoke: about 1.89 million submitted triangles across both eyes. This is a renderer count, not a physical headset frame-time measurement. The city includes distance-based component detail and a shared building-name atlas.
 - Meta IWER's Quest 2 profile: stereo VR, Touch mapping, movement, proportional smooth turns, giant reach, missile triggers, calibration, controller loss/recovery, suspension, recentering and repeated entry/exit.
@@ -38,6 +39,7 @@ No headset was detected during this validation. Emulated 72 Hz is a requested se
 
 - Enter and exit VR three times. Confirm both eyes render, height/scale feel correct, hands match their controllers and menus remain accessible after exit.
 - Test each stick, A calibration and head rotation. Compare a measured 0.5 m hand movement with the reach shown on the headset HUD. Hold the right stick at partial and full deflection and check continuous turning at both speeds. Recenter and recover controller tracking without an unintended strike or movement.
+- Look down toward the street: the torso, hips and legs should fade smoothly while the arms and hands stay solid. Look up to restore them. Confirm the live colossus feed matches this view and a raider still sees an opaque robot.
 - Fire each controller’s missiles at buildings and raiders; check gentle forward homing, cover blocking guidance, cooldown, explosions and damage.
 - Nudge a car gently, punch it hard, walk into one and hit one with a missile. Check the explosion, brief smoke and solid movable wreck; confirm the colossus loses no health and a late spectator sees the same wreck in the same position.
 - Watch a raider enter soaring, turn, dodge and return to hover. Confirm the limbs animate smoothly in the headset and spectator feed. On the raider laptop, press V to inspect the same animation in third person.

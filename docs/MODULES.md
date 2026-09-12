@@ -53,6 +53,7 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
   avatars.js       giant (mech armour), raiders, ragdoll parts
   effects.js       sprite particle pools and tracers
   audio.js         procedural Web Audio synth (no audio files)
+  giant-visibility.js  local look-down torso/leg fade; independent arm materials
   missiles.js, flight-fx.js, spectator.js, xr.js, assets.js, art.js  (unchanged roles)
 
 tests/             node --test. unit (pure shared), physics (real Rapier rooms), abilities,

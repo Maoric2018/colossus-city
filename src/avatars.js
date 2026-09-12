@@ -3,6 +3,7 @@ import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {raiderParts} from '../shared/raider-rig.js';
 import {raiderPose} from '../shared/raider-pose.js';
 import {armElbow} from './arm-rig.js';
+import {SelfBodyVisibility} from './giant-visibility.js';
 import {GIANT,handQuaternion,resolveHand} from '../shared/giant-rig.js';
 import {loadModel,bakedModel} from './assets.js';
 import {TEAM_COLORS} from '../shared/config.js';
@@ -25,6 +26,7 @@ function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();pa
 }};}
 export class GiantView{
  constructor(scene){
+  this.selfBody=new SelfBodyVisibility();
   this.root=new T.Group();scene.add(this.root);this.body=new T.Group();this.head=new T.Group();this.root.add(this.body,this.head);
   const torso=new T.Shape();torso.moveTo(-3.1,4);torso.lineTo(3.1,4);torso.lineTo(3.8,2);torso.lineTo(2.25,-3.5);torso.lineTo(-2.25,-3.5);torso.lineTo(-3.8,2);torso.closePath();
   const tg=new T.ExtrudeGeometry(torso,{depth:3.3,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.3,bevelThickness:.22});tg.translate(0,0,-1.65);mesh(tg,metal,this.body);
@@ -48,7 +50,9 @@ export class GiantView{
   for(const arm of this.arms){arm.upper.rigidLength=GIANT.upperLength;arm.lower.rigidLength=GIANT.lowerLength;arm.lower.anchorEnd=true;arm.wrist=mesh(new T.SphereGeometry(.65,12,8),dark,this.root);arm.shoulder=mesh(new T.SphereGeometry(1.15,12,8),dark,this.root);arm.cuff=mesh(new T.CylinderGeometry(.56,.65,1.55,12),trim,arm.fist,[0,0,2.125]);arm.cuff.rotation.x=Math.PI/2;arm.elbow=mesh(new T.SphereGeometry(1.05,12,8),dark,this.root);arm.piston=mesh(new T.CylinderGeometry(.5,.5,1,10),trim,this.root);}
   this.ready=this.loadArmor();
   this.legs=[-1,1].map(s=>({thigh:segment(this.root,null,null,2.3,2.5),shin:segment(this.root,null,null,2.1,2.35),hip:mesh(new T.SphereGeometry(.95,12,8),dark,this.root),knee:mesh(new T.SphereGeometry(.85,12,8),dark,this.root),ankle:mesh(new T.SphereGeometry(.7,12,8),dark,this.root),foot:mesh(rounded(2.65,1.3,4,.15),dark,this.root)}));
+  this.registerSelfBody();
  }
+ registerSelfBody(){this.selfBody.register(this.body);for(const leg of this.legs)for(const part of [leg.thigh.g,leg.shin.g,leg.hip,leg.knee,leg.ankle,leg.foot])this.selfBody.register(part);}
  async loadArmor(){
   try{
    const model=await loadModel('/assets/imported/mechs/colossus.glb?v=89cc8138');
@@ -67,10 +71,12 @@ export class GiantView{
     // The imported articulated fingers are closed around the tracked impact point.
     replace(arm.fist,'fist'+side,GIANT.handSize);arm.cuff=mesh(new T.CylinderGeometry(.56,.65,1.55,12),trim,arm.fist,[0,0,2.125]);arm.cuff.rotation.x=Math.PI/2;
    }
+   this.registerSelfBody();
   }catch(error){console.error('Mech armor failed to load',error);}
  }
  fist(){const g=new T.Group();this.root.add(g);mesh(rounded(2.7,1.9,2.6,.25),metal,g);for(let i=0;i<4;i++)mesh(rounded(.53,.85,1.25,.12),trim,g,[(i-1.5)*.64,-.55,-.95]);mesh(rounded(.25,.3,2.2,.04),reactor,g,[1.38,.25,0]);return g;}
  update(s,{local=false,collisionWorld=null,stagger=0}={}){
+  if(!local)this.selfBody.update();
   const head=new T.Vector3(...s.head),q=new T.Quaternion().setFromAxisAngle(up,s.bossYaw||0);this.head.position.copy(head);this.head.quaternion.copy(q);this.head.visible=!local;
   // The decorative halo is for other players. From inside the giant it can
   // cover the pilot's view when looking down or leaning toward the reactor.

@@ -87,7 +87,7 @@ export class XRControl {
   const handQ = side => { const r = handQuaternions[side]; return r ? new T.Quaternion(r.x, r.y, r.z, r.w).premultiply(turnQ).toArray() : turnQ.toArray(); };
   const rot = viewer.transform.orientation; q.set(rot.x, rot.y, rot.z, rot.w); q.premultiply(new T.Quaternion().setFromAxisAngle(axis, this.turn)); euler.setFromQuaternion(q, 'YXZ');
   const previous = this.local;
-  const local = {...(snapshot || {}), head, bossYaw:euler.y, bossX:this.rig.position.x, bossZ:this.rig.position.z, left:poses.left ? hand(poses.left) : (this.local?.left || [head[0] - 5, head[1] - 7, head[2] - 4]), right:poses.right ? hand(poses.right) : (this.local?.right || [head[0] + 5, head[1] - 7, head[2] - 4])}; local.leftQuaternion = handQ('left'); local.rightQuaternion = handQ('right'); local.resetHands = this.poseReset; this.local = local;
+  const local = {...(snapshot || {}), head, headLookDown:2*(q.y*q.z-q.w*q.x), bossYaw:euler.y, bossX:this.rig.position.x, bossZ:this.rig.position.z, left:poses.left ? hand(poses.left) : (this.local?.left || [head[0] - 5, head[1] - 7, head[2] - 4]), right:poses.right ? hand(poses.right) : (this.local?.right || [head[0] + 5, head[1] - 7, head[2] - 4])}; local.leftQuaternion = handQ('left'); local.rightQuaternion = handQ('right'); local.resetHands = this.poseReset; this.local = local;
   // Local pre-impact feedback hides the round trip: dust and a haptic tick the moment a tracked
   // hand crosses an intact bay. The server still decides all damage.
   if(previous && dt > 0 && this.localImpact && poses.left && poses.right && !this.poseReset && Math.abs(turnInput) <= .18) for(const [i, side] of ['left', 'right'].entries()){
