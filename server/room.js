@@ -17,9 +17,10 @@ import {v, len, arr, vec, clamp, norm, sub, mul, finiteVector, sanitizeInput, qu
 import {updateMissiles} from './abilities.js';
 import {initialBoss, updateBoss} from './boss.js';
 import {shoot, knockdown, makeRag, ragMeta, removeRag} from './combat.js';
-import {buildCity, breakCells, splitDebris, crumble, damageCell, removeBody, debrisMeta, bodyPose, scheduleFailures, processFailures, flushSkinEvents, damagedSkins, updateDebris, resolveCell, contactFromTag, collisionContact, debrisImpactSpeed} from './destruction.js';
+import {buildCity, breakCells, splitDebris, crumble, damageCell, removeBody, debrisMeta, bodyPose, scheduleFailures, processFailures, processFineCollapses, flushSkinEvents, damagedSkins, updateDebris, resolveCell, contactFromTag, collisionContact, debrisImpactSpeed} from './destruction.js';
 import {noInput, newPlayer, spawn, removePlayer, addBots, updatePlayer} from './players.js';
 import {sideBit} from '../shared/city/materials.js';
+import {initFracture,updateShards,shardMeta} from './fracture.js';
 export const physicsReady = RAPIER.init();
 const G = C.COLLISION;
 
@@ -39,6 +40,7 @@ export class Room {
   this.world.integrationParameters.numSolverIterations = 5;
   this.queue = new RAPIER.EventQueue(true); this.colliderTags = new Map(); this.cells = generateCells(this.env);
   this.cellMap = new Map(); this.detached = new Set(); this.debris = new Map(); this.settled = new Map(); this.nextDebris = 1000; this.missiles = new Map(); this.nextMissile = 20000; this.rags = new Map(); this.events = [];
+  initFracture(this);
   this.phase = 0; this.remaining = C.MATCH_SECONDS; this.bossMaxHP = bossMaxHealth(this.players.size); this.bossHP = this.bossMaxHP; this.kills = 0; this.startTime = this.time; this.towersDown = 0; this.destroyedThisRound = 0;
   this.boss = initialBoss();
   this.ground = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -.3, 0));
@@ -56,7 +58,7 @@ export class Room {
   }
   this.handBodies = ['left', 'right'].map(side => {
    const p = this.boss[side], body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(p.x, p.y, p.z));
-   const co=this.world.createCollider(RAPIER.ColliderDesc.cuboid(...GIANT.handHalf).setFriction(.4).setCollisionGroups(group(G.GIANT, G.DEBRIS | G.RAGDOLL)).setActiveHooks(RAPIER.ActiveHooks.FILTER_CONTACT_PAIRS),body);this.colliderTags.set(co.handle,{hand:side});return body;
+   const co=this.world.createCollider(RAPIER.ColliderDesc.cuboid(...GIANT.handHalf).setFriction(.4).setCollisionGroups(group(G.GIANT, G.DEBRIS | G.RAGDOLL | 32)).setActiveHooks(RAPIER.ActiveHooks.FILTER_CONTACT_PAIRS),body);this.colliderTags.set(co.handle,{hand:side});return body;
   });
   for(const p of this.players.values()){ p.kills = 0; p.damage = 0; p.score = 0; spawn(this, p); }
   // Rays cast before the first step must already see the city.
@@ -98,6 +100,7 @@ export class Room {
    missiles:[...this.missiles.values()].map(m => ({...m, time:this.time, p:arr(m.p)})),
    clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity) && !this.settled.has(c.entity)).map(c => c.id),
    skins:damagedSkins(this), collapsed:[...this.collapsed],
+   fractures:this.cells.filter(c=>c.skin.parts?.length).map(c=>[c.id,c.skin.parts]),shards:[...this.shards.values()].map(shardMeta),
    entities:[...this.debris.values(), ...this.settled.values()].map(e => debrisMeta(e)), rags:[...this.rags.values()].map(r => ragMeta(r)), roster:this.roster()};
  }
  // ---- input ----
@@ -124,7 +127,7 @@ export class Room {
   if(m.type === 'restart' && client.id === this.hostId() && this.phase !== 0){ this.round++; this.initWorld(); this.event({type:'reset'}); }
  }
  event(e){ this.events.push(e); }
- drainEvents(){ const e = this.events; this.events = []; return e; }
+ drainEvents(){ const e = this.events; this.events = [];this.fractureEvents.clear(); return e; }
  hurtBoss(damage, info = {}){
   if(this.phase || damage <= 0 || info.kind === 'debris') return;
   this.bossHP = Math.max(0, this.bossHP - damage);
@@ -134,7 +137,7 @@ export class Room {
  // ---- simulation ----
  step(){
   this.tick++; this.time += C.TICK;this.world.invalidateSceneQueries();
-  if(this.phase){ this.world.step(this.queue,this.physicsHooks); this.queue.drainCollisionEvents(() => {}); updateCars(this); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
+  if(this.phase){ this.world.step(this.queue,this.physicsHooks); this.queue.drainCollisionEvents(() => {}); updateCars(this); processFineCollapses(this); updateShards(this); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
   // Wait for at least one raider. An AI giant fills an empty boss seat; it is not a second authority.
   if(this.players.size) this.remaining = Math.max(0, C.MATCH_SECONDS - (this.time - this.startTime)); else this.startTime = this.time;
   this.stream?.update();
@@ -161,7 +164,7 @@ export class Room {
     const oc=resolveCell(this,other,contact.point);
     if(oc&&!oc.entity&&!this.detached.has(oc.id)&&speed>6&&this.time-oc.lastHit>.28){
      const surface=contactFromTag(other);oc.lastHit=this.time;
-     damageCell(this,oc,Math.min(120,speed*Math.sqrt(Math.min(16,e.cells.length))*1.3),surface.side==null?0:sideBit(surface.side),c.lastHitBy,surface);
+     damageCell(this,oc,Math.min(120,speed*Math.sqrt(Math.min(16,e.cells.length))*1.3),surface.side==null?0:sideBit(surface.side),c.lastHitBy,{...surface,point:arr(contact.point),radius:.7});
      this.event({type:'strike',cell:oc.id,p:arr(contact.point),material:oc.material,power:Math.min(1,speed/25),broke:oc.skin.hp<=0});
     }
    }
@@ -172,8 +175,8 @@ export class Room {
    }
   });
   for(const [p, kick, damage] of hits) if(p.body) knockdown(this, p, kick, damage, -1);
-  updateCars(this);updateDebris(this, hits, fractures, crumbles);
-  scheduleFailures(this); processFailures(this); flushSkinEvents(this);
+  updateCars(this);updateDebris(this, hits, fractures, crumbles);updateShards(this);
+  scheduleFailures(this); processFailures(this); processFineCollapses(this); flushSkinEvents(this);
   for(const [id, r] of this.rags) if(this.time - r.born > 9) removeRag(this, id);
   if(this.bossHP <= 0 || this.remaining <= 0){ this.missiles.clear(); this.phase = this.bossHP <= 0 ? 1 : 2; this.endedAt = this.time; this.event({type:'end', winner:this.phase === 1 ? 'raiders' : 'giant', players:this.scoreboard()}); }
  }
@@ -183,7 +186,7 @@ export class Room {
   return {tick:this.tick, time:this.time, bossHP:this.bossHP, bossMaxHP:this.bossMaxHP, remaining:this.remaining, kills:this.kills, head:arr(b.head), left:arr(b.left), right:arr(b.right), bossYaw:b.yaw, bossX:b.x, bossZ:b.z, leftQuaternion:b.leftQuaternion, rightQuaternion:b.rightQuaternion,
    damage:this.detached.size / this.cells.length * 100, phase:this.phase, round:this.round, bossStagger:b.stagger, towersDown:this.towersDown, bossBlocked:b.pushing ? 1 : 0,
    players:[...this.players.values()].map(p => { const rb = p.body || this.rags.get(p.rag)?.parts[0].body; return {id:p.id, flags:(p.rag ? F.RAG : 0) | (p.hp <= 0 ? F.DEAD : 0) | (this.time < p.invulnerable ? F.SHIELD : 0) | (p.bot ? F.BOT : 0) | (p.soaring ? F.SOAR : 0) | (this.time < p.dodgeUntil ? F.DODGE : 0), p:rb ? arr(rb.translation()) : [0, -20, 0], v:rb ? arr(rb.linvel()) : [0, 0, 0], yaw:p.input.yaw, hp:p.hp, fuel:p.fuel, seq:p.input.seq, pitch:p.input.pitch, dodgeCooldown:Math.max(0, p.dodgeReady - this.time), heavyCooldown:Math.max(0, p.heavyReady - this.time), score:p.score}; }),
-   bodies:[...carSnapshots(this), ...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
+   bodies:[...carSnapshots(this),...[...this.activeShards].map(id=>({id,...bodyPose(this.shards.get(id).body)})), ...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
   };
  }
  dispose(){ this.world.free(); this.queue.free(); }

@@ -13,7 +13,7 @@ import {facadeMaps, roofTexture} from './textures.js';
 const temp = new T.Object3D(), matrix = new T.Matrix4(), local = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0);
 const sphere=new T.Sphere(),projection=new T.Matrix4(),eyePosition=new T.Vector3();
 const white=new T.Color(0xffffff),wtcGlass=new T.Color(0x718087);
-const skinKey=c=>WORLD_STYLE_BY_ID.has(c.architecture)&&c.material==='glass'?'worldGlass':['empire','chrysler','hudson30','vanderbilt'].includes(c.architecture)?c.architecture:c.material;
+export const skinKey=c=>WORLD_STYLE_BY_ID.has(c.architecture)&&c.material==='glass'?'worldGlass':['empire','chrysler','hudson30','vanderbilt'].includes(c.architecture)?c.architecture:c.material;
 const wallLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .5, 0, -Math.cos(a) * .5), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 // Masonry window panes sit just outside the facade box (which spans ±.011 around the wall plane).
 const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .514, 0, -Math.cos(a) * .514), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
@@ -114,17 +114,17 @@ export class Buildings {
 
  writeCore(c,e){
   temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.copy(e.size); temp.updateMatrix();
-  const hidden=e.hidden,m = hidden ? zero : temp.matrix,frameIndex=e.frameIndex??e.index;
-  if(frameIndex>=0){this.frame.setColorAt(frameIndex,e.tint);this.frame.setMatrixAt(frameIndex, e.empireIndex>=0?zero:m); this.dirty.add(this.frame);}
-  if(e.empireIndex>=0){this.empireFrame.setMatrixAt(e.empireIndex,m);this.dirty.add(this.empireFrame);}
-  if(e.roofIndex >= 0){ this.roof.setMatrixAt(e.roofIndex, m); this.dirty.add(this.roof); }
+  const hidden=e.hidden,m = hidden ? zero : temp.matrix,core=e.fine?zero:m,frameIndex=e.frameIndex??e.index;
+  if(frameIndex>=0){this.frame.setColorAt(frameIndex,e.tint);this.frame.setMatrixAt(frameIndex, e.empireIndex>=0?zero:core); this.dirty.add(this.frame);}
+  if(e.empireIndex>=0){this.empireFrame.setMatrixAt(e.empireIndex,core);this.dirty.add(this.empireFrame);}
+  if(e.roofIndex >= 0){ this.roof.setMatrixAt(e.roofIndex, e.fine?.frame?zero:m); this.dirty.add(this.roof); }
   const facade = this.facade[skinKey(c)], glass = this.glass[skinKey(c)];
   for(const w of e.walls){
    if(w.index<0)continue;
    const bit = sideBit(w.side);
    if(glass)glass.setColorAt(w.index,e.glassTint??(c.architecture==='wtc'?wtcGlass:white));
-   if(facade){ facade.setColorAt(w.index,e.tint);matrix.multiplyMatrices(m, wallLocal[w.side]); facade.setMatrixAt(w.index, (hidden || !(e.facadeMask & bit)) ? zero : matrix); this.dirty.add(facade); }
-   if(glass){ matrix.multiplyMatrices(m, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
+   if(facade){ facade.setColorAt(w.index,e.tint);matrix.multiplyMatrices(core, wallLocal[w.side]); facade.setMatrixAt(w.index, (hidden || !(e.facadeMask & bit)) ? zero : matrix); this.dirty.add(facade); }
+   if(glass){ matrix.multiplyMatrices(core, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
   }
  }
  commit(){for(const mesh of this.batches)mesh.visible=mesh.count>0;commitInstances(this.dirty);}

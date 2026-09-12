@@ -52,7 +52,6 @@ const lobby = bindLobby({
  start, leave, toggleCamera, resume(){ if(state.role === 'boss' && quest) hud.hideOverlay(); else pointer(); }, menu(){ input.reset(); hud.showOverlay(undefined, undefined, {renderer, net}); },
  openSpectator(){ if(state.role === 'spectator'){ document.exitPointerLock?.(); hud.hideOverlay(); input.reset(); views.setVisible(true); } else { const url = new URL(location.href); url.searchParams.set('spectator', '1'); window.open(url.toString(), '_blank', 'noopener'); } },
  freeCamera(){ views.setVisible(false); hud.showOverlay('FREE CAMERA', 'WASD moves; Space and C change height; Shift is fast. Use LIVE VIEWS to return to the panel.', {renderer, net}); },
- spawnChrysler(){net.send({type:'spawn-building',building:'chrysler'});},
  restart(){ net.send({type:'restart'}); },
  async enterVR(){ hud.hideOverlay(); audio.unlock(); try{ await xr.enter(); }catch(e){ hud.showOverlay('VR COULD NOT START', e.message, {renderer, net}); } },
  async copyLink(){ const u = new URL(location.href); u.searchParams.set('room', net.room); try{ await navigator.clipboard.writeText(u.toString()); hud.toast('INVITE LINK COPIED'); }catch{ hud.toast(`ROOM CODE / ${net.room}`, 5); } },
@@ -80,17 +79,15 @@ function onMessage(m){
   state.welcome = m; state.role = m.role; state.localId = m.id; views.connect(m); missiles.reset(); for(const missile of m.missiles || []) missiles.add(missile);
   state.current = null; state.previousPhase = 0; xr.resetPose(); cityView.reset();for(const block of m.blocks||[])cityView.stream?.state(block); for(const r of rags.values()) r.dispose(); rags.clear(); for(const p of players.values()) p.dispose(); players.clear();
   for(const car of m.cars||[])cityView.cars.setState(car);cityView.hideCells(m.clearedCells || []); for(const s of m.skins || []) cityView.setSkin(s[0], s[1], s[2], false); for(const e of m.entities) cityView.addDebris(e); for(const r of m.rags) addRag(r); cityView.commit();
-  $('spawn-chrysler').classList.toggle('hidden',m.host!==m.id);$('spawn-status').classList.add('hidden');
+  for(const [id,parts]of m.fractures||[])cityView.setFracture(id,parts);for(const e of m.shards||[])cityView.addShards(e);cityView.fine.time=net.latest?.time||0;cityView.commit();
   $('room-label').textContent = `ROOM / ${m.room}`; $('connection-label').textContent = m.practice ? 'PRACTICE / SERVER ONLINE' : 'SERVER CONNECTED';
   const spawn = city.spawns[(m.id - 1) % city.spawns.length]; input.yaw = state.role === 'raider' ? (spawn[3] ?? Math.atan2(spawn[0], spawn[2])) : 0; input.pitch = 0; cameraRig.reset(spawn); prediction.reset(null); lastReconciled = -1; hud.lastHP = 100; $('scoreboard').classList.add('hidden'); return;
  }
  if(m.type === 'roster'){
-  $('spawn-chrysler').classList.toggle('hidden',m.host!==net.id);
   views.updateRoster(m.players); if(state.welcome){ state.welcome.host = m.host; state.welcome.roster = m.players; }
   $('roster').replaceChildren(...m.players.map(p => { const d = document.createElement('div'); d.textContent = `${p.role === 'boss' ? '◆' : p.role === 'bot' ? '◇' : '›'} ${p.name}${p.id === net.id ? ' / YOU' : ''}`; return d; }));
   $('boss-caption').textContent = m.bossPresent ? 'COLOSSUS / HUMAN PILOT' : 'COLOSSUS / AI STAND-IN'; return;
  }
- if(m.type==='building-spawned'){$('spawn-status').textContent=`Chrysler spawned ${m.distance} m away · East ${m.x}, South ${m.z}.`;$('spawn-status').classList.remove('hidden');}
  if(m.type === 'events') for(const e of m.events) handleEvent(e);
  if(m.type === 'error') hud.toast(m.message, 4);
 }
@@ -146,7 +143,7 @@ function frame(now, xrFrame){
    else players.get(p.id).update(p, isLocal, state.firstPerson,dt,s.renderTime);
   }
   for(const [id, p] of players) if(!ids.has(id)){ p.dispose(); players.delete(id); }
-  for(const body of s.bodies){ if(rags.has(body.id)) rags.get(body.id).update(body.p, body.q); else if(cityView.cars.entries.has(body.id))cityView.cars.pose(body.id,body.p,body.q);else cityView.poseDebris(body.id, body.p, body.q); }
+  cityView.fine.time=s.time;for(const body of s.bodies){ if(rags.has(body.id)) rags.get(body.id).update(body.p, body.q); else if(cityView.cars.entries.has(body.id))cityView.cars.pose(body.id,body.p,body.q);else cityView.poseDebris(body.id, body.p, body.q); }
   cityView.commit();
   if(now - lastHUD > 100){ hud.refresh(s, now, {net, renderer:gr, input}); lastHUD = now; }
   const pilot = me(s), held = input.held();

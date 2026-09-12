@@ -1,6 +1,8 @@
 import {chryslerLODGeometry} from '../render/chrysler-lod.js';
 import {CatalogLOD,catalogTint} from '../render/catalog-lod.js';
 import {WORLD_STYLE_BY_ID} from '../../shared/city/world-landmarks.js';
+import {fractureColliders} from '../../shared/city/fracture.js';
+import {initialSkin} from '../../shared/city/cells.js';
 import * as T from 'three';
 import {CityView} from './city.js';
 import {surface} from '../render/quality.js';
@@ -27,22 +29,24 @@ export class StreamedBlocks{
   this.landmarkLOD=new T.InstancedMesh(chryslerLODGeometry(),surface(owner.tier,{vertexColors:true,roughness:.45}),256);this.landmarkLOD.count=0;this.landmarkLOD.frustumCulled=false;owner.root.add(this.landmarkLOD);
   this.catalogLOD=new CatalogLOD(owner.root,owner.tier);
  }
- record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
+ record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),fractures:new Map(),shards:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
  state(meta){
-  const r=this.record(meta.key);for(const id of r.entities.keys())this.entityOwners.delete(id);
-  r.skins=new Map((meta.skins||[]).map(s=>[s[0],s.slice(1)]));r.cleared=new Set(meta.clearedCells||[]);r.entities=new Map((meta.entities||[]).map(e=>[e.id,e]));
+  const r=this.record(meta.key);for(const id of [...r.entities.keys(),...r.shards.keys()])this.entityOwners.delete(id);
+  r.skins=new Map((meta.skins||[]).map(s=>[s[0],s.slice(1)]));r.fractures=new Map(meta.fractures||[]);r.shards=new Map((meta.shards||[]).map(e=>[e.id,e]));r.cleared=new Set(meta.clearedCells||[]);r.entities=new Map((meta.entities||[]).map(e=>[e.id,e]));for(const e of r.shards.values())this.entityOwners.set(e.id,meta.key);
   for(const e of r.entities.values())this.entityOwners.set(e.id,meta.key);
   const previous=this.previews.get(meta.key),changed=!!meta.landmark&&previous?.landmark!==meta.landmark;r.landmark=meta.landmark;
   if(changed){const view=this.views.get(meta.key);if(view){this.owner.handWorld.children.delete(view.handWorld);view.dispose();this.views.delete(meta.key);}this.previews.delete(meta.key);this.pending=this.pending.filter(e=>e.key!==meta.key);this.lastKey='';}
   const view=this.views.get(meta.key);if(view){this.owner.handWorld.children.delete(view.handWorld);view.reset();this.owner.handWorld.children.add(view.handWorld);this.apply(view,r);}
-  if(!r.landmark&&!r.skins.size&&!r.cleared.size&&!r.entities.size)this.records.delete(meta.key);
+  if(!r.landmark&&!r.skins.size&&!r.fractures.size&&!r.shards.size&&!r.cleared.size&&!r.entities.size)this.records.delete(meta.key);
   this.needsLOD=true;
  }
- apply(view,r){view.hideCells([...r.cleared]);for(const [id,s]of r.skins)view.setSkin(id,...s,false);for(const e of r.entities.values())view.addDebris(e);view.commit();}
+ apply(view,r){view.hideCells([...r.cleared]);for(const [id,s]of r.skins)view.setSkin(id,...s,false);for(const [id,parts]of r.fractures)view.setFracture(id,parts);for(const e of r.shards.values())view.addShards(e);for(const e of r.entities.values())view.addDebris(e);view.commit();}
+ setFracture(id,parts){const key=keyOf(id);if(!key)return;this.record(key).fractures.set(id,[...parts]);this.views.get(key)?.setFracture(id,parts);this.needsLOD=true;}
+ addShards(e){const key=keyOf(e.cell);if(!key)return;this.record(key).shards.set(e.id,{...e});this.entityOwners.set(e.id,key);this.views.get(key)?.addShards(e);}
  setSkin(id,glass,facade,fx){const key=keyOf(id);if(!key)return;this.record(key).skins.set(id,[glass,facade]);this.views.get(key)?.setSkin(id,glass,facade,fx);this.needsLOD=true;}
  hideCells(ids){for(const id of ids){const key=keyOf(id);if(!key)continue;this.record(key).cleared.add(id);this.views.get(key)?.hideCells([id]);}this.needsLOD=true;}
  addDebris(e){const key=keyOf(e.cells[0]);if(!key)return;this.record(key).entities.set(e.id,{...e});this.entityOwners.set(e.id,key);this.views.get(key)?.addDebris(e);this.needsLOD=true;}
- poseDebris(id,p,q){const key=this.entityOwners.get(id),e=this.records.get(key)?.entities.get(id);if(!e||e.settled)return;e.p=p;e.q=q;this.views.get(key)?.poseDebris(id,p,q);}
+ poseDebris(id,p,q){const key=this.entityOwners.get(id),record=this.records.get(key),e=record?.shards.get(id)||record?.entities.get(id);if(!e||e.settled)return;e.p=p;e.q=q;this.views.get(key)?.poseDebris(id,p,q);}
  removeDebris(id){const key=this.entityOwners.get(id),r=this.records.get(key),e=r?.entities.get(id);if(e){for(const c of e.cells)r.cleared.add(c);r.entities.delete(id);}this.views.get(key)?.removeDebris(id);this.entityOwners.delete(id);this.needsLOD=true;}
  crumble(e){this.hideCells(e.cells);if(e.id)this.removeDebris(e.id);}
  getCell(id){return this.views.get(keyOf(id))?.byId.get(id);}
@@ -71,15 +75,19 @@ export class StreamedBlocks{
   this.catalogLOD.reset();
   for(const env of this.previews.values()){
    if(this.views.has(env.key))continue;const record=this.records.get(env.key),gone=new Set([...(record?.cleared||[]),...[...(record?.entities.values()||[])].flatMap(e=>e.cells)]),collapsed=new Set();
-   const damaged=new Map(),surviving=new Map();if(gone.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i),broken=mine.filter(c=>gone.has(c.id));damaged.set(i,broken);if(WORLD_STYLE_BY_ID.has(env.buildings[i].architecture))surviving.set(i,mine.filter(c=>!gone.has(c.id)));if(broken.length>mine.length*.45)collapsed.add(i);}}
+   const damaged=new Map(),surviving=new Map();if(gone.size||record?.fractures.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i),broken=mine.filter(c=>gone.has(c.id)||record?.fractures.has(c.id));damaged.set(i,broken);if(WORLD_STYLE_BY_ID.has(env.buildings[i].architecture)||broken.length)surviving.set(i,mine.filter(c=>!gone.has(c.id)));if(mine.filter(c=>gone.has(c.id)).length>mine.length*.45)collapsed.add(i);}}
    for(const [i,b]of env.buildings.entries()){
     if(collapsed.has(i))continue;
     if(!damaged.get(i)?.length&&this.catalogLOD.building(b))continue;
     this.catalogLOD.roofs(b,damaged.get(i)||[]);
     // Damaged landmarks keep their tapered bays and genuine portals in the
     // skyline; a rectangular tier would fill the openings and restore broken bays.
-    if(WORLD_STYLE_BY_ID.has(b.architecture)&&surviving.has(i)){
-     for(const c of surviving.get(i)){if(index>=this.lod.instanceMatrix.count)break;dummy.position.set(...c.p);dummy.rotation.set(0,0,0);dummy.scale.set(...c.size);if(c.openSkin){dummy.position.y+=c.size[1]/2-.08;dummy.scale.y=.16;}dummy.updateMatrix();this.lod.setMatrixAt(index,dummy.matrix);this.lod.setColorAt(index++,new T.Color(catalogTint(b.architecture)));}continue;
+    if(surviving.has(i)){
+     for(const c of surviving.get(i)){
+      const parts=record?.fractures.get(c.id),skin=initialSkin(c);if(record?.skins.has(c.id)){[skin.glass,skin.facade]=record.skins.get(c.id);}if(parts)skin.parts=parts;
+      const boxes=parts?fractureColliders(c,skin):[[0,c.openSkin?c.size[1]/2-.08:0,0,c.size[0]/2,c.openSkin?.08:c.size[1]/2,c.size[2]/2]];
+      for(const a of boxes){if(index>=this.lod.instanceMatrix.count)break;dummy.position.set(...a.slice(0,3).map((v,k)=>v+c.p[k]));dummy.rotation.set(0,0,0);dummy.scale.set(...a.slice(3).map(v=>v*2));dummy.updateMatrix();this.lod.setMatrixAt(index,dummy.matrix);this.lod.setColorAt(index++,new T.Color(catalogTint(b.architecture)??palette[b.material][b.variant%3]));}
+     }continue;
     }
     if(b.architecture==='chrysler'&&!collapsed.has(i)&&landmarks<this.landmarkLOD.instanceMatrix.count){
      const crown=gone.size?generateCells(env).find(c=>c.building===i&&c.chryslerCrown):null;

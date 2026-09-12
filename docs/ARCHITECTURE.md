@@ -58,9 +58,11 @@ snapshot **COL6** (`shared/protocol.js`):
 | One raider (incl. `seq`, breach cooldown, score) | 64 |
 | One chunk, ragdoll part or moving car | 32 |
 
-At 144 chunks + 8 × 11 ragdoll parts + 37 awake cars + 8 raiders a snapshot is 9,260 bytes,
-185,200 bytes/s per client at 20 Hz before overhead. Sleeping cars and settled structural
+At 144 legacy chunks + 96 fine fragment groups + 8 × 11 ragdoll parts + 37 awake cars + 8 raiders a snapshot is 12,332 bytes,
+246,640 bytes/s per client at 20 Hz before overhead. Sleeping cars and settled structural
 debris send reliable final poses and leave the repeated snapshot list.
+
+Fine destruction uses `fracture` (cell and removed piece IDs), `shards` (small debris group with piece IDs and pose), and `fine-collapse` (fully released cells). Welcome and block states retain the same identities, including resting fragments. Unsupported fine sections release two bays per tick; intact sections remain visible until release. See [FINE_DESTRUCTION.md](FINE_DESTRUCTION.md).
 
 Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
 `skin` (batched `[id, glassMask, facadeMask]` changes), `strike` (a bay was hit; material,

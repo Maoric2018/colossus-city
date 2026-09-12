@@ -15,7 +15,7 @@ export function fly(room, p, i){
  p.body.setLinvel(velocity,moving);
  // Rotate the capsule with the prone pilot, keeping visible and physical bodies aligned.
  const q=flightRotation(p,i),previous=p.colliderRotation;
- if(!previous||q.x!==previous.x||q.y!==previous.y||q.z!==previous.z||q.w!==previous.w){p.body.collider(0).setRotation(q);p.colliderRotation=q;room.world.invalidateSceneQueries();}
+ if(!previous||q.x!==previous.x||q.y!==previous.y||q.z!==previous.z||q.w!==previous.w){p.body.collider(0).setRotationWrtParent(q);p.colliderRotation=q;room.world.invalidateSceneQueries();}
  breachBuildings(room,p,i,velocity);
 }
 export function launchMissile(room, side, aim){

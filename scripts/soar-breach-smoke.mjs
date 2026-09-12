@@ -42,7 +42,7 @@ try{
   },{frame:timeline[i]||null,delivered:timeline[i-6]||null});
   if([11,32,50].includes(i))await page.screenshot({path:`artifacts/soar-breach-${i}.png`});
  }
- const result=await page.evaluate(()=>{const c=window.__COLOSSUS,b=window.breachPreview;return {position:c.prediction.position(),server:b.latest.p,broken:[...c.city.detached],fragments:c.city.fragments.pieces.size,pulse:b.bluePulse,minimumSpeed:Math.min(...b.comparisons.map(p=>p.speed)),backwardSteps:b.comparisons.slice(1).filter((p,i)=>p.pos[2]>b.comparisons[i].pos[2]+.2).length,failedAssets:c.assetStatus.failed};});
+ const result=await page.evaluate(()=>{const c=window.__COLOSSUS,b=window.breachPreview;return {position:c.prediction.position(),server:b.latest.p,broken:[...c.city.fine.cells.keys()],fragments:c.city.fine.shards.size,pulse:b.bluePulse,minimumSpeed:Math.min(...b.comparisons.map(p=>p.speed)),backwardSteps:b.comparisons.slice(1).filter((p,i)=>p.pos[2]>b.comparisons[i].pos[2]+.2).length,failedAssets:c.assetStatus.failed};});
  assert.ok(result.position.z<bounds[2]-2);assert.ok(result.broken.length>=2&&result.fragments>0&&result.pulse);assert.ok(result.minimumSpeed>25);assert.equal(result.backwardSteps,0);assert.deepEqual(result.failedAssets,[]);assert.deepEqual(errors,[]);
  const report={result:'PASS',...result,browserErrors:errors};await writeFile('artifacts/soar-breach-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();room.dispose();server.kill('SIGTERM');}

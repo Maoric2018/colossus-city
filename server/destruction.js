@@ -8,6 +8,8 @@ import {MATERIALS, sideBit, ALL_SIDES, wallSolid} from '../shared/city/materials
 import {cellColliders, initialSkin, facingSide} from '../shared/city/cells.js';
 import {unsupportedCells, overloadedCells} from '../shared/city/structure.js';
 import {v, add, sub, mul, len, arr, vec, dist} from '../shared/math.js';
+import {chipCell} from './fracture.js';
+import {fractureRecipe} from '../shared/city/fracture.js';
 const G = C.COLLISION;
 export const bodyPose = b => { const p = b.translation(), q = b.rotation(); return {p:[p.x, p.y, p.z], q:[q.x, q.y, q.z, q.w]}; };
 
@@ -18,6 +20,7 @@ export const bodyPose = b => { const p = b.translation(), q = b.rotation(); retu
 export function buildCity(room){
  room.buildingBodies=[];room.cellsByBuilding=[];room.floors=[];room.buildingBounds=[];room.buildingColumns=[];
  room.collapsed = new Set(); room.pendingFailures = new Map(); room.dirtyBuildings = new Set(); room.skinEvents = []; room.lastCreak = new Map();
+ room.fineCollapses=new Map();
  addBuildings(room,room.cells,room.env.buildings.map((_,i)=>i));
 }
 export function addBuildings(room,cells,indices){
@@ -107,14 +110,14 @@ function unmergeColumns(room,bi){
 }
 const floorOf = (room, c) => room.floors[c.building][c.floor];
 function attachStructure(room, c){
+ if(c.skin.parts?.length){for(const a of cellColliders(c,c.skin).filter(a=>a.kind==='frame'))c.structureHandles.push(staticCollider(room,room.buildingBodies[c.building],[...a.slice(0,3).map((n,k)=>n+c.p[k]),...a.slice(3)],{cell:c.id,kind:a.kind,part:a.part}));return;}
  const body = room.buildingBodies[c.building], [w, h, d] = c.size, col = .15, slab = .13, p = c.p, tag = {cell:c.id};
  c.structureHandles.push(staticCollider(room, body, [p[0], p[1] + h / 2 - slab, p[2], w / 2, slab, d / 2], tag));
  for(const x of [-1, 1]) for(const z of [-1, 1]) c.structureHandles.push(staticCollider(room, body, [p[0] + x * (w / 2 - col), p[1], p[2] + z * (d / 2 - col), col, h / 2 - .26, col], tag));
 }
 function attachWall(room, c, side){
  if(!c.walls[side] || !wallSolid(c.material, c.skin.glass, c.skin.facade, side)) return;
- const a = cellColliders(c, c.skin).find(s => s.kind==='wall' && s.side===side); if(!a) return;
- c.wallHandles[side].push(staticCollider(room, room.buildingBodies[c.building], [c.p[0] + a[0], c.p[1] + a[1], c.p[2] + a[2], a[3], a[4], a[5]], {cell:c.id,side}));
+ for(const a of cellColliders(c, c.skin).filter(s => s.kind==='wall' && s.side===side))c.wallHandles[side].push(staticCollider(room, room.buildingBodies[c.building], [c.p[0] + a[0], c.p[1] + a[1], c.p[2] + a[2], a[3], a[4], a[5]], {cell:c.id,side,part:a.part}));
 }
 function unmergeStructure(room, f){ if(!f.structureMerged) return; unmergeColumns(room,f.building); removeHandles(room, f.structure); f.structureMerged = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachStructure(room, c); }
 function unmergeWall(room, f, side){ if(!f.wallsMerged[side]) return; removeHandles(room, f.walls[side]); f.wallsMerged[side] = false; for(const c of f.cells) if(!room.detached.has(c.id)) attachWall(room, c, side); }
@@ -140,7 +143,15 @@ function refreshStaticColliders(room, c, sides){
  for(let side = 0; side < 4; side++){ if(!(sides & sideBit(side)) || !c.walls[side]) continue; unmergeWall(room, f, side); removeHandles(room, c.wallHandles[side]); attachWall(room, c, side); }
 }
 // Streaming restores exact accumulated damage without applying a second hit.
-export function restoreSkin(room,c,skin){const changed=c.skin.glass!==skin.glass||c.skin.facade!==skin.facade;Object.assign(c.skin,skin);if(changed)refreshStaticColliders(room,c,ALL_SIDES);room.handWorld?.setSkin(c.id,c.skin);}
+export function restoreSkin(room,c,skin){const changed=c.skin.glass!==skin.glass||c.skin.facade!==skin.facade;Object.assign(c.skin,skin);if(skin.parts?.length)refreshFineColliders(room,c);else if(changed)refreshStaticColliders(room,c,ALL_SIDES);room.handWorld?.setSkin(c.id,c.skin);}
+export function refreshFineColliders(room,c){
+ if(c.entity||room.detached.has(c.id))return;
+ const {pieces}=fractureRecipe(c),lost=(c.skin.parts||[]).map(id=>pieces[id]),f=floorOf(room,c);
+ if(lost.some(p=>p.kind==='frame')){unmergeStructure(room,f);removeHandles(room,c.structureHandles);attachStructure(room,c);}
+ for(const side of new Set(lost.filter(p=>p.kind==='wall').map(p=>p.side))){unmergeWall(room,f,side);removeHandles(room,c.wallHandles[side]);attachWall(room,c,side);}
+ if(lost.some(p=>p.kind==='attachment')){removeHandles(room,c.roofHandles);for(const a of cellColliders(c,c.skin).filter(a=>a.kind==='attachment'))c.roofHandles.push(staticCollider(room,room.buildingBodies[c.building],[...a.slice(0,3).map((n,k)=>n+c.p[k]),...a.slice(3)],{cell:c.id,kind:a.kind,part:a.part}));}
+ room.handWorld?.setSkin(c.id,c.skin);room.world.invalidateSceneQueries();
+}
 export function restoreDebris(room,meta){
  const body=room.world.createRigidBody((meta.settled?RAPIER.RigidBodyDesc.fixed():RAPIER.RigidBodyDesc.dynamic()).setTranslation(...meta.p).setRotation({x:meta.q[0],y:meta.q[1],z:meta.q[2],w:meta.q[3]}));
  const e={...meta,body,born:room.time,radius:0,building:room.cellMap.get(meta.cells[0]).building};
@@ -150,7 +161,7 @@ export function restoreDebris(room,meta){
 }
 // Merged walls resolve on their actual exterior face, including re-entrant notches.
 // Columns/slabs and rooftop attachments bypass the facade rather than picking a wall.
-export const contactFromTag=tag=>({kind:tag?.kind||(tag?.side==null?'frame':'wall'),side:tag?.side});
+export const contactFromTag=tag=>({kind:tag?.kind||(tag?.side==null?'frame':'wall'),side:tag?.side,...(tag?.part!=null?{part:tag.part}:{})});
 export function resolveCell(room, tag, point){
  if(!tag) return null;
  if(tag.cell) return room.cellMap.get(tag.cell) || null;
@@ -194,6 +205,7 @@ export function removeBody(room, body){
 // shields the frame, then the structural frame absorbs the rest. Returns true when the frame fails.
 export function damageCell(room, c, energy, sides = ALL_SIDES, by = 0, contact = null){
  if(!c||room.detached.has(c.id)||energy<=0)return false;
+ if(contact?.point){chipCell(room,c,contact.point,contact.radius??.12,energy,by,contact.direction);return c.skin.hp<=0;}
  const m=MATERIALS[c.material],s=c.skin;let changed=false;
  s.glassHp??=c.walls.map((wall,side)=>wall&&(s.glass&sideBit(side))?m.glassHP:0);
  const faces=contact?.kind==='frame'||contact?.kind==='attachment'?[]:c.walls.flatMap((wall,side)=>wall&&(sides&sideBit(side))?[side]:[]);
@@ -228,7 +240,7 @@ export function damageSphere(room,center,radius,energy,by=0,limit=12){
  candidates.sort((a,b)=>a.distance-b.distance||a.c.id-b.c.id);const hit=[];
  for(const {c,distance,contact} of candidates.slice(0,limit)){
   const falloff=Math.max(.15,1-distance/radius),sides=contact.side==null?0:sideBit(contact.side);
-  if(damageCell(room,c,energy*falloff,sides,by,contact))hit.push(c.id);
+  if(damageCell(room,c,energy*falloff,sides,by,{...contact,point:[center.x,center.y,center.z],radius}))hit.push(c.id);
  }
  return hit;
 }
@@ -261,13 +273,21 @@ export function connectedIslands(room,ids){
  return groups;
 }
 export function breakCells(room, requested, kick = v(0, 0, 0), hint = {}){
- const hits = [...new Set(requested)].filter(id => room.cellMap.has(id) && !room.detached.has(id));
+ const hits = [...new Set(requested)].filter(id => room.cellMap.has(id) && !room.detached.has(id) && !room.fineCollapses.has(id));
  if(!hits.length) return [];
  const buildings=new Set(hits.map(id=>room.cellMap.get(id).building));
  if(buildings.size>1)return [...buildings].flatMap(b=>breakCells(room,hits.filter(id=>room.cellMap.get(id).building===b),kick,hint));
- const prospective=new Set([...room.detached,...hits]);
+ const prospective=new Set([...room.detached,...room.fineCollapses.keys(),...hits]);
  const unsupported = [];
  for(const b of buildings) unsupported.push(...unsupportedCells(room.cellsByBuilding[b], prospective));
+ if(hint.granular||hits.some(id=>room.cellMap.get(id).skin.parts?.length)){
+  releaseFineCells(room,hits,arr(kick));
+  // An unsupported tower sheds from the bottom upward. Keep each upper section
+  // visible and solid until its pieces are released, avoiding a disappearing
+  // tower or a multi-megabyte, single-frame avalanche of debris messages.
+  for(const id of unsupported.sort((a,b)=>room.cellMap.get(a).floor-room.cellMap.get(b).floor))if(!room.fineCollapses.has(id))room.fineCollapses.set(id,[0,0,0]);
+  for(const b of buildings)if(hits.length+unsupported.length>=9)announceCollapse(room,b,hits.length+unsupported.length);return [];
+ }
  // Directly hit bays separate first. Unsupported sections retain only real graph
  // connections. At the body limit use connected coarse chunks and retry failures later.
  let batches=hits.map(id=>[id]);
@@ -358,6 +378,13 @@ export function settleDebris(room,id){
 }
 
 // ---- per-tick collapse processing ---------------------------------------------------
+function releaseFineCells(room,ids,kick){
+ for(const id of ids){const c=room.cellMap.get(id);chipCell(room,c,c.p,Infinity,Infinity,c.lastHitBy,kick,true);detachCellColliders(room,c);room.detached.add(id);c.entity=0;room.handWorld?.setCell(id,null,undefined,true);room.pendingFailures.delete(id);room.dirtyBuildings.add(c.building);}
+ room.destroyedThisRound+=ids.length;room.event({type:'fine-collapse',cells:ids});
+}
+export function processFineCollapses(room){
+ let count=0;for(const [id,kick]of room.fineCollapses){room.fineCollapses.delete(id);if(room.cellMap.has(id)&&!room.detached.has(id))releaseFineCells(room,[id],kick);if(++count>=2)break;}
+}
 export function scheduleFailures(room){
  if(!room.dirtyBuildings.size) return;
  for(const b of room.dirtyBuildings){
@@ -365,7 +392,7 @@ export function scheduleFailures(room){
   const overloaded = overloadedCells(cells, room.detached, c => c.skin.hp / c.skin.maxHp);
   const failing=new Set(overloaded);
   for(const c of cells){
-   if(room.detached.has(c.id)){room.pendingFailures.delete(c.id);continue;}
+   if(room.detached.has(c.id)||room.fineCollapses.has(c.id)){room.pendingFailures.delete(c.id);continue;}
    // A previously overloaded bay may become safe when the load above falls away.
    if(c.skin.hp<=0)room.pendingFailures.set(c.id,room.time);
    else if(!failing.has(c.id))room.pendingFailures.delete(c.id);
@@ -382,7 +409,7 @@ export function processFailures(room){
  if(!room.pendingFailures.size) return;
  const buildings=new Map();
  for(const [id,at] of room.pendingFailures){
-  const c=room.cellMap.get(id);if(!c||room.detached.has(id)){room.pendingFailures.delete(id);continue;}
+  const c=room.cellMap.get(id);if(!c||room.detached.has(id)||room.fineCollapses.has(id)){room.pendingFailures.delete(id);continue;}
   if(room.time>=at){if(!buildings.has(c.building))buildings.set(c.building,[]);buildings.get(c.building).push(id);}
  }
  // Only successful detachments clear pending entries. A full budget must not make

@@ -2,7 +2,7 @@
 
 Midtown contains 169 buildings and 5,827 hollow structural bays. Outside its original five-by-five block grid, deterministic 70 m blocks generate in every horizontal direction. Each new block has eight buildings around a courtyard (occasionally a ninth Chrysler landmark), with footprints that preserve roads and alley clearance. Sixteen architecture families vary material, height, footprint, roofline and details. Existing downloaded Kenney/Quaternius props and photographic textures are reused; custom code supplies the destructible architectural kit and landmark-specific geometry.
 
-`shared/city/components.js` defines **214 real geometry types**. Every building uses at least **75 distinct types**, including the landmarks and the reduced headset kit (the starting district currently has a minimum of 78). `src/world/components.js` shares one batch set across loaded blocks and attaches each part to its parent bay and skin. Physics operates on structural bays and simplified equipment proxies; ornaments do not each create a separate rigid body.
+`shared/city/components.js` defines **214 real geometry types**. Every building uses at least **75 distinct types**, including the landmarks and the reduced headset kit (the starting district currently has a minimum of 78). `src/world/components.js` shares one batch set across loaded blocks and attaches each part to its parent bay and skin. Structural support uses bays; gameplay damage now subdivides contacted surfaces and frame members into small, persistent pieces with shared render/collision recipes. Simplified equipment proxies also fragment locally. Ornaments do not each create a separate rigid body. See [FINE_DESTRUCTION.md](FINE_DESTRUCTION.md).
 
 | Family | Parts |
 | --- | --- |

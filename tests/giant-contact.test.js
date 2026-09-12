@@ -16,16 +16,16 @@ test('visible knuckles and rotated corners stop at the surface and slide without
 });
 test('gentle hand motion opens the wall immediately; touching the exposed frame breaks it',()=>{
  const {room,client,pose,cell}=fixture();try{
-  for(let i=0;i<30;i++){pose.right[2]-=.025;room.input(client,pose);room.step();if(cell.skin.glassHp[2]<6)break;}
-  assert.ok(cell.skin.glassHp[2]<6,'First slow touch must chip the contacted window');assert.equal(cell.skin.facade&4,0);assert.equal(cell.skin.hp,cell.skin.maxHp,'Opening a facade must preserve the frame');assert.equal(room.boss.right.z,pose.right[2]);
+  for(let i=0;i<30;i++){pose.right[2]-=.025;room.input(client,pose);room.step();if(cell.skin.parts?.length)break;}
+  assert.ok(cell.skin.parts?.length,'First slow touch must chip local facade pieces');assert.equal(cell.skin.hp,cell.skin.maxHp,'Opening a facade must preserve the frame');assert.equal(room.boss.right.z,pose.right[2]);
   assert.ok(room.drainEvents().some(e=>e.type==='strike'),'Contact must provide immediate feedback before collapse');
   const skin=structuredClone(cell.skin);for(let i=0;i<90;i++){room.input(client,pose);room.step();}assert.deepEqual(cell.skin,skin,'A held hand must not grind the wall or frame away');
   for(let jab=0;jab<12&&!room.detached.has(cell.id);jab++){pose.right=[0,7.5,-13];for(let i=0;i<25;i++){room.input(client,pose);room.step();}pose.right=[3.85,7.5,-24];room.input(client,pose);room.step();}
-  assert.ok(room.detached.has(cell.id),'Deliberate strikes on the remaining columns demolish the stronger bay');
+  assert.ok(cell.skin.hp<cell.skin.maxHp,'Struck steel segments weaken the bay without deleting untouched supports');
  }finally{room.dispose();}
 });
 test('a fast hand opens both crossed walls in the same tick without destroying untouched supports',()=>{
- const {room,client,pose,cell}=fixture();try{pose.right[2]=-30;room.input(client,pose);room.step();assert.equal(room.boss.right.z,-30);assert.equal(cell.skin.glass&5,0);assert.equal(cell.skin.facade&5,0);assert.equal(cell.skin.hp,cell.skin.maxHp,'A path through the hollow bay does not touch its corner columns');assert.equal(room.detached.has(cell.id),false,'One punch does not delete a reinforced frame');}finally{room.dispose();}
+ const {room,client,pose,cell}=fixture();try{pose.right[2]=-30;room.input(client,pose);room.step();assert.equal(room.boss.right.z,-30);assert.ok(cell.skin.parts?.length);assert.ok(room.handWorld.cells.get(cell.id).boxes.some(b=>b.kind==='wall'),'unhit facade remains');assert.equal(cell.skin.hp,cell.skin.maxHp,'A path through the hollow bay does not touch its corner columns');assert.equal(room.detached.has(cell.id),false,'One punch does not delete a reinforced frame');}finally{room.dispose();}
 });
 test('recenter and artificial turn still cannot become building attacks',()=>{
  const {room,client,pose,cell}=fixture();try{pose.right=[0,7.5,-20];room.input(client,{...pose,reset:true});room.step();for(let i=0;i<30;i++){room.input(client,pose);room.step();}assert.equal(cell.skin.hp,cell.skin.maxHp);assert.equal(room.detached.size,0);

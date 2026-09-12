@@ -42,11 +42,21 @@ export class Components{
    if(!eligible&&!this.activeCells.has(c.id))continue;let any=false;
    for(const part of this.entries.get(c.id)){
     const mask=part.layer==='glass'?e.glassMask:e.facadeMask;
-    const visible=eligible&&(!part.fine||distance2<(this.tier.lambert?36:65)**2)&&(near||part.signature)&&(part.layer==='frame'||!!(mask&(1<<part.side)));
+    const cut=e.fine&&this.intersectsOpening(part);
+    const visible=eligible&&!cut&&(!part.fine||distance2<(this.tier.lambert?36:65)**2)&&(near||part.signature)&&(part.layer==='frame'||!!(mask&(1<<part.side)));
     if(visible){any=true;if(part.index<0)this.add(part);}else this.remove(part);
    }
    if(any)this.activeCells.add(c.id);else this.activeCells.delete(c.id);
   }
+ }
+ intersectsOpening(part){
+  const fine=part.pose.fine,key=part.type+':'+part.side;if(fine.cutComponents.has(key))return fine.cutComponents.get(key);
+  const geometry=this.batches.get(part.type).geometry;if(!geometry.boundingBox)geometry.computeBoundingBox();
+  const transform=new T.Matrix4().makeScale(...part.cell.size);if(part.side>=0)transform.multiply(sides[part.side]);const bounds=geometry.boundingBox.clone().applyMatrix4(transform),lo=bounds.min.toArray(),hi=bounds.max.toArray();
+  // Preserve intact cornices, sills and trim beside a hole. A decorative assembly
+  // detaches only where its footprint overlaps removed material on its own face.
+  const dimensions=part.side>=0?[part.side%2?2:0,1]:[0,1,2],cut=fine.lost.some(p=>(part.side<0||p.side===part.side)&&dimensions.every(k=>hi[k]>=p.p[k]-p.size[k]/2-.04&&lo[k]<=p.p[k]+p.size[k]/2+.04));
+  fine.cutComponents.set(key,cut);return cut;
  }
  add(part){const slots=this.active.get(part.type);this.reserve(part.type,slots.length+1);part.index=slots.length;slots.push(part);this.batches.get(part.type).count=slots.length;this.batches.get(part.type).visible=true;this.write(part);}
  remove(part){

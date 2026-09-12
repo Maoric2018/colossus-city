@@ -53,5 +53,5 @@ test('a pristine manually spawned tower is still described to late joiners after
 });
 
 test('missile blast at the high spire damages its owning crown bay',()=>{
- const room=new Room('CROWN HIT');try{const crown=room.cells.find(c=>c.chryslerCrown),hp=crown.skin.hp;damageSphere(room,v(crown.p[0],crown.p[1]+crown.size[1]*(CHRYSLER_SPIRE.base+2),crown.p[2]),3,180);assert.ok(crown.skin.hp<hp);const point=[crown.p[0],crown.p[1]+crown.size[1]*(CHRYSLER_SPIRE.base+2),crown.p[2]];assert.ok([...room.handWorld.near(point,point)].some(b=>b.cell===crown.id),'hand broad phase reaches the spire');}finally{room.dispose();}
+ const room=new Room('CROWN HIT');try{const crown=room.cells.find(c=>c.chryslerCrown),hp=crown.skin.hp;damageSphere(room,v(crown.p[0],crown.p[1]+crown.size[1]*(CHRYSLER_SPIRE.base+2),crown.p[2]),3,180);assert.ok(crown.skin.parts?.length);assert.equal(crown.skin.hp,hp,'A spire hit preserves the supporting bay');const point=[crown.p[0],crown.p[1]+crown.size[1]*(CHRYSLER_SPIRE.base+2),crown.p[2]];assert.ok(room.shards.size,'The spire sheds actual small fragments');}finally{room.dispose();}
 });

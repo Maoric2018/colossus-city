@@ -16,11 +16,11 @@ function fixture(material='stone',strength=1,nx=3,nz=3){
 test('a continuous hand sweep opens its path while the connected tower remains standing',()=>{
  const {r,client,pose}=fixture('concrete',1,4,4);try{
   pose.right=[0,10.15,-23];r.input(client,pose);r.step();
-  assert.equal(r.boss.right.z,pose.right[2]);assert.ok(r.detached.size>0,'Columns in the actual hand path break on contact');assert.ok(r.detached.size<r.cells.length*.12);
+  assert.equal(r.boss.right.z,pose.right[2]);assert.ok(r.cells.some(c=>c.skin.parts?.length),'Pieces in the actual hand path break on contact');assert.ok(r.detached.size<r.cells.length*.12);
   const pierced=r.detached.size;
   for(let i=0;i<240;i++){r.input(client,pose);r.step();}
   assert.ok(r.detached.size<r.cells.length*.15,`${pierced} hit bays should not bring down ${r.cells.length} bays`);assert.equal(r.collapsed.size,0);
-  const late=r.welcome({id:100,role:'spectator'});assert.ok(late.entities.length);assert.equal(late.entities.flatMap(e=>e.cells).length,r.detached.size);
+  const late=r.welcome({id:100,role:'spectator'});assert.ok(late.shards.length);assert.ok(late.fractures.length);assert.ok(late.shards.every(e=>Math.max(...e.half)<1.15));
  }finally{r.dispose();}
 });
 test('local holes hold for several seconds; removing every support still releases the upper tower',()=>{
@@ -34,14 +34,14 @@ test('local holes hold for several seconds; removing every support still release
 test('reinforcement cannot make a directly struck column resist a moving giant hand',()=>{
  const {r,client,pose}=fixture('stone',20);try{
   const target=r.cells.find(c=>c.floor===2&&c.ix===1&&c.iz===2);pose.right=[1.85,10.15,-15];r.input(client,pose);r.step();
-  assert.ok(r.detached.has(target.id));assert.equal(r.boss.right.z,-15);assert.ok(r.detached.size<r.cells.length*.15);assert.equal(r.collapsed.size,0);
+  assert.ok(target.skin.parts?.length);assert.ok(target.skin.hp<target.skin.maxHp);assert.equal(r.boss.right.z,-15);assert.ok(r.detached.size<r.cells.length*.15);assert.equal(r.collapsed.size,0);
  }finally{r.dispose();}
 });
 test('wall-only strikes remove that facade without weakening neighbouring frames',()=>{
  for(const material of ['glass','brick','concrete','stone']){
   const {r,client,pose}=fixture(material);try{
    const c=r.cells.find(c=>c.floor===2&&c.ix===1&&c.iz===2);pose.right=[0,10.15,-13];r.input(client,pose);r.step();
-   assert.equal(c.skin.glass&4,0,material);assert.equal(c.skin.facade&4,0,material);assert.equal(c.skin.hp,c.skin.maxHp);assert.equal(r.detached.size,0);assert.equal(r.boss.right.z,-13);
+   assert.ok(c.skin.parts?.length,material);const above=r.cells.find(cell=>cell.floor===3&&cell.ix===c.ix&&cell.iz===c.iz);assert.ok(r.handWorld.cells.get(above.id).boxes.some(b=>b.kind==='wall'),'unhit story remains solid');assert.equal(c.skin.hp,c.skin.maxHp);assert.equal(r.detached.size,0);assert.equal(r.boss.right.z,-13);
    assert.ok(r.cells.every(cell=>cell.skin.hp===cell.skin.maxHp));
   }finally{r.dispose();}
  }
@@ -58,7 +58,7 @@ test('a single pose has a bounded fracture workload and cannot phase through unp
 });
 test('fresh fragments briefly clear the crushing hand, then regain ordinary debris contact',()=>{
  const {r,client,pose}=fixture();try{
-  pose.right=[1.85,10.15,-15];r.input(client,pose);r.step();const id=[...r.boss.breakGrace.keys()][0],cell=r.cellMap.get(id),a=r.handBodies[1].collider(0).handle,b=cell.handles[0];assert.ok(id);
+  pose.right=[1.85,10.15,-15];r.input(client,pose);r.step();const id=[...r.boss.breakGrace.keys()][0],shard=[...r.shards.values()].find(e=>e.cell===id&&e.body),a=r.handBodies[1].collider(0).handle,b=shard.body.collider(0).handle;assert.ok(id);
   assert.equal(r.physicsHooks.filterContactPair(a,b),null);r.time+=C.HAND_DEBRIS_GRACE+.01;assert.notEqual(r.physicsHooks.filterContactPair(a,b),null);assert.ok(r.world.getCollider(b));
  }finally{r.dispose();}
 });

@@ -28,7 +28,7 @@ export function shoot(room, p, heavy = false){
   if(c && !room.detached.has(c.id)){
    const contact=contactFromTag(tag),side=contact.side==null?0:sideBit(contact.side);
    if(heavy){structure=true;damageSphere(room,at,2.4,C.HEAVY_STRUCTURE,p.id,6);room.event({type:'impact',p:arr(at),power:.5,material:c.material});}
-   else damageCell(room,c,6,side,p.id,contact);
+   else damageCell(room,c,6,side,p.id,{...contact,point:arr(at),direction:arr(direction)});
 
   }
  }

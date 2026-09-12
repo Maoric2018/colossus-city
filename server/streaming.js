@@ -6,6 +6,7 @@ import {generateCells,initialSkin} from '../shared/environment.js';
 import {generateBlock,blockAt,blockKey,homeBlock,cellBlock} from '../shared/city/layout.js';
 import {box} from '../shared/giant-rig.js';
 import {addBuildings,removeBody,bodyPose,debrisMeta,detachCellColliders,restoreSkin,restoreDebris} from './destruction.js';
+import {shardMeta,restoreShards,removeShards} from './fracture.js';
 export class CityStreaming{
  constructor(room){this.room=room;this.active=new Map();this.archive=new Map();this.free=[];this.landmarks=new Set();this.lastSpawn=-Infinity;this.lastFocus='';}
  ensureAround(x,z,wanted=new Set()){
@@ -41,9 +42,11 @@ export class CityStreaming{
   const tile={key:env.key,x,z,landmark:env.landmark,indices,cells,cellIds:new Set(cells.map(c=>c.id)),ground,groundBox};this.active.set(tile.key,tile);
   const saved=this.archive.get(tile.key);
   if(saved){
+   for(const [id,kick]of saved.fineCollapses||[])r.fineCollapses.set(id,kick);
    for(const [id,skin]of saved.damage)restoreSkin(r,r.cellMap.get(id),skin);
    for(const id of saved.detached){const c=r.cellMap.get(id);detachCellColliders(r,c);r.detached.add(id);r.handWorld.setCell(id,null,undefined,true);}
    for(const e of saved.entities)restoreDebris(r,e);
+   for(const e of saved.shards||[])restoreShards(r,e);
    for(const local of saved.collapsed)r.collapsed.add(indices[local]);
    for(const [id,delay]of saved.failures)r.pendingFailures.set(id,r.time+delay);
   }
@@ -72,17 +75,18 @@ export class CityStreaming{
  }
  capture(tile){
   const r=this.room,damage=[];
-  for(const c of tile.cells){const s=initialSkin(c);if(c.skin.hp!==s.hp||c.skin.glass!==s.glass||c.skin.facade!==s.facade||c.skin.facadeHp.some((h,i)=>h!==s.facadeHp[i])||c.skin.glassHp.some((h,i)=>h!==s.glassHp[i]))damage.push([c.id,{...c.skin,facadeHp:[...c.skin.facadeHp],glassHp:[...c.skin.glassHp]}]);}
-  return {x:tile.x,z:tile.z,key:tile.key,landmark:tile.landmark,damage,detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
+  for(const c of tile.cells){const s=initialSkin(c);if(c.skin.parts?.length||Object.keys(c.skin.partHP||{}).length||c.skin.hp!==s.hp||c.skin.glass!==s.glass||c.skin.facade!==s.facade||c.skin.facadeHp.some((h,i)=>h!==s.facadeHp[i])||c.skin.glassHp.some((h,i)=>h!==s.glassHp[i]))damage.push([c.id,structuredClone(c.skin)]);}
+  return {x:tile.x,z:tile.z,key:tile.key,landmark:tile.landmark,damage,fineCollapses:[...r.fineCollapses].filter(([id])=>tile.cellIds.has(id)),shards:[...r.shards.values()].filter(e=>tile.cellIds.has(e.cell)).map(shardMeta),detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
  }
  meta(tile){const saved=this.capture(tile);return this.publicState(saved,tile.indices);}
- publicState(saved,indices){const inDebris=new Set(saved.entities.flatMap(e=>e.cells));return {key:saved.key,x:saved.x,z:saved.z,landmark:saved.landmark,indices,skins:saved.damage.map(([id,s])=>[id,s.glass,s.facade]),clearedCells:saved.detached.filter(id=>!inDebris.has(id)),entities:saved.entities};}
+ publicState(saved,indices){const inDebris=new Set(saved.entities.flatMap(e=>e.cells));return {key:saved.key,x:saved.x,z:saved.z,landmark:saved.landmark,indices,skins:saved.damage.map(([id,s])=>[id,s.glass,s.facade]),fractures:saved.damage.filter(([,s])=>s.parts?.length).map(([id,s])=>[id,s.parts]),shards:saved.shards||[],clearedCells:saved.detached.filter(id=>!inDebris.has(id)),entities:saved.entities};}
  unload(key){
   const tile=this.active.get(key),r=this.room,saved=this.capture(tile);if(saved.damage.length||saved.detached.length||this.landmarks.has(key))this.archive.set(key,saved);
   r.event({type:'block-unload',...this.publicState(saved,tile.indices)});
   for(const e of saved.entities){const entity=r.debris.get(e.id)||r.settled.get(e.id);removeBody(r,entity.body);r.debris.delete(e.id);r.settled.delete(e.id);}
+  for(const e of saved.shards||[])removeShards(r,e.id);
   for(const i of tile.indices){removeBody(r,r.buildingBodies[i]);r.buildingBodies[i]=null;r.cellsByBuilding[i]=[];r.floors[i]=[];r.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];r.buildingColumns[i]=null;r.env.buildings[i]=null;r.dirtyBuildings.delete(i);r.lastCreak.delete(i);r.collapsed.delete(i);this.free.push(i);}
-  for(const c of tile.cells){r.cellMap.delete(c.id);r.handWorld.setCell(c.id,null,undefined,true);r.handWorld.cells.delete(c.id);r.detached.delete(c.id);r.pendingFailures.delete(c.id);}
+  for(const c of tile.cells){r.fineCollapses.delete(c.id);r.cellMap.delete(c.id);r.handWorld.setCell(c.id,null,undefined,true);r.handWorld.cells.delete(c.id);r.detached.delete(c.id);r.pendingFailures.delete(c.id);}
   r.cells=r.cells.filter(c=>!tile.cellIds.has(c.id));removeBody(r,tile.ground);r.handWorld.fixed=r.handWorld.fixed.filter(b=>b!==tile.groundBox);this.active.delete(key);
  }
  welcome(){return [...this.active.values()].map(t=>this.meta(t)).concat([...this.archive].filter(([key])=>!this.active.has(key)).map(([,s])=>this.publicState(s)));}

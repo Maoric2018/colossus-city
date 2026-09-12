@@ -1,5 +1,6 @@
 import {shapeModernCell,finishModernCells} from './modern-landmarks.js';
 import {shapeCatalogCell,finishCatalogCells} from './catalog.js';
+import {fractureColliders} from './fracture.js';
 // A structural cell is one hollow storey bay: slab + four corner columns + exterior skins.
 // Cells form a support graph anchored at foundations. No triangle-mesh physics anywhere.
 import {C} from '../config.js';
@@ -56,6 +57,7 @@ export const exteriorMask = c => c.walls.reduce((acc, w, side) => acc | (w ? sid
 // Cuboid components in LOCAL space: [center x,y,z, half x,y,z]. A wall is present only
 // while its solid skin layer stands, so broken windows/facades become openings.
 export function cellColliders(c, skin){
+ if(skin?.parts?.length)return fractureColliders(c,skin);
  const [w, h, d] = c.size, slab = .13, col = .15, out = [];
  out.push([0, h / 2 - slab, 0, w / 2, slab, d / 2]);
  for(const x of [-1, 1]) for(const z of [-1, 1]) out.push([x * (w / 2 - col), 0, z * (d / 2 - col), col, h / 2 - .26, col]);

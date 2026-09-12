@@ -15,6 +15,7 @@ import {buildGround} from './ground.js';
 import {Rubble} from './rubble.js';
 import {CarsView} from './cars.js';
 import {Fragments} from './fragments.js';
+import {FineBuildings} from './fine-buildings.js';
 const skyVertex = `varying vec3 vDir; void main(){vDir=position;vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}`;
 const skyFragment = `varying vec3 vDir;uniform vec3 topColor;uniform vec3 horizon;void main(){vec3 d=normalize(vDir);float h=max(d.y,0.);vec3 c=mix(horizon,topColor,pow(h,.42));vec3 sun=normalize(vec3(-.8,.22,-.65));float s=max(dot(d,sun),0.);c+=vec3(1.,.51,.22)*pow(s,18.)*.37*smoothstep(0.,.15,h);c+=vec3(1.,.82,.48)*smoothstep(.9986,.9995,s)*2.;gl_FragColor=vec4(c,1.);
 #include <colorspace_fragment>
@@ -35,7 +36,8 @@ export class CityView {
   if(!parent)this.makeSkyAndLights(); this.ground = parent ? {update(){}} : buildGround(this.root, env, tier, this.textures);
   this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || this.texture(t.concrete, 1),resources:parent?.buildings,components:parent?.buildings.components});
   this.transforms = this.buildings.entries;
-  if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{if(scene.userData.reuseCityVisibility)return;this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.commit();};
+  this.fine=parent?.fine||new FineBuildings(this.root,tier);
+  if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{if(scene.userData.reuseCityVisibility)return;this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.fine.select(camera);this.commit();};
   for(const c of this.cells){ const s = this.skins.get(c.id); this.buildings.setSkin(c.id, s.glass, s.facade); }
   this.buildings.commit(); this.rubble = parent?.rubble || new Rubble(scene, tier); this.fragments=new Fragments(this.root,this.cells,tier); this.cars=parent?{entries:new Map(),reset(){},*boxes(){}}:new CarsView(this.root,env,tier); this.ready = Promise.all([this.loadCustomAssets(),this.cars.ready]);
   if(!parent&&env.infinite)this.stream=new StreamedBlocks(this);
@@ -52,10 +54,16 @@ export class CityView {
  }
  batch(g, m, n){ const b = new T.InstancedMesh(g, m, n); b.instanceMatrix.setUsage(T.DynamicDrawUsage); b.frustumCulled = false; b.castShadow = true; b.receiveShadow = true; this.root.add(b); this.batches.push(b); return b; }
  // ---- state from the server ----
+ setFracture(id,parts){
+  const c=this.byId.get(id);if(!c){this.stream?.setFracture(id,parts);return;}const s=this.skins.get(id);s.parts=[...parts];this.colliderCache.set(id,cellColliders(c,s));this.handWorld.setSkin(id,s);
+  const pose=this.buildings.pose(id);this.fine.set(c,s,pose,this.buildings);this.buildings.writeCore(c,pose);this.buildings.components.selectionDirty=true;
+ }
+ addShards(meta){const c=this.byId.get(meta.cell);if(!c){this.stream?.addShards(meta);return;}this.fine.addShards(c,meta);}
  setSkin(id, glass, facade, fx = true){
   const c = this.byId.get(id), s = this.skins.get(id); if(!c){this.stream?.setSkin(id,glass,facade,fx);return;}
   const lostGlass = s.glass & ~glass, lostFacade = s.facade & ~facade;
   s.glass = glass; s.facade = facade; this.buildings.setSkin(id, glass, facade); this.colliderCache.set(id, cellColliders(c, s)); this.handWorld.setSkin(id,s);
+  if(s.parts?.length){this.setFracture(id,s.parts);return;}
   if(!lostGlass && !lostFacade) return;
   const e = this.buildings.pose(id);
   for(let side = 0; side < 4; side++){
@@ -71,6 +79,7 @@ export class CityView {
  hideCells(ids){ for(const id of ids){ if(!this.byId.has(id)){this.stream?.hideCells([id]);continue;}this.detached.add(id); this.handWorld.setCell(id,null,undefined,true); this.buildings.setCell(id, null, null, true); } }
  addDebris(e){ if(!this.byId.has(e.cells[0])){this.stream?.addDebris(e);return;}const entry = {cells:e.cells, origin:new T.Vector3(...e.origin), material:e.material, pos:new T.Vector3(), rot:new T.Quaternion(), radius:0}; for(const id of e.cells){ this.detached.add(id); this.handWorld.setCell(id,null,undefined,true); entry.radius = Math.max(entry.radius, new T.Vector3(...this.byId.get(id).p).distanceTo(entry.origin) + Math.hypot(...this.byId.get(id).queryHalf)); } this.moving.set(e.id, entry); this.poseDebris(e.id, e.p, e.q); entry.settled=!!e.settled;if(entry.settled)for(const id of e.cells){const pose=this.buildings.pose(id);this.handWorld.setDebris(id,pose.p.toArray(),pose.q.toArray());} }
  poseDebris(id, p, q){
+  if(this.fine.poseShard(id,p,q))return;
   const e = this.moving.get(id); if(!e){this.stream?.poseDebris(id,p,q);return;}if(e.settled)return;
   e.pos.set(p[0], p[1], p[2]); e.rot.set(q[0], q[1], q[2], q[3]);
   for(const cId of e.cells){ const c = this.byId.get(cId); tp.set(c.p[0], c.p[1], c.p[2]).sub(e.origin).applyQuaternion(e.rot).add(e.pos); this.buildings.setCell(cId, tp, e.rot, false); }
@@ -88,12 +97,12 @@ export class CityView {
   }
   if(ev.id) this.moving.delete(ev.id);
  }
- reset(){ this.stream?.reset();this.cars.reset(); this.fragments.reset(); this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
- commit(){ this.buildings.commit();for(const v of this.stream?.views.values()||[])v.buildings.commit(); }
+ reset(){ this.stream?.reset();if(!this.parent)this.fine.reset();else this.fine.unregister(this.cells);this.cars.reset(); this.fragments.reset(); this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.pose(c.id).skinDirty=true;this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
+ commit(){ this.buildings.commit();this.fine.commit();for(const v of this.stream?.views.values()||[])v.buildings.commit(); }
  getCell(id){return this.byId.get(id)||this.stream?.getCell(id);}
- dispose(){this.disposed=true;this.buildings.components.unregister(this.cells);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();});for(const mesh of this.fragments.batches.values()){mesh.geometry.dispose();mesh.material.dispose();}this.root.removeFromParent();}
+ dispose(){this.disposed=true;this.fine.unregister(this.cells);this.buildings.components.unregister(this.cells);this.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();});for(const mesh of this.fragments.batches.values()){mesh.geometry.dispose();mesh.material.dispose();}this.root.removeFromParent();}
  *solidProps(){yield* this.handWorld.fixed;yield* this.cars.boxes();}
- update(dt){ this.ground.update(dt);if(!this.parent)this.rubble.update(dt);this.fragments.update(dt);for(const v of this.stream?.views.values()||[])v.fragments.update(dt); }
+ update(dt){ this.ground.update(dt);if(!this.parent){this.rubble.update(dt);this.fine.update(dt);}this.fragments.update(dt);for(const v of this.stream?.views.values()||[])v.fragments.update(dt); }
  // ---- spatial queries ----
  rayBuilding(origin, direction, maxDistance){
   const out = [];

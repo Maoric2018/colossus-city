@@ -43,7 +43,7 @@ export function resolveHand(from,target,q,world){
   // order choose one arbitrary bay, or carry the sweep through the front wall.
   for(const {hit,other} of hits)if(Math.abs(hit.t-nearest.t)<1e-5&&dot(hit.normal,nearest.normal)>.95){
    const point=closestBoxPoint(minus(position,times(hit.normal,support(basis,half,hit.normal))),other);
-   contacts.set(other,{cell:other.cell,point,normal:hit.normal,kind:other.kind||'frame',side:other.side,debris:!!other.debris});
+   contacts.set(other,{cell:other.cell,point,normal:hit.normal,kind:other.kind||'frame',side:other.side,part:other.part,debris:!!other.debris});
   }
   const rest=minus(target,position),into=dot(rest,nearest.normal);target=into<0?minus(target,times(nearest.normal,into)):target;
   if(Math.hypot(...minus(target,position))<.0001)break;

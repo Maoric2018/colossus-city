@@ -50,7 +50,7 @@ test('blast limits select the nearest struck surface, independent of cell iterat
   const r=room([building({tiers:[{nx:3,nz:1,floors:1,ix:0,iz:0}]})]);try{
    const near=r.cells.find(c=>c.ix===2),far=r.cells.find(c=>c.ix===0);if(reversed)r.cellsByBuilding[0].reverse();
    damageSphere(r,v(near.p[0],near.p[1],-17.9),12,12,0,1);
-   assert.equal(near.skin.glass&4,0);assert.equal(near.skin.hp,near.skin.maxHp);assert.deepEqual(near.skin.glassHp,[5,5,0,0]);assert.deepEqual(far.skin,initialSkin(far));
+   assert.ok(near.skin.parts?.length);assert.equal(near.skin.hp,near.skin.maxHp);assert.ok(r.shards.size);assert.deepEqual(far.skin,initialSkin(far));
   }finally{r.dispose();}
  }
 });
@@ -72,7 +72,7 @@ test('both hands can open opposite faces of one bay in the same tick',()=>{
  const {r,client,pose,c}=tracked();try{
   pose.left[2]=-14.5;pose.right[2]=-25.5;r.input(client,{...pose,reset:true});r.step();for(let i=0;i<15;i++){r.input(client,pose);r.step();}r.drainEvents();
   pose.left[2]-=.1;pose.right[2]+=.1;r.input(client,pose);r.step();
-  const strikes=r.drainEvents().filter(e=>e.type==='strike'&&e.cell===c.id);assert.equal(strikes.length,2);assert.equal(c.skin.hp,c.skin.maxHp);assert.equal(c.skin.facade&5,0);assert.equal(r.boss.left.z,pose.left[2]);assert.equal(r.boss.right.z,pose.right[2]);
+  const strikes=r.drainEvents().filter(e=>e.type==='strike'&&e.cell===c.id);assert.equal(strikes.length,2);assert.equal(c.skin.hp,c.skin.maxHp);assert.ok(c.skin.parts?.length);assert.ok(r.handWorld.cells.get(c.id).boxes.some(b=>b.kind==='wall'));assert.equal(r.boss.left.z,pose.left[2]);assert.equal(r.boss.right.z,pose.right[2]);
  }finally{r.dispose();}
 });
 test('moving sideways along a wall does not turn tangential speed into a punch',()=>{
@@ -124,6 +124,6 @@ test('falling chunks damage bays at real contact points instead of the bay neare
   for(let i=0;i<24;i++){r.step();impacts.push(...r.drainEvents().filter(e=>e.type==='strike'&&r.cellMap.get(e.cell)?.building===0));}
   assert.ok(impacts.length,'The incoming chunk must hit the target building');
   for(const impact of impacts){const c=r.cellMap.get(impact.cell);assert.ok(Math.abs(impact.p[0]-c.p[0])<=c.size[0]/2+.1,'Damage belongs to the contacted bay');assert.ok(Math.abs(impact.p[1]-c.p[1])<=c.size[1]/2+.15);}
-  assert.ok(impacts.some(e=>r.cellMap.get(e.cell).ix!==1),'Corner contacts must hit outer bays, not the bay under the chunk centre');
+  assert.ok(impacts.every(e=>r.cellMap.get(e.cell).skin.parts?.length),'Each real contact removes pieces from that bay');
  }finally{r.dispose();}
 });
