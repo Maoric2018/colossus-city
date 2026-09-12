@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {staticProps,roofProp} from '../shared/props.js';
 import {generateCells,cellColliders} from '../shared/environment.js';
 import {rayAABB} from '../shared/math.js';
 import {mergeParts,mesh,box,labelTexture} from './art.js';
@@ -8,7 +9,7 @@ const skyVertex=`varying vec3 vDir; void main(){vDir=position;vec4 p=projectionM
 const skyFragment=`varying vec3 vDir;uniform vec3 topColor;uniform vec3 horizon;void main(){vec3 d=normalize(vDir);float h=max(d.y,0.);vec3 c=mix(horizon,topColor,pow(h,.42));vec3 sun=normalize(vec3(-.8,.22,-.65));float s=max(dot(d,sun),0.);c+=vec3(1.,.51,.22)*pow(s,18.)*.37;c+=vec3(1.,.82,.48)*smoothstep(.9986,.9995,s)*2.;float cloud=sin(d.x*15.+sin(d.z*9.))*sin(d.z*20.+d.x*8.);c+=vec3(.035)*smoothstep(.2,.8,cloud)*smoothstep(0.,.25,h)*(1.-smoothstep(.3,.6,h));gl_FragColor=vec4(c,1.);}`;
 export class CityView{
  constructor(scene,env,{quest=false}={}){
-  this.scene=scene;this.env=env;this.quest=quest;this.root=new T.Group();scene.add(this.root);this.cells=generateCells(env);this.byId=new Map(this.cells.map(c=>[c.id,c]));this.entries=new Map();this.moving=new Map();this.batches=[];this.assetCells=new Map();this.attachments=new Map();this.dirty=new Set();this.transforms=new Map();this.colliderCache=new Map(this.cells.map(c=>[c.id,cellColliders(c)]));
+  this.scene=scene;this.env=env;this.quest=quest;this.root=new T.Group();scene.add(this.root);this.cells=generateCells(env);this.byId=new Map(this.cells.map(c=>[c.id,c]));this.entries=new Map();this.moving=new Map();this.batches=[];this.assetCells=new Map();this.attachments=new Map();this.dirty=new Set();this.transforms=new Map();this.props=staticProps(env);this.colliderCache=new Map(this.cells.map(c=>[c.id,cellColliders(c)]));
   this.loader=new T.TextureLoader();this.materials=[];this.makeWorld();this.makeBuildings();this.makeDetails();this.ready=this.loadCustomAssets();
  }
  texture(url,repeat=1,srgb=true){const t=this.loader.load(url);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(repeat,repeat);t.anisotropy=4;if(srgb)t.colorSpace=T.SRGBColorSpace;return t;}
@@ -95,7 +96,7 @@ export class CityView{
  reset(){this.moving.clear();for(const c of this.cells)this.setCell(c.id,new T.Vector3(...c.p),new T.Quaternion());this.commit();}
  makeDetails(){
   const dark=new T.MeshStandardMaterial({color:0x293d42,metalness:.65,roughness:.61});
-  // Pavement, steps, and signboards. These are static non-interactive trim.
+  // Pavement, steps, and signboards. Fixed collision proxies are defined in shared/props.js.
   for(const b of this.env.buildings){
    const w=b.nx*b.bay,d=b.nz*b.bay;
    box(this.root,[w+3,.16,d+3],[b.x,.08,b.z],this.baseMaterial);
@@ -119,10 +120,12 @@ export class CityView{
   for(const c of this.cells){
    const state=this.transforms.get(c.id);if(!state||state.hidden)continue;
    inv.copy(state.q).invert();o.copy(origin).sub(state.p).applyQuaternion(inv);d.copy(direction).applyQuaternion(inv);
-   half.set(c.size[0]/2,c.size[1]/2,c.size[2]/2);center.set(0,0,0);
+   const roof=roofProp(c);half.set(Math.max(c.size[0]/2,roof?Math.max(roof.size[0],roof.size[2])/2:0),c.size[1]/2+(roof?.height||0)/2+.02,Math.max(c.size[2]/2,roof?Math.max(roof.size[0],roof.size[2])/2:0));center.set(0,(roof?.height||0)/2,0);
    if(rayAABB(o,d,center,half,result,padding)===Infinity)continue;
    for(const a of this.colliderCache.get(c.id)){center.set(a[0],a[1],a[2]);half.set(a[3],a[4],a[5]);result=Math.min(result,rayAABB(o,d,center,half,result,padding));}
   }
+  for(const prop of this.props){inv.setFromAxisAngle(new T.Vector3(0,1,0),-prop.yaw);o.copy(origin).sub(new T.Vector3(...prop.position)).applyQuaternion(inv);d.copy(direction).applyQuaternion(inv);for(const a of prop.boxes){center.set(a[0],a[1],a[2]);half.set(a[3],a[4],a[5]);result=Math.min(result,rayAABB(o,d,center,half,result,padding));}}
+  for(const prop of this.env.props||[]){if(!prop.collider)continue;inv.setFromEuler(new T.Euler(...(prop.rotation||[0,0,0]))).invert();o.copy(origin).sub(new T.Vector3(...(prop.position||[0,0,0]))).applyQuaternion(inv);d.copy(direction).applyQuaternion(inv);center.fromArray(prop.collider.offset||[0,0,0]).multiplyScalar(prop.scale||1);half.fromArray(prop.collider.half).multiplyScalar(prop.scale||1);result=Math.min(result,rayAABB(o,d,center,half,result,padding));}
   return result;
  }
  async loadCustomAssets(){

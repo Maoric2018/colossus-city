@@ -3,7 +3,9 @@
 
 Asymmetric multiplayer source prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders the city; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
-**Validation status (September 11, 2026):** dependencies installed and locked; **52 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
+**Validation status (September 11, 2026):** dependencies installed and locked; **55 Node tests pass**, including real Rapier physics and WebSocket multiplayer. The real Three.js renderer and Meta IWER's **Quest 2 profile** pass browser tests for stereo VR, Touch controls, calibration, tracking loss/recovery, suspension and repeated VR entry/exit. The server's eight-player collapse benchmark passes its 16.67 ms step budget on this Mac. **No physical Quest 2 was connected: headset frame rate, physical tracking, haptics and comfort remain unverified.** See [Quest 2 setup and results](docs/QUEST2_TESTING.md).
+
+The latest update adds rigid, articulated giant arms; solid cars, rooftop equipment and street fixtures; a new armored raider facing forward; brighter laser pulses and impacts; and a wider camera over the right shoulder. Roof equipment stays solid as its building collapses.
 
 ## 1. Start on a laptop
 
@@ -100,7 +102,7 @@ This is **pre-authored, support-based game destruction**, not finite-element eng
 
 ### Environment and presentation
 
-The harbor now uses downloaded Kenney skyscrapers, vehicles, industrial equipment and astronauts, plus Quaternius's textured Stan mech adapted to tracked armor parts. Poly Haven provides photographic asphalt/concrete maps and the cloud panorama used for lighting and reflections. New window framing, animated water and downloaded smoke, spark and muzzle sprites complete the scene. Rooftop equipment follows its supporting bay through collapse, removal and reset.
+The harbor now uses downloaded Kenney skyscrapers, vehicles, industrial equipment and rifles, plus Quaternius's armored Spacesuit raider and textured Stan mech adapted to tracked armor parts. Poly Haven provides photographic asphalt/concrete maps and the cloud panorama used for lighting and reflections. New window framing, animated water and downloaded smoke, spark and muzzle sprites complete the scene. Rooftop equipment follows its supporting bay through collapse, removal and reset.
 
 Repeated models are merged by material and instanced. Quest uses a smaller skyline, capped particle pools, a 1K sky and no shadow/bloom passes; desktop uses a 2K sky and shadows/bloom. All assets are served locally and are bundled in the repository. The scene has been inspected in Chromium and in emulated Quest 2 stereo.
 
@@ -135,7 +137,7 @@ npm test               # 24 dependency-free checks
 npm run test:physics   # Actual Rapier stepping, joints, collapse, reset
 npm run test:network   # Actual multiplayer + spectator-channel integration
 npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three math)
-npm run test:all       # All 52 Node tests after installation
+npm run test:all       # All 55 Node tests after installation
 npm run bench          # Real server-physics profile; outputs local results
 ```
 

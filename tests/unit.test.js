@@ -20,10 +20,10 @@ test('severing a complete floor releases precisely the upper storeys',()=>{
  const removed=new Set(cells.filter(c=>c.building===0&&c.floor===2).map(c=>c.id));const result=unsupportedCells(cells,removed);assert.equal(result.length,12);assert.ok(result.every(id=>byId.get(id).floor>2));
 });
 test('empty support graph has no remaining nodes to detach',()=>assert.deepEqual(unsupportedCells(cells,new Set(cells.map(c=>c.id))),[]));
-test('collision cells are genuinely hollow, not full solid boxes',()=>{
- for(const c of cells){const shapes=cellColliders(c),volume=shapes.reduce((s,x)=>s+8*x[3]*x[4]*x[5],0),envelope=c.size.reduce((a,b)=>a*b,1);assert.ok(volume<envelope*.35);assert.ok(shapes.length>=5);}
+test('structural bays remain hollow beneath their rooftop equipment',()=>{
+ for(const c of cells){const shapes=cellColliders({...c,hasRoofProps:false}),volume=shapes.reduce((s,x)=>s+8*x[3]*x[4]*x[5],0),envelope=c.size.reduce((a,b)=>a*b,1);assert.ok(volume<envelope*.35);assert.ok(shapes.length>=5);}
 });
-test('compound shapes are finite and stay inside each bay',()=>{for(const c of cells)for(const a of cellColliders(c)){assert.ok(a.every(Number.isFinite));for(let k=0;k<3;k++){assert.ok(a[k+3]>0);assert.ok(Math.abs(a[k])+a[k+3]<=c.size[k]/2+1e-6);}}});
+test('structural collision shapes are finite and stay inside each bay',()=>{for(const c of cells)for(const a of cellColliders({...c,hasRoofProps:false})){assert.ok(a.every(Number.isFinite));for(let k=0;k<3;k++){assert.ok(a[k+3]>0);assert.ok(Math.abs(a[k])+a[k+3]<=c.size[k]/2+1e-6);}}});
 test('segment sweep catches a fast hand passing entirely through a target',()=>{assert.ok(segmentAABB(v(-20,4,0),v(20,4,0),v(0,4,0),v(2,2,2),1));near(segmentDistance(v(0,4,0),v(-20,4,0),v(20,4,0)),0);});
 test('sweep handles parallel misses and stationary hands',()=>{assert.equal(segmentAABB(v(-20,10,0),v(20,10,0),v(),v(1,1,1)),false);assert.equal(segmentAABB(v(),v(),v(),v(1,1,1)),true);near(segmentDistance(v(3,4,0),v(),v()),5);});
 test('ray-sphere intersection chooses the nearest forward hit',()=>{near(raySphere(v(0,0,10),v(0,0,-1),v(),2),8);assert.equal(raySphere(v(0,0,10),v(0,0,1),v(),2),Infinity);near(raySphere(v(),v(1,0,0),v(),2),2);});

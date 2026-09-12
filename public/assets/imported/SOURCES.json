@@ -51,6 +51,14 @@
       "download": "https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Animated%20Mech%20Pack%20-%20March%202021/Textured/glTF/Stan.gltf",
       "license": "CC0",
       "modifications": "Stan split into rigid tracked armor parts; baked bind pose; removed animation and skin buffers; corrected normals; converted texture to 1K JPEG. The original skeleton and source data remain available from the download."
+    },
+    {
+      "id": "raider-armored-pilot",
+      "creator": "Quaternius",
+      "page": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "download": "https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Spacesuit.gltf",
+      "license": "CC0",
+      "modifications": "Spacesuit baked at 0.3 seconds of Idle_Gun_Pointing; source skinning and transforms applied; rotated to -Z forward, centered and scaled to 2.2 m; merged vertex-colored mesh with wrist mount metadata. Runtime flight pack and Kenney rifle added by src/avatars.js. Rebuild with scripts/prepare-raider.mjs."
     }
   ],
   "textures": [
@@ -310,6 +318,16 @@
       "sha256": "c5f96b735a12b616f5ba209290d74de60c474cceab3ae7565a82a4154b0adde1"
     },
     {
+      "file": "public/assets/imported/raider/License.txt",
+      "bytes": 372,
+      "sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe"
+    },
+    {
+      "file": "public/assets/imported/raider/armored-pilot.glb",
+      "bytes": 1141360,
+      "sha256": "c63742cd9fbf32fa54b3b17370753d028772e5b95211b545f9d366df53ee5b8b"
+    },
+    {
       "file": "public/assets/imported/space-kit/License.txt",
       "bytes": 610,
       "sha256": "bd4e050e69d41351282c4d53f943cd4d80a80b968593e60653ba5292637941b7"
@@ -320,9 +338,29 @@
       "sha256": "9db62dd9790beadc1b8e45cf9623e99ade21751bb23f16dfe1b8cfb05a54f3b5"
     },
     {
+      "file": "public/assets/imported/space-kit/rocket_baseA.glb",
+      "bytes": 21232,
+      "sha256": "cd1e61105d70a6d8ae4d5245b7c8655e6f13c879af9e4db7195191d64f01e2bd"
+    },
+    {
+      "file": "public/assets/imported/space-kit/rocket_fuelA.glb",
+      "bytes": 6912,
+      "sha256": "093c94f292a974d4765224d7704c948d4b33d8e7e891489d4c66eb4b0b263868"
+    },
+    {
+      "file": "public/assets/imported/space-kit/rocket_topA.glb",
+      "bytes": 6432,
+      "sha256": "29cd77e5f86546e46947781cec63dcb29b56b8f4cc66262bf1b52928eecc2c19"
+    },
+    {
       "file": "public/assets/imported/space-kit/satelliteDish_detailed.glb",
       "bytes": 26044,
       "sha256": "143dd36b2c427e3201110967a18fd836bc7aa8002dbf3e44efa42c75fbb44ae5"
+    },
+    {
+      "file": "public/assets/imported/space-kit/weapon_rifle.glb",
+      "bytes": 8740,
+      "sha256": "266ffd12306a2afc2638e9a479687adf738fc3cd9e938ce8e3195ccb312a6b31"
     },
     {
       "file": "public/assets/imported/textures/asphalt-Diffuse.jpg",
@@ -363,21 +401,6 @@
       "file": "public/assets/imported/textures/sky-2k.hdr",
       "bytes": 5451493,
       "sha256": "5244534e9cf5b606f2ff513aa00ddb161b0a4826ffd88a0d3bd03ac29247d198"
-    },
-    {
-      "file": "public/assets/imported/space-kit/rocket_baseA.glb",
-      "bytes": 21232,
-      "sha256": "cd1e61105d70a6d8ae4d5245b7c8655e6f13c879af9e4db7195191d64f01e2bd"
-    },
-    {
-      "file": "public/assets/imported/space-kit/rocket_fuelA.glb",
-      "bytes": 6912,
-      "sha256": "093c94f292a974d4765224d7704c948d4b33d8e7e891489d4c66eb4b0b263868"
-    },
-    {
-      "file": "public/assets/imported/space-kit/rocket_topA.glb",
-      "bytes": 6432,
-      "sha256": "29cd77e5f86546e46947781cec63dcb29b56b8f4cc66262bf1b52928eecc2c19"
     }
   ]
 }

@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {armElbow} from './arm-rig.js';
 import {loadModel,bakedModel} from './assets.js';
 import {TEAM_COLORS} from '../shared/config.js';
 import {rounded,mesh,glow,coloredGeometry,up} from './art.js';
@@ -10,12 +11,13 @@ const cyan=new T.MeshBasicMaterial({color:0x83eeff,toneMapped:false});
 const tmp=new T.Vector3(),frameInverse=new T.Quaternion(),swing=new T.Quaternion();
 function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();parent.add(g);const armor=mesh(rounded(width,1,depth,.1),material,g),joint=mesh(new T.SphereGeometry(width*.5,10,8),dark,g);return {g,armor,joint,width,set(a,b,bodyRotation){
  g.position.copy(a).add(b).multiplyScalar(.5);
+ if(this.rigidLength){const direction=tmp.copy(b).sub(a).normalize();g.position.copy(this.anchorEnd?b:a).addScaledVector(direction,(this.anchorEnd?-1:1)*this.rigidLength/2);}
  // Solve the limb's swing in body space, then carry it into the world. A
  // world-up shortest arc reaches the endpoints but introduces unwanted twist
  // when the whole tracked rig yaws (especially for nearly downward arms).
  frameInverse.copy(bodyRotation).invert();tmp.copy(b).sub(a).normalize().applyQuaternion(frameInverse);
  g.quaternion.copy(bodyRotation).multiply(swing.setFromUnitVectors(up,tmp));
- this.armor.scale.y=a.distanceTo(b);this.joint.position.y=-a.distanceTo(b)*.5;
+ this.armor.scale.y=this.rigidLength||a.distanceTo(b);this.joint.position.y=-(this.rigidLength||a.distanceTo(b))*.5;
 }};}
 export class GiantView{
  constructor(scene){
@@ -39,6 +41,7 @@ export class GiantView{
   for(const s of [-1,1]){mesh(rounded(.48,2,2.6,.09),trim,this.head,[s*2,.35,.1]);mesh(rounded(.25,1.9,.5,.05),dark,this.head,[s*1.65,2.7,.7]);}
   this.eyeGlow=glow(this.head,0xbeff9e,5,[0,.35,-2.15]);
   this.arms=[-1,1].map(s=>({upper:segment(this.root,null,null,1.8,2),lower:segment(this.root,null,null,2.2,2.25),fist:this.fist()}));
+  for(const arm of this.arms){arm.upper.rigidLength=6;arm.lower.rigidLength=6;arm.lower.anchorEnd=true;arm.elbow=mesh(new T.SphereGeometry(1.05,12,8),dark,this.root);arm.piston=mesh(new T.CylinderGeometry(.5,.5,1,10),trim,this.root);}
   this.ready=this.loadArmor();
   this.legs=[-1,1].map(s=>({thigh:segment(this.root,null,null,2.3,2.5),shin:segment(this.root,null,null,2.1,2.35),foot:mesh(rounded(2.65,1.3,4,.15),dark,this.root)}));
  }
@@ -70,7 +73,9 @@ export class GiantView{
   const chest=head.clone().add(new T.Vector3(0,-7.2,0));this.body.position.copy(chest);this.body.quaternion.copy(q);
   [-1,1].forEach((sign,i)=>{
    const shoulder=new T.Vector3(sign*4.2,3.1,0).applyQuaternion(q).add(chest),hand=new T.Vector3(...(i?s.right:s.left));
-   const center=shoulder.clone().lerp(hand,.47),bend=new T.Vector3(sign*1.5,-1,2).applyQuaternion(q);center.add(bend);
+   const center=armElbow(shoulder,hand,q,sign),arm=this.arms[i];arm.elbow.position.copy(center);
+   const reach=center.distanceTo(hand),extension=Math.max(0,reach-arm.lower.rigidLength);arm.piston.visible=extension>.02;
+   if(arm.piston.visible){const direction=hand.clone().sub(center).normalize();arm.piston.position.copy(center).addScaledVector(direction,extension/2);arm.piston.quaternion.setFromUnitVectors(up,direction);arm.piston.scale.set(1,extension+.2,1);}
    this.arms[i].upper.set(shoulder,center,q);this.arms[i].lower.set(center,hand,q);this.arms[i].fist.position.copy(hand);this.arms[i].fist.quaternion.copy(q);if(s[i?'rightQuaternion':'leftQuaternion'])this.arms[i].fist.quaternion.fromArray(s[i?'rightQuaternion':'leftQuaternion']);
    const hip=new T.Vector3(sign*1.6,-4.3,0).applyQuaternion(q).add(chest),foot=new T.Vector3(sign*2.1,1,1.1).applyQuaternion(q);foot.x+=head.x;foot.z+=head.z;
    const knee=hip.clone().lerp(foot,.52).add(new T.Vector3(0,0,-1.3).applyQuaternion(q));this.legs[i].thigh.set(hip,knee,q);this.legs[i].shin.set(knee,foot,q);this.legs[i].foot.position.copy(foot);this.legs[i].foot.quaternion.copy(q);
@@ -98,11 +103,14 @@ function suitGeometry(color){
 }
 export class RaiderView{
  constructor(scene,id){
-  this.id=id;this.root=new T.Group();scene.add(this.root);const color=TEAM_COLORS[(id-1)%TEAM_COLORS.length];
+  this.id=id;this.weaponMaterials=[];this.root=new T.Group();scene.add(this.root);const color=TEAM_COLORS[(id-1)%TEAM_COLORS.length];
   this.mesh=new T.Mesh(suitGeometry(color),new T.MeshStandardMaterial({vertexColors:true,metalness:.4,roughness:.56}));this.mesh.castShadow=true;this.root.add(this.mesh);
-  this.disposed=false;this.ready=bakedModel('/assets/imported/space-kit/astronautA.glb').then(model=>{
+  this.disposed=false;this.ready=Promise.all([loadModel('/assets/imported/raider/armored-pilot.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([model,rifle])=>{
    if(this.disposed)return;this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.removeFromParent();
-   this.mesh=new T.Group();const scale=2.2/model.size.y;for(const part of model.parts){const m=new T.Mesh(part.geometry,part.material);m.scale.setScalar(scale);m.position.y=-1.15;m.castShadow=true;this.mesh.add(m);}this.root.add(this.mesh);this.imported=true;
+   this.mesh=new T.Group();model.traverse(part=>{if(!part.isMesh)return;const m=new T.Mesh(part.geometry,part.material);m.position.y=-1.15;m.castShadow=true;this.mesh.add(m);});
+   const pack=this.pack=new T.Group();pack.position.set(0,.28,.27);this.mesh.add(pack);mesh(rounded(.32,.4,.18,.04),dark,pack);for(const sign of [-1,1]){mesh(new T.CylinderGeometry(.095,.13,.48,10),metal,pack,[sign*.25,-.07,.05]);mesh(new T.CylinderGeometry(.065,.065,.05,10),cyan,pack,[sign*.25,-.33,.05]);}
+   const mount=model.getObjectByName('Raider_ArmoredPilot').userData.weaponMount;for(const part of rifle.parts){const material=part.material.clone();material.color.set(0x587486);material.metalness=.6;this.weaponMaterials.push(material);const gun=new T.Mesh(part.geometry,material);gun.scale.setScalar(1.2);gun.position.fromArray(mount).add(new T.Vector3(0,-1.25,-.13));gun.castShadow=true;this.mesh.add(gun);}
+   this.root.add(this.mesh);this.imported=true;
   }).catch(error=>console.error('Raider model failed to load',error));
   this.jets=[-1,1].map(s=>glow(this.root,color,.9,[s*.27,-.21,.36]));this.color=color;
  }
@@ -111,7 +119,7 @@ export class RaiderView{
   const speed=Math.hypot(p.v[0],p.v[2]);const target=p.flags&16?-Math.PI/2+(p.pitch||0):-Math.min(.4,speed*.018);this.mesh.rotation.x+=(target-this.mesh.rotation.x)*.2;this.mesh.rotation.z+=(Math.max(-.4,Math.min(.4,(p.v[0]*Math.cos(p.yaw)-p.v[2]*Math.sin(p.yaw))*.025))-this.mesh.rotation.z)*.15;
   for(const [index,j]of this.jets.entries()){j.position.set(index? .27:-.27,-.21,.36).applyAxisAngle(new T.Vector3(1,0,0),this.mesh.rotation.x);const on=(p.v[1]>1||speed>4)&&p.fuel>.01;j.visible=on;j.scale.setScalar((p.flags&32?2:p.flags&16?1.4:.8)+Math.sin(performance.now()*.06)*.2);}
  }
- dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}for(const j of this.jets)j.material.dispose();}
+ dispose(){this.disposed=true;this.root.removeFromParent();if(!this.imported){this.mesh.geometry.dispose();this.mesh.material.dispose();}this.pack?.traverse(o=>o.geometry?.dispose());for(const material of this.weaponMaterials)material.dispose();for(const j of this.jets)j.material.dispose();}
 }
 export class RagView{
  constructor(scene,part,player){this.id=part.id;this.mesh=new T.Mesh(rounded(...part.size,.05),new T.MeshStandardMaterial({color:part.size[0]>.5?TEAM_COLORS[(player-1)%TEAM_COLORS.length]:0x8b9fa7,roughness:.55,metalness:.4}));this.mesh.castShadow=true;scene.add(this.mesh);this.update(part.p,part.q);}

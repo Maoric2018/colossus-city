@@ -2,12 +2,12 @@
 
 ## Current local validation — September 11, 2026
 
-- **52 Node tests: PASS:** 24 dependency-free unit tests, 11 real Rapier physics tests, six movement/projectile tests, one real multiplayer/debug-channel integration test, and ten XR lifecycle/input tests using fake XR frames with real Three.js math.
-- **33 JavaScript modules: syntax/import checks PASS.** All 55 bundled asset files pass SHA-256 verification.
+- **55 Node tests: PASS:** 24 dependency-free unit tests, 11 real Rapier physics tests, six movement/projectile tests, three prop collision/impact tests, one real multiplayer/debug-channel integration test, and ten XR lifecycle/input tests using fake XR frames with real Three.js math.
+- **39 JavaScript modules: syntax/import checks PASS.** All 58 bundled asset files pass SHA-256 verification.
 - **Actual browser renderer and multiplayer: PASS.** Chromium renders the imported art and uses real pointer capture/keyboard controls for ascent, hover/soar switching, fast flight and directional dodge. Two raider clients and a Quest client publish real images into a fourth spectator client. Closing the panel stops capture.
-- **Meta IWER Quest 2 emulation: PASS.** Stereo views, Touch mapping, proportional smooth yaw, 0.5 m physical controller extension reaching 7 m on the actual server, trigger-fired missiles, A calibration, controller tracking loss/recovery, visibility changes, recentering and repeated exit/re-entry. No browser JavaScript, resource or shader errors were reported. The sampled intact VR view submitted 156 draw calls / 442,548 triangles across both eyes with shadows disabled, before live-view capture. This is one view, not a worst-case GPU budget.
+- **Meta IWER Quest 2 emulation: PASS.** Stereo views, Touch mapping, proportional smooth yaw, 0.5 m physical controller extension reaching 7 m on the actual server, trigger-fired missiles, A calibration, controller tracking loss/recovery, visibility changes, recentering and repeated exit/re-entry. No browser JavaScript, resource or shader errors were reported. The sampled intact VR view submitted 160 draw calls / 446,612 triangles across both eyes with shadows disabled, before live-view capture. This is one view, not a worst-case GPU budget.
 - **Spectator visual inspection: PASS.** Headset left-eye scene, projection and in-world HUD match the emulated headset. Smoke/glow billboards now account for the giant camera scale; they no longer swamp the mirrored view. Actual player images are separated from explicitly simulated AI cameras.
-- **Real server benchmark: PASS on this Mac (Apple M5 Pro, Node 22.19.0).** Eight raiders, six staged collapses and repeated ragdolls: p95 4.37 ms, p99 7.08 ms, maximum 9.89 ms versus a 16.67 ms simulation budget. These are CPU measurements without network transport or headset rendering.
+- **Real server benchmark: PASS on this Mac (Apple M5 Pro, Node 22.19.0).** Eight raiders, six staged collapses and repeated ragdolls: p95 1.88 ms, p99 2.17 ms, maximum 6.37 ms versus a 16.67 ms simulation budget. These are CPU measurements without network transport or headset rendering.
 - **Dependency installation audit: zero reported vulnerabilities.** Runtime packages, test tools and transitive versions are locked in `package-lock.json`. This audit was performed during dependency setup, not repeated for this controls-only dependency tree.
 - **USB tool installed, headset unavailable.** Android Platform Tools 37.0.1 was downloaded from Google; the earlier `npm run quest:check` found no connected device.
 
@@ -16,6 +16,12 @@ Current logs: `artifacts/test-results.txt`, `artifacts/syntax-results.txt`, `art
 ## Arm orientation and self-glow regression
 
 `npm run test:xr-view` reproduces stationary-controller turning with the real Quest 2 emulator and imported armor. Before the fix, forearms could twist by about 163 degrees in headset space while the fists stayed still. Limb swing is now solved relative to the giant’s body rotation before applying world yaw. The test covers tilted head/wrists, an offset standing position, a complete turn and yaw wraparound, and checks rendered mesh transforms. The pilot and its mirrored view exclude the local reactor halo; other players retain it. Reports and before/after-turn images are in `artifacts/xr-view-report.json` and `artifacts/xr-hands-*.png`.
+
+## Rigid arms, solid props and raider art
+
+`test:xr-view` now also sweeps short, extended, overhead and backward reaches with the rendered imported armor. The largest scale change was below 0.00000002; tracked fist position error was zero, and extreme reach exercised the extending piston. Existing full-yaw and hidden self-halo checks still pass.
+
+The three prop regressions use real Rapier ray casts and movement: cars stop raider capsules; lamps/signboards block shots; antenna collision follows a detached bay and resets; car impacts emit surface normals without boss damage. The structural tests separately retain their hollow-bay volume/containment assertions, excluding equipment above the roof. The visual check follows actual collapsed roof art, verifies the padded camera ray stops at a car, and renders the new raider front/back and laser core, glow, travelling pulse, sparks and surface ring. Screenshots are `artifacts/visual-raider-front-back.png`, `artifacts/visual-raider-laser.png`, `artifacts/desktop-smoke.png` and `artifacts/raider-soaring.png`.
 
 ## Still not validated
 
@@ -72,6 +78,6 @@ Test one Fly Machine, HTTPS static files, WSS upgrade, health checks, origin pol
 
 ## Known limits / not completed features
 
-The environment combines downloaded Kenney/Poly Haven assets and Quaternius mech armor with authored destructible bays. It is a stylized harbor, not a photorealistic NYC environment. The giant/raiders use rigid posing rather than full animation rigs. Destruction is bay-level game fracture using graph connectivity, not engineering-grade structural analysis. Intact structures may retain unrealistic cantilevers. Decorations/far skyline do not break. Lower giant limbs are not a full collision rig. Imported props use optional fixed boxes. Avatar hits use simplified server shapes rather than skinned-mesh collision.
+The environment combines downloaded Kenney/Poly Haven assets and Quaternius mech armor with authored destructible bays. It is a stylized harbor, not a photorealistic NYC environment. The giant/raiders use rigid posing rather than full animation rigs. Destruction is bay-level game fracture using graph connectivity, not engineering-grade structural analysis. Intact structures may retain unrealistic cantilevers. Decorations/far skyline do not break. Lower giant limbs are not a full collision rig. Street props use fixed box proxies; rooftop equipment contributes boxes to its collapsing bay. Avatar hits use simplified server shapes rather than skinned-mesh collision.
 
 Movement uses bounded camera extrapolation, not a reconciled prediction/rollback system. No rewind hit validation, WebRTC/TURN, authenticated accounts, reconnect tokens, persistence, horizontal scaling or public-service abuse protection is implemented. Graph/body/particle limits bound some costs but not every GPU/solver workload. Physical plausibility, balance, stability and sustained Quest frame rate still require real-device evaluation and iteration. Live feeds are low-resolution previews capped at six updates per second, with transport delay and extra capture cost; they do not record headset system overlays or passthrough.

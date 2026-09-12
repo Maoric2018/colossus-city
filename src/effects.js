@@ -27,7 +27,11 @@ export class Effects{
   this.sparks=new ParticlePool(scene,base+'spark.png',quest?70:140,true);
   this.flashes=new ParticlePool(scene,base+'muzzle.png',24,true);
   this.flares=new ParticlePool(scene,base+'flare.png',16,true);
-  this.beams=new T.InstancedMesh(new T.CylinderGeometry(1,1,1,5),new T.MeshBasicMaterial({color:0xd8ffb5,toneMapped:false}),48);this.beams.instanceMatrix.setUsage(T.DynamicDrawUsage);this.beams.count=0;this.beams.frustumCulled=false;scene.add(this.beams);
+  this.beams=new T.InstancedMesh(new T.CylinderGeometry(1,1,1,5),new T.MeshBasicMaterial({color:0xe9fbff,toneMapped:false}),48);this.beams.instanceMatrix.setUsage(T.DynamicDrawUsage);this.beams.count=0;this.beams.frustumCulled=false;scene.add(this.beams);
+  const beamGeometry=this.beams.geometry;this.beamGlow=new T.InstancedMesh(beamGeometry,new T.MeshBasicMaterial({color:0x42bfff,transparent:true,opacity:.3,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),48);this.bolts=new T.InstancedMesh(beamGeometry,new T.MeshBasicMaterial({color:0xb0f5ff,toneMapped:false}),48);
+  this.rings=[];this.ringMesh=new T.InstancedMesh(new T.TorusGeometry(1,.045,4,24),new T.MeshBasicMaterial({color:0x7eeaff,transparent:true,opacity:.7,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),24);
+  for(const mesh of [this.beamGlow,this.bolts,this.ringMesh]){mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);}
+
  }
  unlockAudio(){if(this.audio)return;const AC=window.AudioContext||window.webkitAudioContext;if(AC){this.audio=new AC();this.audio.resume();}}
  sound(freq,duration=.12,type='sine',volume=.06){
@@ -43,13 +47,25 @@ export class Effects{
   }
   this.particle(this.flares,p,{life:.25,size:5*power,color:new T.Color(0xffc989),growth:2});this.sound(75,.4,'triangle',power*.1);
  }
- shot(e,color=0xcfffad){
+ shot(e,color=0x68dfff){
   if(this.tracers.length>=48)this.tracers.shift();const a=new T.Vector3(...e.from),b=new T.Vector3(...e.to);this.tracers.push({a,b,age:0});
-  this.particle(this.flashes,e.from,{life:.09,size:.75,color:new T.Color(color),growth:.8});
-  if(e.hit){this.particle(this.flares,e.to,{life:.14,size:1.7,color:new T.Color(color)});for(let i=0;i<3;i++)this.particle(this.sparks,e.to,{v:new T.Vector3((Math.random()-.5)*5,Math.random()*4,(Math.random()-.5)*5),life:.3,size:.22,color:new T.Color(0xffe2ab),gravity:-9});}
+  this.particle(this.flashes,e.from,{life:.12,size:.6,color:new T.Color(color),growth:1.5});
+  this.particle(this.flares,e.from,{life:.08,size:.42,color:new T.Color(0xe1faff),growth:1});
+  if(e.impact||e.hit){const normal=new T.Vector3(...(e.normal||[0,1,0])),at=b.clone().addScaledVector(normal,.08).toArray();
+   this.particle(this.flares,at,{life:.22,size:e.weak?2:1.15,color:new T.Color(e.weak?0xffd183:color),growth:1.7});
+   for(let i=0;i<8;i++)this.particle(this.sparks,at,{v:normal.clone().multiplyScalar(2+Math.random()*4).add(new T.Vector3((Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5)),life:.25+Math.random()*.3,size:.12+Math.random()*.16,color:new T.Color(i%2?color:0xffffff),gravity:-5});
+   this.particle(this.smoke,at,{v:normal.clone().multiplyScalar(.8),life:.45,size:.3,color:new T.Color(0x789eae),growth:1.5,opacity:.35});
+   if(this.rings.length>=24)this.rings.shift();this.rings.push({p:new T.Vector3(...at),q:new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,1),normal),age:0});
+  }
  }
  update(dt){
   for(const pool of [this.smoke,this.dust,this.sparks,this.flashes,this.flares])pool.update(dt);
-  this.tracers=this.tracers.filter(t=>t.age<.115);this.tracers.forEach((t,i)=>{t.age+=dt;dummy.position.copy(t.a).lerp(t.b,.5);dummy.quaternion.setFromUnitVectors(up,t.b.clone().sub(t.a).normalize());const width=.035*Math.max(0,1-t.age/.12);dummy.scale.set(width,t.a.distanceTo(t.b),width);dummy.updateMatrix();this.beams.setMatrixAt(i,dummy.matrix);});this.beams.count=this.tracers.length;this.beams.instanceMatrix.needsUpdate=true;
+  this.tracers=this.tracers.filter(t=>t.age<.2);this.tracers.forEach((t,i)=>{
+   t.age+=dt;const distance=t.a.distanceTo(t.b),direction=t.b.clone().sub(t.a).normalize(),fade=Math.max(0,1-t.age/.2);
+   dummy.position.copy(t.a).lerp(t.b,.5);dummy.quaternion.setFromUnitVectors(up,direction);dummy.scale.set(.026*fade,distance,.026*fade);dummy.updateMatrix();this.beams.setMatrixAt(i,dummy.matrix);
+   dummy.scale.set(.115*fade,distance,.115*fade);dummy.updateMatrix();this.beamGlow.setMatrixAt(i,dummy.matrix);
+   const front=Math.min(distance,t.age*330),length=Math.min(front,7);dummy.position.copy(t.a).addScaledVector(direction,front-length/2);dummy.scale.set(.065*fade,length,.065*fade);dummy.updateMatrix();this.bolts.setMatrixAt(i,dummy.matrix);
+  });for(const mesh of [this.beams,this.beamGlow,this.bolts]){mesh.count=this.tracers.length;mesh.instanceMatrix.needsUpdate=true;}
+  this.rings=this.rings.filter(r=>r.age<.28);this.rings.forEach((r,i)=>{r.age+=dt;const t=r.age/.28;dummy.position.copy(r.p);dummy.quaternion.copy(r.q);dummy.scale.setScalar((.12+t*.8)*Math.max(0,1-t));dummy.updateMatrix();this.ringMesh.setMatrixAt(i,dummy.matrix);});this.ringMesh.count=this.rings.length;this.ringMesh.instanceMatrix.needsUpdate=true;
  }
 }

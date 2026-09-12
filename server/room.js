@@ -3,6 +3,7 @@
 import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {fly,launchMissile,updateMissiles} from './abilities.js';
+import {staticProps} from '../shared/props.js';
 import {C,group} from '../shared/config.js';
 import {activeEnvironment as city,generateCells,unsupportedCells,cellColliders} from '../shared/environment.js';
 import {v,add,sub,mul,len,norm,dist,arr,vec,clamp,quatYaw,quatEuler,rotateYaw,segmentDistance,segmentAABB,raySphere,lookDir,finiteVector,sanitizeInput} from '../shared/math.js';
@@ -34,6 +35,8 @@ export class Room {
    c.hp=90;c.lastHit=-100;c.body=this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(...c.p));
    c.colliders=this.addCellColliders(c,c.body,v(),G.WORLD);this.cellMap.set(c.id,c);
   }
+  this.props=staticProps(this.env);
+  for(const prop of this.props){const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(...prop.position).setRotation(quatYaw(prop.yaw)));for(const a of prop.boxes){const co=this.world.createCollider(RAPIER.ColliderDesc.cuboid(a[3],a[4],a[5]).setTranslation(a[0],a[1],a[2]).setFriction(.7).setCollisionGroups(group(G.WORLD)),body);this.colliderTags.set(co.handle,{prop:prop.id});}}
   for(const prop of this.env.props){if(!prop.collider)continue;
    const p=prop.position||[0,0,0],scale=prop.scale||1,half=prop.collider.half,rotation=quatEuler(...(prop.rotation||[0,0,0]));
    if(!finiteVector(half)||half.some(x=>x<=0)||!Number.isFinite(scale)||scale<=0)throw Error('Invalid prop collider');
@@ -169,10 +172,10 @@ export class Room {
    const t=raySphere(origin,direction,center,radius);if(t<distance){distance=t;damage=C.SHOT_DAMAGE*mult;weak=mult>1;}
   }
   const ray=new RAPIER.Ray(origin,direction);
-  const obstruction=this.world.castRay(ray,distance,true,undefined,group(G.PLAYER,G.WORLD|G.DEBRIS));
-  if(obstruction){distance=obstruction.timeOfImpact??obstruction.toi;damage=0;}
+  const obstruction=this.world.castRayAndGetNormal(ray,distance,true,undefined,group(G.PLAYER,G.WORLD|G.DEBRIS));
+  if(obstruction){distance=obstruction.timeOfImpact??obstruction.toi;damage=0;weak=false;}
   if(damage){if(p.bot)damage*=.26;this.bossHP=Math.max(0,this.bossHP-damage);p.damage+=damage;}
-  this.event({type:'shot',player:p.id,from:arr(origin),to:arr(add(origin,mul(direction,distance))),hit:damage>0,weak});
+  this.event({type:'shot',player:p.id,from:arr(origin),to:arr(add(origin,mul(direction,distance))),hit:damage>0,impact:!!obstruction||damage>0,normal:obstruction?arr(obstruction.normal):arr(mul(direction,-1)),weak});
  }
  updateBoss(){
   const b=this.boss,prevL={...b.left},prevR={...b.right};

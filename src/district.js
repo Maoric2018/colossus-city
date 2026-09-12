@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
 import {bakedModel,instances,assetStatus} from './assets.js';
+import {carPlacements,ROOF_ASSETS,roofProp} from '../shared/props.js';
 import {seeded} from '../shared/math.js';
 const base='/assets/imported/';
 export async function installDistrict(view,renderer){
@@ -19,17 +20,15 @@ export async function installDistrict(view,renderer){
   tasks.push(bakedModel(base+`city-kit-commercial/${name}.glb`).then(model=>{for(const p of places)p.scale=p.height/model.size.y;for(const part of model.parts)part.material.color.setHex(0x9aafb9);instances(root,model,places,{castShadow:false});}));
  });
  // Street cars sit in the existing traffic lanes, preserving walkable space.
- const cars=['taxi','sedan','police','van','firetruck','delivery'];
- cars.forEach((name,type)=>{const places=[];for(let i=type;i<42;i+=cars.length){const along=(i%14)*10-66,road=[-37,0,37][Math.floor(i/14)],swap=i%2;if([-37,0,37].some(n=>Math.abs(along-n)<8))continue;places.push({position:[swap?along:road+3.6,.13,swap?road-3.6:along],yaw:swap?Math.PI/2:Math.PI});}
-  tasks.push(bakedModel(base+`car-kit/${name}.glb`).then(model=>{for(const p of places)p.scale=(type>2?4.8:3.9)/model.size.z;instances(root,model,places);}));
- });
+ const cars=carPlacements(view.env);
+ for(const asset of new Set(cars.map(p=>p.asset)))tasks.push(bakedModel(base+asset+'.glb').then(model=>instances(root,model,cars.filter(p=>p.asset===asset))));
  // Harbor equipment is outside the playable island. Roof props follow the bay
  // underneath them, including rotations, removal and full round resets.
- const roofAssets=[['city-kit-industrial/water-tower',2.8],['space-kit/satelliteDish_detailed',2.4],['city-kit-industrial/detail-tank',1.1],['city-kit-industrial/solar-panel-flat',.25]];
+ const roofAssets=ROOF_ASSETS;
  roofAssets.forEach(([name,height],type)=>tasks.push(bakedModel(base+name+'.glb').then(model=>{
-  const cells=view.cells.filter(c=>c.roof&&(c.ix+c.iz*2+c.building)%4===type);
+  const cells=view.cells.filter(c=>roofProp(c)?.asset===name);
   for(const part of model.parts){const batch=view.batch(part.geometry,part.material,cells.length);cells.forEach((c,index)=>{
-    const local=new T.Matrix4().compose(new T.Vector3(0,c.size[1]/2+.02,0),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),c.building*Math.PI/2),new T.Vector3().setScalar(height/model.size.y));
+    const local=new T.Matrix4().compose(new T.Vector3(0,c.size[1]/2+.02,0),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),c.building*Math.PI/2),new T.Vector3().setScalar(roofProp(c).scale));
     if(!view.attachments.has(c.id))view.attachments.set(c.id,[]);view.attachments.get(c.id).push({batch,index,local});
    });}
   for(const c of cells){const state=view.transforms.get(c.id);view.setCell(c.id,state.p,state.q,state.hidden);}view.commit();

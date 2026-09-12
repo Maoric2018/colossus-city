@@ -1,3 +1,4 @@
+import {roofColliders} from './props.js';
 // The only authoritative map definition. Visual assets never decide collisions.
 // A structural cell is a hollow storey bay: slab + corner columns + exterior walls.
 // Adjacent bays are a support graph, anchored to foundations. No triangle-mesh physics.
@@ -39,7 +40,7 @@ export function generateCells(env=city){
    const cell={id:id++,building:bi,floor:f,ix:x,iz:z,style:b.style,ground:f===0,
     p:[b.x+(x-(b.nx-1)/2)*b.bay,.15+f*b.story+b.story/2,b.z+(z-(b.nz-1)/2)*b.bay],
     size:[b.bay,b.story,b.bay],walls:[z===0,x===b.nx-1,z===b.nz-1,x===0],
-    neighbors:[],roof:f===b.floors-1};
+    neighbors:[],roof:f===b.floors-1,hasRoofProps:env.id==='harbor-district'};
    ids.set(`${x}:${f}:${z}`,cell.id);cells.push(cell);
   }
   for(const c of cells.filter(c=>c.building===bi)){
@@ -65,5 +66,5 @@ export function cellColliders(c){
  if(c.walls[1])out.push([w/2-.06,0,0,.06,h/2-.22,d/2-.24]);
  if(c.walls[2])out.push([0,0,d/2-.06,w/2-.24,h/2-.22,.06]);
  if(c.walls[3])out.push([-w/2+.06,0,0,.06,h/2-.22,d/2-.24]);
- return out;
+ return out.concat(roofColliders(c));
 }

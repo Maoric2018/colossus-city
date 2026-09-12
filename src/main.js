@@ -7,7 +7,7 @@ import {C} from '../shared/config.js';
 import {activeEnvironment as city} from '../shared/environment.js';
 import {clamp,raySphere,vec,lookDir} from '../shared/math.js';
 import {installDistrict} from './district.js';
-import {assetStatus,bakedModel} from './assets.js';
+import {assetStatus,bakedModel,loadModel} from './assets.js';
 import {CityView} from './city.js';
 import {GiantView,RaiderView,RagView} from './avatars.js';
 import {Effects} from './effects.js';
@@ -126,11 +126,11 @@ function desktopCamera(dt,s){
   // this is not a second collision solver or unbounded dead reckoning.
   const source=latest||p,lead=source.flags&3?0:Math.min((performance.now()-net.receivedAt)/1000,.075);
   desired.set(source.p[0]+source.v[0]*lead,source.p[1]+.67+source.v[1]*lead,source.p[2]+source.v[2]*lead);
-  if(!firstPerson){const back=new T.Vector3(0,1.1,4.4).applyAxisAngle(up,yaw),distance=back.length();back.normalize();const safe=cityView.rayDistance(desired,back,distance,.25);desired.addScaledVector(back,Math.max(0,safe-.18));}
+  if(!firstPerson){const back=new T.Vector3(1.15,1.15,(p.flags&16)?8.2:6.8).applyEuler(new T.Euler(pitch,yaw,0,'YXZ')),distance=back.length();back.normalize();const safe=cityView.rayDistance(desired,back,distance,.25);desired.addScaledVector(back,Math.max(0,safe-.18));}
   cameraPos.lerp(desired,1-Math.exp(-dt*(p.flags&2?5:22)));if(cameraPos.y<.35)cameraPos.y=.35;
  }
  camera.position.copy(cameraPos);camera.rotation.order='YXZ';const pilot=s.players.find(p=>p.id===net.id),fast=role==='raider'&&!!(pilot?.flags&16),dodging=role==='raider'&&!!(pilot?.flags&32);
- camera.fov+=((dodging?94:fast?84:65)-camera.fov)*(1-Math.exp(-dt*5));camera.updateProjectionMatrix();
+ camera.fov+=((dodging?94:fast?86:role==='raider'?72:65)-camera.fov)*(1-Math.exp(-dt*5));camera.updateProjectionMatrix();
  const bank=fast?clamp((pilot.v[0]*Math.cos(yaw)-pilot.v[2]*Math.sin(yaw))*.006,-.11,.11):0;
  camera.rotation.set(pitch,yaw,-bank,'YXZ');
  // Three.js looks along -Z. Positive pitch looks upward.
@@ -199,7 +199,7 @@ $('vr-button').onclick=async()=>{hideOverlay();fx.unlockAudio();try{await xr.ent
 $('copy-link').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',net.room);try{await navigator.clipboard.writeText(u.toString());toast('INVITE LINK COPIED');}catch{toast(`ROOM CODE / ${net.room}`,5);}};
 document.querySelectorAll('[data-role]').forEach(e=>e.onclick=()=>setRole(e.dataset.role));
 const params=new URLSearchParams(location.search);$('room-input').value=params.get('room')||'';$('name').value=localStorage.getItem('colossus-name')||'';if(params.get('role')==='boss'||quest)setRole('boss');
-const artReady=Promise.all([cityView.ready,giant.ready,missiles.ready,installDistrict(cityView,renderer),bakedModel('/assets/imported/space-kit/astronautA.glb')]).then(()=>{window.COLOSSUS_ART_READY=true;if(!playing)notice('CITY READY · CREATE A ROOM OR JOIN YOUR FRIENDS');});
+const artReady=Promise.all([cityView.ready,giant.ready,missiles.ready,installDistrict(cityView,renderer),loadModel('/assets/imported/raider/armored-pilot.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(()=>{window.COLOSSUS_ART_READY=true;if(!playing)notice('CITY READY · CREATE A ROOM OR JOIN YOUR FRIENDS');});
 if(params.get('spectator')==='1'&&params.get('room'))artReady.then(()=>start(false,false,true));
 window.COLOSSUS_READY=true;notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test.

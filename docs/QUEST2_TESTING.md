@@ -17,13 +17,13 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 
 ## What passed locally
 
-- 52 automated Node tests, including real server physics and multiplayer.
+- 55 automated Node tests, including real server physics and multiplayer.
 - Real Chromium rendering, mouse capture and keyboard movement with the downloaded visual upgrade.
 - Focused Quest rendering regression: arms and fists stay aligned in headset space through a complete joystick turn, including tilted head/wrists and an offset standing position. The giant’s own decorative reactor halo is hidden in its view and its spectator mirror.
-- All 55 bundled asset files pass hash verification. Downloaded roof equipment follows real Rapier collapse, removal and reset; smoke/impact sprites render without errors.
-- Upgraded intact emulated stereo scene: 156 draw calls and 442,548 submitted triangles across both eyes. This is a renderer count, not a physical headset frame-time measurement.
+- All 58 bundled asset files pass hash verification. Downloaded roof equipment follows real Rapier collapse, removal and reset; smoke/impact sprites render without errors.
+- Upgraded intact emulated stereo scene: 160 draw calls and 446,612 submitted triangles across both eyes. This is a renderer count, not a physical headset frame-time measurement.
 - Meta IWER's Quest 2 profile: stereo VR, Touch mapping, movement, proportional smooth turns, giant reach, missile triggers, calibration, controller loss/recovery, suspension, recentering and repeated entry/exit.
-- Eight-player server collapse benchmark: maximum 9.89 ms per simulation step on this Mac, within the 16.67 ms budget.
+- Eight-player server collapse benchmark: maximum 6.37 ms per simulation step on this Mac, within the 16.67 ms budget.
 - Real hover/soar/dodge keyboard controls and a live spectator panel with two raiders and the headset view. Opening and closing the panel starts and stops player capture.
 - Dependency audit from the dependency installation: zero reported vulnerabilities.
 
