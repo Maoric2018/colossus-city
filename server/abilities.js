@@ -1,7 +1,7 @@
 // Raider flight (shared model) and giant missiles.
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {C, group} from '../shared/config.js';
-import {v, add, sub, mul, norm, dist, arr, vec, clamp} from '../shared/math.js';
+import {lookDir,v, add, sub, mul, norm, dist, arr, vec, clamp} from '../shared/math.js';
 import {blastCars} from './cars.js';
 import {flightStep, flightRotation} from '../shared/flight.js';
 import {damageSphere, breakCells} from './destruction.js';
@@ -9,7 +9,8 @@ import {breachBuildings} from './soar-breach.js';
 const G = C.COLLISION;
 export function fly(room, p, i){
  const at = p.body.translation(), lv = p.body.linvel();
- const {velocity, dodge} = flightStep(p, at, lv, i, room.time);
+ const {velocity, dodge, enteredSoar} = flightStep(p, at, lv, i, room.time);
+ if(enteredSoar)room.event({type:'soar-start',player:p.id,p:arr(at),direction:arr(lookDir(i.yaw,i.pitch))});
  if(dodge) room.event({type:'dodge', player:p.id, p:arr(at), direction:arr(dodge.direction)});
  const moving=!!(i.x||i.z||i.up||i.boost||p.soaring||dodge);
  p.body.setLinvel(velocity,moving);

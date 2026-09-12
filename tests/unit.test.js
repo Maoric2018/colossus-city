@@ -93,3 +93,10 @@ test('weapon convergence is separate from movement yaw and rejects invalid aim',
  const i = sanitizeInput({yaw:.2, pitch:.3, aimYaw:1.2, aimPitch:.4}); near(i.yaw, .2); near(i.aimYaw, 1.2);
  const fallback = sanitizeInput({yaw:.2, pitch:.3, aimYaw:NaN, aimPitch:Infinity}); near(fallback.aimYaw, .2); near(fallback.aimPitch, .3);
 });
+
+test('soaring and boosted soaring stay available for a full minute with no fuel',()=>{
+ for(const boost of [false,true]){const p={fuel:0,soaring:false,dodgeUntil:0,dodgeReady:0,dodgeDirection:v(0,0,-1),lastDodgeSeq:0},input={x:0,z:-1,up:0,yaw:0,pitch:0,soar:true,boost,dodge:0};let velocity=v(),entries=0;
+  for(let i=0;i<3600;i++){const result=flightStep(p,v(0,20,0),velocity,input,i/60);velocity=result.velocity;entries+=result.enteredSoar?1:0;assert.equal(p.soaring,true);assert.equal(p.fuel,0);}
+  assert.equal(entries,1);assert.ok(-velocity.z>30);flightStep(p,v(0,20,0),velocity,{...input,soar:false},60);assert.equal(p.soaring,false);
+ }
+});

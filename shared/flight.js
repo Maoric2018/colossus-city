@@ -7,7 +7,8 @@ import {v, add, mul, len, norm, clamp, rotateYaw, lookDir} from './math.js';
 export function flightStep(p, pos, vel, i, time){
  let movement = i.world ? v(i.x, 0, i.z) : rotateYaw(v(i.x, 0, i.z), i.yaw);
  if(len(movement) > 1) movement = norm(movement);
- p.soaring = !!i.soar && p.fuel > (p.soaring ? .005 : .16) && pos.y > 2;
+ const wasSoaring=!!p.soaring;
+ p.soaring = !!i.soar && pos.y > 2;
  let dodge = null;
  if(i.dodge > p.lastDodgeSeq){
   p.lastDodgeSeq = i.dodge;
@@ -18,7 +19,7 @@ export function flightStep(p, pos, vel, i, time){
    dodge = {direction:p.dodgeDirection};
   }
  }
- const boosted = i.boost && p.fuel > .02, air = i.up > 0 && p.fuel > 0;
+ const boosted = i.boost && (p.soaring || p.fuel > .02), air = i.up > 0 && p.fuel > 0;
  let desired = mul(movement, boosted ? C.BOOST_SPEED : C.PLAYER_SPEED);
  desired.y = air ? C.ASCEND_SPEED * i.up : i.up < 0 ? -10 : pos.y > 2 ? -2.3 : vel.y;
  if(p.soaring){
@@ -32,9 +33,9 @@ export function flightStep(p, pos, vel, i, time){
   : v(vel.x + (desired.x - vel.x) * a, vel.y + (desired.y - vel.y) * (p.soaring ? a : av), vel.z + (desired.z - vel.z) * a);
  if(pos.y > C.MAX_ALTITUDE) velocity.y = Math.min(velocity.y, -4);
  // Midtown towers reach 120 m: a full tank of hover thrust must climb most of one.
- const burn = p.soaring ? -(boosted ? .14 : .065) : boosted ? -.14 : air ? -C.ASCEND_BURN : (pos.y < 2 ? .48 : .16);
+ const burn = p.soaring ? 0 : boosted ? -.14 : air ? -C.ASCEND_BURN : (pos.y < 2 ? .48 : .16);
  p.fuel = clamp(p.fuel + burn * C.TICK, 0, 1);
- return {velocity, dodge};
+ return {velocity, dodge, enteredSoar:p.soaring&&!wasSoaring};
 }
 // Capsule orientation for the prone soaring pose; shared so the render and the collider agree.
 export function flightRotation(p, i){

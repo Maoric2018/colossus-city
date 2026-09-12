@@ -28,7 +28,7 @@ try{
   const pilot=new RaiderView(c.scene,initial.id);await pilot.ready;
   const handler=makeEventHandler({...c,hud:{},shake:{add(){}},city:c.city,addRag(){},rags:new Map(),listenerPosition:()=>Object.values(c.prediction.position())});
   const cameraRig=new CameraRig(c.camera,c.rig,c.city,{update:()=>({x:0,y:0,roll:0})},c.prediction);cameraRig.reset(initial.p);
-  window.breachPreview={pilot,handler,cameraRig,initial,latest:initial,time:0,comparisons:[],bluePulse:false};
+  window.breachPreview={pilot,handler,cameraRig,initial,latest:initial,time:0,comparisons:[],bluePulse:false,boomSeen:false};
  },initial);
  for(let i=0;i<timeline.length+6;i++){
   await page.evaluate(({frame,delivered})=>{
@@ -36,13 +36,13 @@ try{
    if(delivered){for(const e of delivered.events)b.handler(e);if(delivered.snapshot){b.latest=delivered.snapshot.players.find(p=>p.id===b.initial.id);b.time=delivered.snapshot.time;c.prediction.reconcile(b.latest,.1);for(const body of delivered.snapshot.bodies)c.city.poseDebris(body.id,body.p,body.q);}}
    if(frame)c.prediction.advance(frame.input,1/60,frame.input.seq,b.time);
    const pos=c.prediction.position(),vel=c.prediction.velocity(),p={...b.latest,p:[pos.x,pos.y,pos.z],v:[vel.x,vel.y,vel.z],flags:16,yaw:0,pitch:.07};
-   b.pilot.update(p,true,false,1/60,b.time);c.city.update(1/60);c.fx.update(1/60);b.bluePulse||=c.flightFX.pulse>0;c.flightFX.update(1/60,p,true);
+   b.pilot.update(p,true,false,1/60,b.time);c.city.update(1/60);c.fx.update(1/60);b.bluePulse||=c.flightFX.pulse>0;b.boomSeen||=c.fx.booms.length>0&&c.flightFX.boom>0;c.flightFX.update(1/60,p,true);
    b.cameraRig.update(1/60,{players:[p]},{input:{yaw:0,pitch:.07,charge:0,held:()=>({x:0,z:-1,up:0,soar:true})},net:{lead:.1}});c.renderer.render(c.scene,c.camera);
    b.comparisons.push({pos:p.p,speed:Math.hypot(...p.v)});
   },{frame:timeline[i]||null,delivered:timeline[i-6]||null});
   if([11,32,50].includes(i))await page.screenshot({path:`artifacts/soar-breach-${i}.png`});
  }
- const result=await page.evaluate(()=>{const c=window.__COLOSSUS,b=window.breachPreview;return {position:c.prediction.position(),server:b.latest.p,broken:[...c.city.fine.cells.keys()],fragments:c.city.fine.shards.size,pulse:b.bluePulse,minimumSpeed:Math.min(...b.comparisons.map(p=>p.speed)),backwardSteps:b.comparisons.slice(1).filter((p,i)=>p.pos[2]>b.comparisons[i].pos[2]+.2).length,failedAssets:c.assetStatus.failed};});
- assert.ok(result.position.z<bounds[2]-2);assert.ok(result.broken.length>=2&&result.fragments>0&&result.pulse);assert.ok(result.minimumSpeed>25);assert.equal(result.backwardSteps,0);assert.deepEqual(result.failedAssets,[]);assert.deepEqual(errors,[]);
+ const result=await page.evaluate(()=>{const c=window.__COLOSSUS,b=window.breachPreview;return {position:c.prediction.position(),server:b.latest.p,broken:[...c.city.fine.cells.keys()],fragments:c.city.fine.shards.size,pulse:b.bluePulse,sonicBoom:b.boomSeen,speedEffects:c.flightFX.strength,minimumSpeed:Math.min(...b.comparisons.map(p=>p.speed)),backwardSteps:b.comparisons.slice(1).filter((p,i)=>p.pos[2]>b.comparisons[i].pos[2]+.2).length,failedAssets:c.assetStatus.failed};});
+ assert.ok(result.position.z<bounds[2]-2);assert.ok(result.broken.length>=2&&result.fragments>0&&result.pulse);assert.ok(result.minimumSpeed>25);assert.ok(result.sonicBoom&&result.speedEffects>.6);assert.equal(result.backwardSteps,0);assert.deepEqual(result.failedAssets,[]);assert.deepEqual(errors,[]);
  const report={result:'PASS',...result,browserErrors:errors};await writeFile('artifacts/soar-breach-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();room.dispose();server.kill('SIGTERM');}

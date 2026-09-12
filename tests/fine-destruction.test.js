@@ -64,3 +64,14 @@ test('a large unsupported building releases fine rubble gradually without hiding
   assert.equal(r.detached.size,r.cells.length);assert.equal(steps,9);assert.ok(largestPacket<150000,largestPacket);assert.equal(r.debris.size,0);assert.ok(r.shards.size>100);assert.ok(r.activeShards.size<=MAX_ACTIVE_SHARDS);
  }finally{r.dispose();}
 });
+test('a loose facade island falls while the surrounding frame stays intact',()=>{
+ const r=fixture('brick');try{const c=r.cells[2],recipe=fractureRecipe(c),group=recipe.groups.find(g=>g.kind==='wall'&&g.side===2),center=recipe.pieces.find(p=>p.group===group.id&&p.grid[0]===4&&p.grid[1]===7),neighbors=recipe.pieces.filter(p=>p.group===group.id&&p.grid.reduce((n,v,k)=>n+Math.abs(v-center.grid[k]),0)===1);
+  assert.equal(neighbors.length,4);for(const p of neighbors)chipCell(r,c,p.p.map((n,k)=>n+c.p[k]),.001,Infinity);
+  assert.ok(c.skin.parts.includes(center.id),'an isolated brick must not hang in the hole');assert.ok([...r.shards.values()].some(e=>e.pieces.includes(center.id)));assert.equal(c.skin.hp,c.skin.maxHp);
+ }finally{r.dispose();}
+});
+test('resting rubble resumes falling when its actual supporting floor is destroyed',()=>{
+ const r=fixture('glass',5);try{const c=r.cells[1],support=r.cells[3];chipCell(r,c,[0,c.p[1],-18],.5,Infinity);const e=[...r.shards.values()][0],top=support.p[1]+support.size[1]/2;e.body.setTranslation(v(0,top+e.half[1],-20),true);e.body.setRotation({x:0,y:0,z:0,w:1},true);settleShard(r,e);updateShards(r);assert.equal(e.settled,true,'a real floor supports resting rubble');
+  r.breakCells([support.id]);updateShards(r);assert.equal(e.settled,false);assert.equal(e.ballistic,true);assert.ok(!r.shardSolids.has(e.id));const initial=e.p[1];for(let i=0;i<240;i++){r.time+=C.TICK;r.world.step();updateShards(r);}assert.ok(e.p[1]<initial-2);assert.ok(r.shards.has(e.id));
+ }finally{r.dispose();}
+});

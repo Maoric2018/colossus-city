@@ -33,7 +33,7 @@ export class HUD {
   const p = me(s);
   if(p){
    $('hp').textContent = Math.ceil(p.hp); $('fuel-fill').style.width = `${p.fuel * 100}%`; $('altitude').textContent = `${Math.max(0, p.p[1]).toFixed(0).padStart(2, '0')}m`;
-   $('flight-mode').textContent = p.flags & F.DODGE ? 'DODGE' : p.flags & F.SOAR ? 'SOARING' : 'HOVER'; $('speed-readout').textContent = `${Math.round(Math.hypot(...p.v))} m/s`;
+   $('flight-mode').textContent = p.flags & F.DODGE ? 'DODGE' : p.flags & F.SOAR ? 'SOARING ∞' : 'HOVER'; $('speed-readout').textContent = `${Math.round(Math.hypot(...p.v))} m/s`;
    $('dodge-readout').textContent = p.dodgeCooldown > 0 ? `DODGE ${p.dodgeCooldown.toFixed(1)}s` : p.fuel < C.DODGE_FUEL ? 'DODGE · RECHARGING' : 'DODGE READY · E';
    $('heavy-readout').textContent = p.heavyCooldown > 0 ? `BREACH ${p.heavyCooldown.toFixed(1)}s` : p.fuel < C.HEAVY_FUEL ? 'BREACH · LOW THRUST' : 'BREACH READY · HOLD RIGHT CLICK';
    $('score-readout').textContent = `SCORE ${Math.round(p.score)}`;

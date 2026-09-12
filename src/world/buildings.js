@@ -117,7 +117,7 @@ export class Buildings {
   const hidden=e.hidden,m = hidden ? zero : temp.matrix,core=e.fine?zero:m,frameIndex=e.frameIndex??e.index;
   if(frameIndex>=0){this.frame.setColorAt(frameIndex,e.tint);this.frame.setMatrixAt(frameIndex, e.empireIndex>=0?zero:core); this.dirty.add(this.frame);}
   if(e.empireIndex>=0){this.empireFrame.setMatrixAt(e.empireIndex,core);this.dirty.add(this.empireFrame);}
-  if(e.roofIndex >= 0){ this.roof.setMatrixAt(e.roofIndex, e.fine?.frame?zero:m); this.dirty.add(this.roof); }
+  if(e.roofIndex >= 0){ this.roof.setMatrixAt(e.roofIndex, e.fine?zero:m); this.dirty.add(this.roof); }
   const facade = this.facade[skinKey(c)], glass = this.glass[skinKey(c)];
   for(const w of e.walls){
    if(w.index<0)continue;

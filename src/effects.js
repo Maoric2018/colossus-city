@@ -36,6 +36,7 @@ export class Effects{
   this.flares=new ParticlePool(scene,base+'flare.png',16,true);
   this.beams=new T.InstancedMesh(new T.CylinderGeometry(1,1,1,5),new T.MeshBasicMaterial({color:0xe9fbff,toneMapped:false}),48);this.beams.instanceMatrix.setUsage(T.DynamicDrawUsage);this.beams.count=0;this.beams.frustumCulled=false;scene.add(this.beams);
   const beamGeometry=this.beams.geometry;this.beamGlow=new T.InstancedMesh(beamGeometry,new T.MeshBasicMaterial({color:0x42bfff,transparent:true,opacity:.3,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),48);this.bolts=new T.InstancedMesh(beamGeometry,new T.MeshBasicMaterial({color:0xb0f5ff,toneMapped:false}),48);
+  this.booms=[];this.boomMesh=new T.InstancedMesh(new T.TorusGeometry(1,.035,4,48),new T.MeshBasicMaterial({color:0xcdf5ff,transparent:true,opacity:.65,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),16);this.boomMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);this.boomMesh.count=0;this.boomMesh.frustumCulled=false;scene.add(this.boomMesh);
   this.rings=[];this.ringMesh=new T.InstancedMesh(new T.TorusGeometry(1,.045,4,24),new T.MeshBasicMaterial({color:0x7eeaff,transparent:true,opacity:.7,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false}),24);
   for(const mesh of [this.beamGlow,this.bolts,this.ringMesh]){mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);}
 
@@ -53,6 +54,11 @@ export class Effects{
    if(i % 2) this.particle(this.sparks, p, {v:new T.Vector3(Math.cos(angle) * speed * 1.7, Math.random() * 12, Math.sin(angle) * speed * 1.7), life:.35 + Math.random() * .7, size:.2 + Math.random() * .4, color:new T.Color(tint.spark), gravity:-13, drag:.1, opacity:1});
   }
   this.particle(this.flares, p, {life:.25, size:5 * power, color:new T.Color(material === 'glass' ? 0xbfe9ff : 0xffc989), growth:2});
+ }
+ sonicBoom(p,direction){
+  if(this.booms.length>=8)this.booms.shift();const q=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(...direction).normalize());this.booms.push({p:new T.Vector3(...p),q,age:0});
+  this.particle(this.flares,p,{life:.18,size:2.4,color:new T.Color(0xc8f2ff),growth:2});
+  for(let i=0;i<12;i++){const angle=i/12*Math.PI*2,v=new T.Vector3(Math.cos(angle),Math.sin(angle),0).applyQuaternion(q);this.particle(this.smoke,p,{v:v.multiplyScalar(9),life:.48,size:.45,color:new T.Color(0xe1f5ff),growth:2,opacity:.18,drag:.6});}
  }
  carExplosion(p){
   this.impact(p,1.2,'steel');
@@ -76,6 +82,7 @@ export class Effects{
   }
  }
  update(dt){
+  this.booms=this.booms.filter(b=>b.age<.7);let rings=0;for(const b of this.booms){b.age+=dt;for(let i=0;i<2;i++){const t=Math.max(0,b.age-i*.065),size=.7+t*17,fade=Math.max(0,1-t/.7);dummy.position.copy(b.p);dummy.quaternion.copy(b.q);dummy.scale.set(size,size,fade*.65);dummy.updateMatrix();this.boomMesh.setMatrixAt(rings,dummy.matrix);this.boomMesh.setColorAt(rings++,new T.Color().setScalar(fade*fade));}}this.boomMesh.count=rings;this.boomMesh.visible=rings>0;if(rings){markRange(this.boomMesh.instanceMatrix,0,rings);this.boomMesh.instanceMatrix.needsUpdate=true;markRange(this.boomMesh.instanceColor,0,rings);this.boomMesh.instanceColor.needsUpdate=true;}
   for(const pool of [this.smoke,this.dust,this.sparks,this.flashes,this.flares])pool.update(dt);
   this.tracers=this.tracers.filter(t=>t.age<.2);this.tracers.forEach((t,i)=>{
    t.age+=dt;const distance=t.a.distanceTo(t.b),direction=t.b.clone().sub(t.a).normalize(),fade=Math.max(0,1-t.age/.2);

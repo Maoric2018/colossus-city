@@ -35,7 +35,7 @@ export class CityView {
   this.textures = parent?.textures || {concrete:tex(t.concrete, 30), concreteNormal:tex(tier.normalMaps&&t.concreteNormal, 30, false), concreteRoughness:tex(!tier.lambert&&t.concreteRoughness, 30, false), asphalt:tex(t.asphalt, 38), asphaltNormal:tex(tier.normalMaps&&t.asphaltNormal, 38, false), asphaltRoughness:tex(!tier.lambert&&t.asphaltRoughness, 38, false)};
   if(!parent)this.makeSkyAndLights(); this.ground = parent ? {update(){}} : buildGround(this.root, env, tier, this.textures);
   this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || this.texture(t.concrete, 1),resources:parent?.buildings,components:parent?.buildings.components});
-  this.transforms = this.buildings.entries;
+  this.buildings.attachments=this.attachments;this.transforms = this.buildings.entries;
   this.fine=parent?.fine||new FineBuildings(this.root,tier);
   if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{if(scene.userData.reuseCityVisibility)return;this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.fine.select(camera);this.commit();};
   for(const c of this.cells){ const s = this.skins.get(c.id); this.buildings.setSkin(c.id, s.glass, s.facade); }
@@ -56,9 +56,9 @@ export class CityView {
  // ---- state from the server ----
  setFracture(id,parts){
   const c=this.byId.get(id);if(!c){this.stream?.setFracture(id,parts);return;}const s=this.skins.get(id);s.parts=[...parts];this.colliderCache.set(id,cellColliders(c,s));this.handWorld.setSkin(id,s);
-  const pose=this.buildings.pose(id);this.fine.set(c,s,pose,this.buildings);this.buildings.writeCore(c,pose);this.buildings.components.selectionDirty=true;
+  const pose=this.buildings.pose(id);this.fine.set(c,s,pose,this.buildings);pose.skinDirty=true;this.buildings.setCell(id,null,null,pose.hidden);this.buildings.components.selectionDirty=true;
  }
- addShards(meta){const c=this.byId.get(meta.cell);if(!c){this.stream?.addShards(meta);return;}this.fine.addShards(c,meta);}
+ addShards(meta){const c=this.byId.get(meta.cell);if(!c){this.stream?.addShards(meta);return;}this.fine.addShards(c,meta,this.buildings);}
  setSkin(id, glass, facade, fx = true){
   const c = this.byId.get(id), s = this.skins.get(id); if(!c){this.stream?.setSkin(id,glass,facade,fx);return;}
   const lostGlass = s.glass & ~glass, lostFacade = s.facade & ~facade;

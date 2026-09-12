@@ -60,6 +60,16 @@ export function fractureStrength(c,skin){
  return cut===4||lost>.87?0:Math.max(.45,1-lost*.5-cut*.07);
 }
 export const pieceEnergy=p=>({glass:2,brick:5,stone:7,concrete:8,steel:12}[p.material]||6);
+// Small islands surrounded by a hole cannot remain suspended in a facade.
+// Border-connected masonry still benefits from the building's strong frame.
+export function unsupportedWallPieces(c,gone){
+ const {pieces,groups}=fractureRecipe(c),out=[];
+ for(const g of groups){if(g.kind!=='wall')continue;const [nx,ny,nz]=g.n,count=nx*ny*nz,seen=new Set(),queue=[],index=(x,y,z)=>g.start+x+nx*(y+ny*z);
+  for(let i=g.start;i<g.start+count;i++){const p=pieces[i];if(!gone.has(i)&&p.grid.some((v,k)=>g.n[k]>1&&(v===0||v===g.n[k]-1))){seen.add(i);queue.push(p);}}
+  for(let j=0;j<queue.length;j++)for(let k=0;k<3;k++)for(const d of [-1,1]){const xyz=[...queue[j].grid];xyz[k]+=d;if(xyz[k]<0||xyz[k]>=g.n[k])continue;const id=index(...xyz);if(!gone.has(id)&&!seen.has(id)){seen.add(id);queue.push(pieces[id]);}}
+  for(let i=g.start;i<g.start+count;i++)if(!gone.has(i)&&!seen.has(i))out.push(pieces[i]);
+ }return out;
+}
 export function shardBallistic(meta,time){
  const t=Math.max(0,Math.min(meta.duration,time-meta.born)),p=meta.start.map((v,k)=>v+meta.velocity[k]*t+(k===1?-12*t*t:0));
  p[1]=Math.max(meta.ground,p[1]);return {p,q:[Math.sin(t*.7)*.3,Math.sin(t*.5)*.3,0,Math.sqrt(1-(Math.sin(t*.7)*.3)**2-(Math.sin(t*.5)*.3)**2)]};

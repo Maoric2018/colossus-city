@@ -147,7 +147,7 @@ function frame(now, xrFrame){
   cityView.commit();
   if(now - lastHUD > 100){ hud.refresh(s, now, {net, renderer:gr, input}); lastHUD = now; }
   const pilot = me(s), held = input.held();
-  if(state.role === 'raider' && pilot){ const speed = Math.hypot(...pilot.v), thrust = (pilot.fuel > .01 && ((held.up > 0) || held.boost || (pilot.flags & F.SOAR))) ? 1 : speed > 3 ? .35 : 0; audio.ambient(state.paused ? 0 : thrust, Math.min(1, speed / 40)); }
+  if(state.role === 'raider' && pilot){ const speed = Math.hypot(...pilot.v), thrust = ((pilot.flags & F.SOAR) || (pilot.fuel > .01 && ((held.up > 0) || held.boost))) ? 1 : speed > 3 ? .35 : 0; audio.ambient(state.paused ? 0 : thrust, Math.min(1, speed / 40)); }
   else audio.ambient(0, 0);
  }else if(!state.playing){
   const t = now * .0001;

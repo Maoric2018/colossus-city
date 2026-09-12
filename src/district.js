@@ -68,10 +68,10 @@ function attachRoofProps(view, cells){
    original(id, p, q, hidden);
    const attached = view.attachments.get(id); if(!attached) return;
    const e = buildings.entries.get(id); temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.set(1, 1, 1); temp.updateMatrix(); offset.copy(temp.matrix);
-   for(const part of attached){ matrix.multiplyMatrices(offset, part.local); part.batch.setMatrixAt(part.index, hidden ? zero : matrix); part.batch.instanceMatrix.needsUpdate = true; }
+   for(const part of attached){ matrix.multiplyMatrices(offset, part.local); part.batch.setMatrixAt(part.index, (hidden||e.fine) ? zero : matrix); part.batch.instanceMatrix.needsUpdate = true; }
   };
   buildings.attachmentHook = true;
  }
- for(const c of cells){ const e = buildings.entries.get(c.id); buildings.setCell(c.id, null, null, e.hidden); }
+ for(const c of cells){view.fine?.refreshSource(c,buildings); const e = buildings.entries.get(c.id); buildings.setCell(c.id, null, null, e.hidden); }
  buildings.commit();
 }

@@ -2,7 +2,7 @@
 // audio files ship and the Quest browser has nothing to download. Distance attenuation is
 // computed from the listener position that the game sets every frame.
 const KINDS = {
- shot:{range:220, priority:1}, heavy:{range:320, priority:3}, charge:{range:60, priority:3}, hit:{range:40, priority:2}, headshot:{range:40, priority:3},
+ sonicboom:{range:300, priority:3}, shot:{range:220, priority:1}, heavy:{range:320, priority:3}, charge:{range:60, priority:3}, hit:{range:40, priority:2}, headshot:{range:40, priority:3},
  glass:{range:170, priority:2}, brick:{range:200, priority:2}, stone:{range:220, priority:2}, concrete:{range:220, priority:2}, steel:{range:240, priority:2},
  collapse:{range:600, priority:4}, creak:{range:260, priority:3}, explosion:{range:420, priority:4}, missile:{range:300, priority:2}, dodge:{range:60, priority:2},
  thud:{range:120, priority:2}, stomp:{range:320, priority:2}, closecall:{range:40, priority:3}, towerdown:{range:2000, priority:5}, kill:{range:2000, priority:4},
@@ -88,5 +88,6 @@ export class GameAudio {
  _combo(g, n){ const base = 440 * Math.pow(1.06, Math.min(12, n)); this.tone('triangle', base, base, .1, .005, .05, .12); this.tone('triangle', base * 1.5, base * 1.5, .08, .005, .05, .16, .05); }
  _win(g){ [523, 659, 784, 1046].forEach((f, i) => this.tone('triangle', f, f, .14, .02, .22, .6, i * .14)); }
  _lose(g){ [392, 349, 311, 262].forEach((f, i) => this.tone('sawtooth', f, f * .98, .08, .03, .25, .5, i * .2)); this.tone('sine', 50, 30, .3, .1, .6, 1.2); }
+ _sonicboom(g){this.burst('lowpass',2200,110,.65,.55*g,.002,.025,.55);this.tone('sine',95,28,.45*g,.002,.03,.5);this.burst('highpass',1800,400,.5,.17*g,.004,.025,.3,.065);}
  _ui(g){ this.tone('sine', 880, 880, .05, .005, .03, .08); }
 }

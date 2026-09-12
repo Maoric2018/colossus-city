@@ -26,12 +26,11 @@ test('soaring opens both sides of a building, keeps speed and health, and replic
   for(let i=0;i<65;i++)tick(r,client,{soar:false,z:0});assert.equal(p.breachCells.size,0);r.spawn(p);assert.equal(p.breachCells.size,0);
  }finally{r.dispose();}
 });
-test('normal flight, normal dodge, exhausted fuel and stale soar input cannot breach',()=>{
- for(const mode of ['normal','dodge','empty','stale']){
+test('normal flight, normal dodge and stale soar input cannot breach',()=>{
+ for(const mode of ['normal','dodge','stale']){
   const {r,client,p}=setup();try{
-   if(mode==='empty')p.fuel=0;
    if(mode==='stale'){r.input(client,{type:'input',soar:true,z:-1,yaw:0,pitch:0});r.time+=.5;}
-   for(let i=0;i<30;i++){if(mode==='stale')r.step();else tick(r,client,{soar:mode==='empty',dodge:mode==='dodge'?1:0});}
+   for(let i=0;i<30;i++){if(mode==='stale')r.step();else tick(r,client,{soar:false,dodge:mode==='dodge'?1:0});}
    assert.equal(r.detached.size,0,mode);assert.equal(p.breachCells.size,0);assert.ok(!r.drainEvents().some(e=>e.type==='soar-breach'));
   }finally{r.dispose();}
  }
@@ -73,4 +72,10 @@ test('prediction crosses only swept building cells while leaving unrelated colli
  const city={handWorld:{*near(){yield wall;}},overlapBox(p,half,ignored){skipped=!!ignored?.has(12);return skipped?null:{center:v(0,10,-1.5),half:v(2,2,.02)};}},prediction=new Prediction(city);
  prediction.reset({p:[0,10,0],v:[0,0,-32],fuel:1});prediction.simulate({yaw:0,pitch:0,soar:true,z:-1,up:0,x:0,dodge:0});assert.ok(skipped);assert.ok(prediction.vel.z<-25);
  prediction.reset({p:[0,10,0],v:[0,0,-32],fuel:1});prediction.simulate({yaw:0,pitch:0,soar:false,z:-1,up:0,x:0,dodge:0});assert.equal(skipped,false);
+});
+
+test('empty fuel does not stop soaring or breaching, and the entry boom fires only on entry',()=>{
+ const {r,client,p,bounds}=setup();try{p.fuel=0;r.drainEvents();for(let i=0;i<45;i++)tick(r,client,{soar:true});assert.ok(p.body.translation().z<bounds[2]-3);assert.equal(p.fuel,0);assert.equal(r.drainEvents().filter(e=>e.type==='soar-start'&&e.player===p.id).length,1);
+ tick(r,client,{soar:false});r.drainEvents();tick(r,client,{soar:true});assert.equal(r.drainEvents().filter(e=>e.type==='soar-start').length,1);
+ }finally{r.dispose();}
 });
