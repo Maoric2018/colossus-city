@@ -56,7 +56,7 @@ export function steerMissile(room,m){
   const rank=dot-distance*.0008;if(rank>score){score=rank;best={p,at,distance};}
  }
  if(!best)return forward;
- const lead=Math.min(.22,best.distance/C.MISSILE_SPEED*.3),target=add(best.at,mul(best.p.body.linvel(),lead)),desired=norm(sub(target,m.p));
+ const lead=Math.min(.45,best.distance/C.MISSILE_SPEED*.6),target=add(best.at,mul(best.p.body.linvel(),lead)),desired=norm(sub(target,m.p));
  const angle=Math.acos(clamp(forward.x*desired.x+forward.y*desired.y+forward.z*desired.z,-1,1)),step=C.MISSILE_TURN_RATE*C.TICK;
  if(angle<1e-5)return forward;
  const t=Math.min(1,step/angle),sin=Math.sin(angle),next=norm(add(mul(forward,Math.sin((1-t)*angle)/sin),mul(desired,Math.sin(t*angle)/sin)));

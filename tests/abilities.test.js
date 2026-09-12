@@ -57,7 +57,7 @@ test('raider input cannot fire giant missiles; stale tracking cannot keep firing
  }finally{r.dispose();}
 });
 
-test('missile homing is gentle, forward-only and ignores protected or occluded players',()=>{
+test('missile homing has bounded turns, stays forward-only and ignores protected or occluded players',()=>{
  const {r,p}=raider();try{
   r.spawn(p,v(4,20,-22));p.invulnerable=0;p.body.setLinvel(v(),true);r.world.updateSceneQueries();
   const missile=()=>({p:v(0,20,0),direction:[0,0,-1]});let m=missile(),d=steerMissile(r,m);
