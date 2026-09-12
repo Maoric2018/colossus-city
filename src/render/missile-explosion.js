@@ -29,8 +29,8 @@ const fogUniforms=`
 // burn white/yellow, then orange, before the shared smoke particles take over.
 // Two instanced draws cover all overlapping explosions; no lights or post pass.
 export class MissileExplosions{
- constructor(scene,{quest=false}={}){
-  this.items=[];this.lobes=quest?6:9;this.dummy=new T.Object3D();
+ constructor(scene,{quest=false,mobile=false}={}){
+  this.items=[];this.lobes=mobile?3:quest?6:9;this.dummy=new T.Object3D();
   const geometry=new T.InstancedBufferGeometry().copy(new T.PlaneGeometry(1,1));geometry.instanceCount=0;
   this.attributes={};
   for(const [name,size]of [['center',3],['shape',3],['heat',1]]){
@@ -56,7 +56,7 @@ export class MissileExplosions{
      #include <colorspace_fragment>
     }`});
   this.fire=new T.Mesh(geometry,material);this.fire.frustumCulled=false;this.fire.visible=false;this.fire.renderOrder=3;scene.add(this.fire);
-  const shellGeometry=new T.SphereGeometry(1,24,16);
+  const shellGeometry=new T.SphereGeometry(1,mobile?12:24,mobile?8:16);
   this.shellLife=new T.InstancedBufferAttribute(new Float32Array(LIMIT),1).setUsage(T.DynamicDrawUsage);shellGeometry.setAttribute('blastLife',this.shellLife);
   const shellMaterial=new T.ShaderMaterial({uniforms,transparent:true,depthWrite:false,toneMapped:false,fog:true,
    vertexShader:`attribute float blastLife;varying float vLife;varying vec3 vNormal;varying vec3 vView;varying vec2 vUV;

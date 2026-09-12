@@ -136,10 +136,11 @@ function aim(){
 }
 const localOverride = {p:[0, 0, 0], v:[0, 0, 0]};
 function frame(now, xrFrame){
+ if(!gr.shouldFrame(now))return;
  const frameStartCPU=performance.now();
- const dt = Math.min((now - lastNow) / 1000, .05); lastNow = now; frameCount++;
+ const elapsed = (now - lastNow) / 1000, dt = Math.min(elapsed, .05); lastNow = now; frameCount++;
  if(now - frameStart > 1000){ hud.fps = Math.round(frameCount * 1000 / (now - frameStart)); frameCount = 0; frameStart = now; }
- gr.adapt(dt, now);
+ gr.adapt(elapsed, now);
  const s = net.sample();
  if(state.playing && s){
   state.current = s; touchControls?.update(now);
@@ -154,7 +155,7 @@ function frame(now, xrFrame){
    }
    if(s.phase&&prediction.active)prediction.reset(null);
    if(ending.defeated)cameraRig.finale(dt,ending.result);else {cameraRig.endShot=null;cameraRig.update(dt,s,{input,net});}
-   if(!s.phase&&now - lastInput > 1000 / C.INPUT_HZ){ net.send(input.packet(aim)); lastInput = now; }
+   if(!s.phase&&(tier.mobile||now - lastInput > 1000 / C.INPUT_HZ)){ net.send(input.packet(aim)); lastInput = now; }
   }
   if(!ending.defeated)giant.selfBody.update({local:state.role==='boss',lookDown:presenting?(xr.local?.headLookDown||0):-Math.sin(camera.rotation.x),dt});
   const ids = new Set();

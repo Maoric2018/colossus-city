@@ -2,7 +2,7 @@
 // the Q key only toggles the cheap runtime switches (shadows, bloom, pixel ratio).
 import * as T from 'three';
 export const TIERS = Object.freeze({
- mobile: {name:'MOBILE',      pixelRatio:1,   antialias:false, shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.3,  rubble:180, skyline:.3, xrScale:.8,  textureSize:256, far:520},
+ mobile: {name:'MOBILE',      mobile:true, unlit:true, maxPixels:190000, minScale:.3, fps:30, fogNear:35, fogFar:70, pixelRatio:.55,   antialias:false, shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.05, rubble:40, skyline:.1, xrScale:.8, textureSize:128, far:150},
  quest:  {name:'QUEST',       pixelRatio:1,   antialias:false, shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.45, rubble:260, skyline:.4, xrScale:.8,  textureSize:256, far:700},
  low:    {name:'PERFORMANCE', pixelRatio:1,   antialias:true,  shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.7,  rubble:520, skyline:.6, xrScale:.85, textureSize:512, far:900},
  medium: {name:'BALANCED',    pixelRatio:1,   antialias:true,  shadows:true,  shadowSize:1024, bloom:false, normalMaps:true,  lambert:false, particles:1,   rubble:900, skyline:1,  xrScale:.85, textureSize:512, far:900},
@@ -18,6 +18,8 @@ export function gpuLabel(name){
  return label.replace(/\s*(Direct3D|OpenGL|Metal|Vulkan).*$/i, '').trim().slice(0, 30);
 }
 export function detectTier(renderer, quest, touch){
+ // Shared cinematic links and saved desktop settings must respect the phone budget.
+ if(touch && !quest) return 'mobile';
  const forced = new URLSearchParams(location.search).get('quality') || localStorage.getItem('colossus-tier');
  if(forced && TIERS[forced]) return forced;
  if(quest) return 'quest';
@@ -28,9 +30,11 @@ export function detectTier(renderer, quest, touch){
 // glass keeps a cheap PBR reflection. The API mirrors MeshStandardMaterial's options.
 export function surface(tier, options = {}){
  const {normalMap, normalScale, roughnessMap, roughness, metalness, envMapIntensity, ...rest} = options;
+ if(tier.unlit){ const {emissive, emissiveMap, emissiveIntensity, ...basic} = rest; return new T.MeshBasicMaterial(basic); }
  if(tier.lambert) return new T.MeshLambertMaterial(rest);
  return new T.MeshStandardMaterial({normalMap:tier.normalMaps ? normalMap : null, normalScale, roughnessMap:tier.normalMaps ? roughnessMap : null, roughness, metalness, envMapIntensity, ...rest});
 }
 export function glassMaterial(tier, options = {}){
+ if(tier.unlit) return new T.MeshBasicMaterial({color:options.color??0x9fd3ea, map:options.map??null, alphaTest:options.alphaTest??.02, side:T.DoubleSide});
  return new T.MeshStandardMaterial({color:0x9fd3ea, metalness:.85, roughness:.14, transparent:true, opacity:tier.lambert ? .62 : .55, envMapIntensity:1.2, depthWrite:false, side:T.DoubleSide, forceSinglePass:true, ...options});
 }

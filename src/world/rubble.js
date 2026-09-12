@@ -14,7 +14,7 @@ const dummy = new T.Object3D(), zero = new T.Matrix4().makeScale(0, 0, 0), axis 
 class Pool {
  constructor(scene, kind, limit, spec, tier){
   this.spec = spec; this.limit = limit; this.items = []; this.cursor = 0;
-  const material = spec.glass ? new T.MeshStandardMaterial({color:spec.color, metalness:.9, roughness:.12, transparent:true, opacity:.65, side:T.DoubleSide, depthWrite:false})
+  const material = tier.unlit ? new T.MeshBasicMaterial({color:spec.color,side:spec.glass?T.DoubleSide:T.FrontSide}) : spec.glass ? new T.MeshStandardMaterial({color:spec.color, metalness:.9, roughness:.12, transparent:true, opacity:.65, side:T.DoubleSide, depthWrite:false})
    : tier.lambert ? new T.MeshLambertMaterial({color:spec.color}) : new T.MeshStandardMaterial({color:spec.color, roughness:.85, metalness:kind === 'steel' ? .7 : .05});
   this.mesh = new T.InstancedMesh(spec.geometry(), material, limit); this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); this.mesh.frustumCulled = false; this.mesh.castShadow = false; this.mesh.receiveShadow = !tier.lambert;
   for(let i = 0; i < limit; i++) this.mesh.setMatrixAt(i, zero);
@@ -52,13 +52,14 @@ class Pool {
 }
 export class Rubble {
  constructor(scene, tier){
-  this.pools = {}; const budget = tier.rubble;
-  for(const [kind, spec] of Object.entries(KINDS)) this.pools[kind] = new Pool(scene, kind, Math.max(24, Math.round(budget * spec.count / 4.2)), spec, tier);
+  this.pools = {}; this.mobile=!!tier.mobile; const budget = tier.rubble, weight = this.mobile ? Object.values(KINDS).reduce((sum,spec)=>sum+spec.count,0) : 4.2;
+  for(const [kind, spec] of Object.entries(KINDS)) this.pools[kind] = new Pool(scene, kind, Math.max(tier.mobile?4:24, Math.round(budget * spec.count / weight)), spec, tier);
   this.rand = seeded(4242);
  }
  // Burst `n` pieces of `kind` from a point with a base velocity and random spread.
  burst(kind, p, n, {velocity = [0, 0, 0], spread = 6, up = 4, scale = 1} = {}){
   const pool = this.pools[kind] || this.pools.concrete, rand = this.rand, pos = new T.Vector3(...p), vel = new T.Vector3();
+  if(this.mobile)n=Math.min(pool.limit,Math.ceil(n*.2));
   for(let i = 0; i < n; i++){
    vel.set((rand() - .5) * 2 * spread + velocity[0], rand() * up + velocity[1] + 1, (rand() - .5) * 2 * spread + velocity[2]);
    pos.set(p[0] + (rand() - .5) * 2.5, p[1] + (rand() - .5) * 2, p[2] + (rand() - .5) * 2.5);

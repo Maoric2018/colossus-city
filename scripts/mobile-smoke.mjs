@@ -25,7 +25,7 @@ try{
  await page.screenshot({path:'artifacts/mobile/lobby-landscape.png'});
  await page.locator('#create').tap(); await page.waitForFunction(()=>window.__COLOSSUS.state);
  const room=await page.evaluate(()=>window.__COLOSSUS.net.room);
- assert.ok(await page.locator('#touch-layer').isHidden());
+ await page.locator('#touch-layer').waitFor({state:'hidden'});
  assert.doesNotMatch(await page.locator('#overlay-text').textContent(),/WASD|RIGHT CLICK/);
  await page.locator('#resume').tap();await page.waitForFunction(()=>window.__COLOSSUS.touchControls.enabled);
  assert.equal(await page.evaluate(()=>document.pointerLockElement),null);
@@ -60,7 +60,7 @@ try{
  let sequence=(await held()).heavy;
  await page.locator('.tc-heavy').tap();assert.equal((await held()).heavy,sequence,'Breach tap must not bypass charge');
  await down(6,...await center('.tc-heavy'));await page.waitForFunction(()=>window.__COLOSSUS.input.charge===1);
- assert.equal(await page.locator('.tc-heavy small').textContent(),'RELEASE');await up(6);
+ await page.waitForFunction(()=>document.querySelector('.tc-heavy small').textContent==='RELEASE');await up(6);
  assert.equal((await held()).heavy,sequence+1);
  await page.waitForFunction(()=>window.__COLOSSUS.net.latest.players.find(p=>p.id===window.__COLOSSUS.net.id).heavyCooldown>0);
  await down(16,...await center('.tc-heavy'));await up(16);assert.equal((await held()).heavy,sequence+1,'Cooldown suppresses repeated breach presses');
@@ -69,7 +69,7 @@ try{
  await page.waitForFunction(()=>window.__COLOSSUS.net.latest.players.find(p=>p.id===window.__COLOSSUS.net.id).dodgeCooldown>0);
  checks.push('Breach hold/release, charge progress, authoritative cooldown and dodge repeat suppression');
  await down(7,...await center('.tc-fire'));await page.locator('#menu-button').tap();await cancel();
- assert.equal((await held()).fire,false);assert.ok(await page.locator('#touch-layer').isHidden());
+ assert.equal((await held()).fire,false);await page.locator('#touch-layer').waitFor({state:'hidden'});
  await page.locator('#camera-toggle').tap();assert.equal(await page.evaluate(()=>window.__COLOSSUS.firstPerson),false);
  assert.doesNotMatch(await page.locator('#camera-toggle').textContent(),/ · V/);
  await page.locator('#resume').tap();await waitActive();
@@ -96,7 +96,7 @@ try{
  const observer=await phone.newPage();observer.on('pageerror',e=>errors.push(e.message));
  await observer.goto(`${url}/?spectator=1&room=${room}`);await observer.waitForFunction(()=>window.__COLOSSUS?.views.cards.size>0);
  await observer.waitForFunction(()=>[...window.__COLOSSUS.views.cards.values()].some(c=>c.frames>=2&&c.transport==='video'&&c.video.videoWidth===640),null,{timeout:45000});
- assert.ok(await observer.locator('#touch-layer').isHidden());
+ await observer.locator('#touch-layer').waitFor({state:'hidden'});
  await observer.locator('#spectator-free').tap();await observer.locator('#resume').tap();await observer.waitForFunction(()=>window.__COLOSSUS.touchControls.enabled);
  assert.equal(await observer.locator('.tc-btn').count(),2);
  const observerCDP=await phone.newCDPSession(observer),upBox=await observer.locator('.tc-thrust').boundingBox(),downBox=await observer.locator('.tc-soar').boundingBox();
@@ -107,7 +107,7 @@ try{
  await observer.locator('#open-spectator').tap();assert.ok(await observer.locator('#spectator-panel').isVisible());await observer.close();
  checks.push('Mobile live video, spectator free camera and independent UP/DOWN release');
  await page.bringToFront();await page.locator('#menu-button').tap();await page.locator('#leave').tap();
- assert.ok(await page.locator('#touch-layer').isHidden());assert.equal(await page.evaluate(()=>window.__COLOSSUS.touchControls.pointers.size),0);
+ await page.locator('#touch-layer').waitFor({state:'hidden'});assert.equal(await page.evaluate(()=>window.__COLOSSUS.touchControls.pointers.size),0);
  await page.setViewportSize({width:360,height:640});await page.screenshot({path:'artifacts/mobile/lobby-portrait.png'});
  assert.ok(await page.locator('#create').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}));
  await page.locator('[data-role="boss"]').tap();await page.locator('#create').tap();await page.waitForFunction(()=>window.__COLOSSUS.state);await page.locator('#resume').tap();await waitActive();

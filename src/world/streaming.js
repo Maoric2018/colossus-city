@@ -9,7 +9,7 @@ export class StreamedBlocks{
  constructor(owner){
   this.owner=owner;this.views=new Map();this.previews=new Map();this.records=new Map();this.entityOwners=new Map();this.lastKey='';this.pending=[];this.position=new T.Vector3();this.previous=new T.Vector3();this.velocity=new T.Vector3();this.lastTime=0;this.building=null;this.buildStats={frames:0,maxMS:0};
   this.ground=streamGround(owner.root,owner.tier,owner.textures,owner.scene.fog.far);
-  this.preparation=new BlockPreparation(!owner.tier.lambert);
+  this.preparation=new BlockPreparation(!owner.tier.lambert,!owner.tier.mobile);
  }
  record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),fractures:new Map(),shards:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
  state(meta){

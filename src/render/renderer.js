@@ -14,7 +14,7 @@ export class GameRenderer {
   catch(e){ throw Error('WebGL 2 is unavailable. Enable hardware acceleration in your browser.'); }
   this.renderer = renderer; this.quest = quest; this.touch = touch; this.tierName = detectTier(renderer, quest, touch); this.tier = TIERS[this.tierName]; this.gpu = gpuName(renderer);
   // A DPR-3 phone would otherwise shade nine times the pixels of its CSS viewport.
-  this.minScale = touch ? .5 : .6;
+  this.minScale = this.tier.minScale ?? .6; this.nextFrame = null;
   this.cinematic = false; this.scale = 1; this.frameEMA = 16; this.lastAdjust = performance.now(); this.composer = null; this.adaptive = true;
   renderer.setSize(innerWidth, innerHeight); renderer.info.autoReset = false;
   renderer.shadowMap.enabled = this.tier.shadows; renderer.shadowMap.type = T.PCFShadowMap;
@@ -22,14 +22,23 @@ export class GameRenderer {
   renderer.xr.enabled = true; renderer.xr.setFramebufferScaleFactor(this.tier.xrScale); renderer.xr.setFoveation(1);
   this.applyScale(this.targetRatio());
  }
- targetRatio(){ return Math.min(devicePixelRatio, this.touch ? 1 : Infinity, this.cinematic ? TIERS.high.pixelRatio : this.tier.pixelRatio); }
+ targetRatio(){ return Math.min(devicePixelRatio, this.cinematic ? TIERS.high.pixelRatio : this.tier.pixelRatio, Math.sqrt((this.tier.maxPixels ?? Infinity) / (innerWidth * innerHeight))); }
+ // Cap the whole phone loop, including cosmetic simulation, on 60/90/120 Hz displays.
+ shouldFrame(now){
+  if(!this.tier.fps || this.renderer.xr.isPresenting){ this.nextFrame=null; return true; }
+  const interval=1000/this.tier.fps;
+  if(this.nextFrame!==null && now+.5<this.nextFrame) return false;
+  this.nextFrame=this.nextFrame===null || now-this.nextFrame>interval ? now+interval : this.nextFrame+interval;
+  return true;
+ }
  applyScale(ratio){ this.scale = ratio; this.renderer.setPixelRatio(ratio); this.composer?.setPixelRatio(ratio); this.composer?.setSize(innerWidth, innerHeight); }
- resize(camera){ camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer?.setSize(innerWidth, innerHeight); }
+ resize(camera){ if(this.tier.mobile) this.applyScale(Math.min(this.scale,this.targetRatio())); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer?.setSize(innerWidth, innerHeight); }
  ensureComposer(scene, camera){
   if(!this.composer){ this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(scene, camera)); this.composer.addPass(new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .22, .3, 1.15)); this.composer.addPass(new OutputPass()); this.composer.setPixelRatio(this.scale); }
   return this.composer;
  }
  toggleCinematic(){
+  if(this.tier.mobile) return this.tier.name;
   this.cinematic = !this.cinematic;
   this.renderer.shadowMap.enabled = this.cinematic ? true : this.tier.shadows;
   this.applyScale(this.targetRatio()); this.frameEMA = 16;
@@ -41,11 +50,12 @@ export class GameRenderer {
  adapt(dt, now){
   if(this.renderer.xr.isPresenting || !this.adaptive) return;
   // Hidden tabs are throttled by the browser; their frame times say nothing about the GPU.
-  if(document.hidden || dt >= .049){ this.lastAdjust = now; return; }
+  if(document.hidden || dt > .5){ this.lastAdjust = now; return; }
   this.frameEMA += (dt * 1000 - this.frameEMA) * .06;
-  if(now - this.lastAdjust < 1200) return;
+  if(now - this.lastAdjust < (this.tier.mobile ? 800 : 1200)) return;
   const target = this.targetRatio();
-  if(this.frameEMA > 20 && this.scale > this.minScale){ this.applyScale(Math.max(this.minScale, this.scale - .1)); this.lastAdjust = now; }
+  const floor=Math.min(this.minScale,target);
+  if(this.frameEMA > (this.tier.mobile ? 40 : 20) && this.scale > floor){ this.applyScale(Math.max(floor, this.scale - .1)); this.lastAdjust = now; }
   else if(this.frameEMA < 12.5 && this.scale < target){ this.applyScale(Math.min(target, this.scale + .05)); this.lastAdjust = now; }
  }
  render(scene, camera, dt){

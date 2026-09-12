@@ -26,7 +26,7 @@ export class Components{
  register(buildings,cells){for(const _ of this.prepare(buildings,cells)){} }
  *prepare(buildings,cells){
   for(const c of cells){const e=buildings.entries.get(c.id);this.nearIndex.set(c.id,e.p.x,e.p.z);if(c.architecture==='wtc'||c.architecture==='empire'||c.architecture==='chrysler'||modernLandmark(c.architecture)||catalogLandmark(c.architecture)||c.roof&&c.catalogRoof&&c.catalogRoof!=='flat'){this.landmarks.add(c.id);this.landmarkIndex.set(c.id,e.p.x,e.p.z);}}
-  for(const c of cells){const e=buildings.entries.get(c.id);this.cells.set(c.id,c);this.poses.set(c.id,e);this.entries.set(c.id,(c.preparedComponents||componentPlacements(c,{interiors:!this.tier.lambert})).map(p=>({...p,index:-1,cell:c,pose:e,signature:COMPONENTS[p.type].signature||p.type.startsWith('wtc')||p.type.startsWith('empire')||p.type.startsWith('chrysler')||(/^hudson(Roof|Edge|Ribbon|SilverLip|KnifeFin)|^vanderbilt(Spandrel|Mullion|VolumeFin|Setback|Crown|Needle)/.test(p.type)),fine:p.type==='vanderbiltFlutes'||p.type==='hudsonPanelSeam'})));delete c.preparedComponents;yield;}
+  for(const c of cells){const e=buildings.entries.get(c.id);this.cells.set(c.id,c);this.poses.set(c.id,e);this.entries.set(c.id,(this.tier.mobile?[]:c.preparedComponents||componentPlacements(c,{interiors:!this.tier.lambert})).map(p=>({...p,index:-1,cell:c,pose:e,signature:COMPONENTS[p.type].signature||p.type.startsWith('wtc')||p.type.startsWith('empire')||p.type.startsWith('chrysler')||(/^hudson(Roof|Edge|Ribbon|SilverLip|KnifeFin)|^vanderbilt(Spandrel|Mullion|VolumeFin|Setback|Crown|Needle)/.test(p.type)),fine:p.type==='vanderbiltFlutes'||p.type==='hudsonPanelSeam'})));delete c.preparedComponents;yield;}
   for(const c of cells)for(const p of this.entries.get(c.id))if(!this.batches.has(p.type)){this.active.set(p.type,[]);this.reserve(p.type,32);yield;}
   this.lastPosition=null;
  }
@@ -47,6 +47,7 @@ export class Components{
   for(const parts of this.active.values())for(const part of parts)this.write(part);
  }
  select(camera){
+  if(this.tier.mobile)return;
   const view=camera.cameras?.[0]||camera,now=performance.now();position.setFromMatrixPosition(view.matrixWorld);rotation.setFromRotationMatrix(rotationMatrix.extractRotation(view.matrixWorld));
   if(!this.selectionDirty&&this.lastPosition&&position.distanceToSquared(this.lastPosition)<1&&Math.abs(rotation.dot(this.lastRotation))>.99985&&now-(this.lastUpdate||0)<100)return;
   (this.lastPosition??=new T.Vector3()).copy(position);this.lastRotation.copy(rotation);this.lastUpdate=now;this.selectionDirty=false;

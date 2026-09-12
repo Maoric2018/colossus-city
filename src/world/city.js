@@ -67,10 +67,9 @@ export class CityView {
  texture(url, repeat = 1, srgb = true){ const t = this.loader.load(url); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = this.quest ? 2 : 4; if(srgb) t.colorSpace = T.SRGBColorSpace; return t; }
  makeSkyAndLights(){
   const env = this.env;
-  // Three neighboring blocks are detailed in every direction. Fade completely
-  // inside that footprint, before unloaded buildings or simpler facades appear.
+  // Fade inside the streamed footprint. Phones use a much smaller neighborhood.
   if(env.infinite)installDistanceFog();
-  this.scene.fog = env.infinite ? new T.Fog(env.sky.fog,110,150) : new T.FogExp2(env.sky.fog, env.sky.fogDensity);
+  this.scene.fog = env.infinite ? new T.Fog(env.sky.fog,this.tier.fogNear??110,this.tier.fogFar??150) : new T.FogExp2(env.sky.fog, env.sky.fogDensity);
   const sky = new T.Mesh(new T.SphereGeometry(800, 24, 12), new T.ShaderMaterial({vertexShader:skyVertex, fragmentShader:skyFragment, toneMapped:false, uniforms:{topColor:{value:new T.Color(env.infinite?0x6e8eaa:env.sky.top)}, horizon:{value:new T.Color(env.infinite?env.sky.fog:env.sky.horizon)}}, side:T.BackSide, depthWrite:false})); this.sky = sky; sky.renderOrder = 100; this.root.add(sky);
   // Neutral ground bounce: a green ground colour tints Lambert facades olive.
   this.root.add(new T.HemisphereLight(0xdcecf5, 0x8f887c, this.tier.lambert ? 1.7 : 1.4));

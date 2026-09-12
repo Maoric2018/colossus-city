@@ -118,7 +118,7 @@ export class FineBuildings{
  select(camera,far=0){
   const view=camera.cameras?.[0]||camera;eye.setFromMatrixPosition(view.matrixWorld);
   const visibleRange=Number.isFinite(far)?far+12:0;
-  this.selectIndex(this.cellIndex,this.visibleCells,Math.max(230,visibleRange));this.selectIndex(this.shardIndex,this.visibleShards,Math.max(170,visibleRange));
+  this.selectIndex(this.cellIndex,this.visibleCells,Math.max(this.tier.mobile?0:230,visibleRange));this.selectIndex(this.shardIndex,this.visibleShards,Math.max(this.tier.mobile?0:170,visibleRange));
  }
  selectIndex(index,visible,radius){
   this.candidates.clear();for(const e of visible)this.candidates.add(e);index.addNear(this.candidates,eye.x,eye.z,radius);

@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
 import {bakedModel, instances, assetStatus} from './assets.js';
-import {roofProp,ROOF_ASSETS} from '../shared/props.js';
+import {roofProp,roofColliders,ROOF_ASSETS} from '../shared/props.js';
 import {seeded} from '../shared/math.js';
 import {cloudSkyMaterial} from './render/cloud-sky.js';
 import {setAtmospherePanorama} from './render/distance-fog.js';
@@ -13,8 +13,9 @@ export async function installDistrict(view, renderer){
  const skyURL = base + 'textures/sky-' + (view.quest || tier.name==='QUEST' ? '1k' : '2k') + '.hdr';
  const tasks = [], rand = seeded(78021), root = view.root;
  tasks.push(new RGBELoader().loadAsync(skyURL).then(hdr => {
-  hdr.mapping = T.EquirectangularReflectionMapping; const pmrem = new T.PMREMGenerator(renderer), envMap = pmrem.fromEquirectangular(hdr); pmrem.dispose();
-  view.scene.environment = envMap.texture; view.scene.environmentIntensity = tier.lambert ? .45 : .6; view.scene.background = env.infinite ? null : hdr; view.scene.backgroundIntensity = .8; view.scene.backgroundBlurriness = 0;
+  hdr.mapping = T.EquirectangularReflectionMapping;
+  if(!tier.mobile){ const pmrem = new T.PMREMGenerator(renderer), envMap = pmrem.fromEquirectangular(hdr); pmrem.dispose(); view.scene.environment = envMap.texture; }
+  view.scene.environmentIntensity = tier.lambert ? .45 : .6; view.scene.background = env.infinite ? null : hdr; view.scene.backgroundIntensity = .8; view.scene.backgroundBlurriness = 0;
   view.scene.backgroundRotation.y = .4; view.scene.environmentRotation.y = .4; view.sky.visible = !!env.infinite; assetStatus.loaded.push(skyURL);
   if(env.infinite){
    setAtmospherePanorama(view.scene,hdr,view.scene.environmentRotation.y);
@@ -43,6 +44,7 @@ export async function installDistrict(view, renderer){
  return results;
 }
 export async function installRoofDressing(view){
+ if(view.tier.mobile){ installSimpleRoofs(view); return; }
  const tasks=[],env=view.env;
  // Roof props follow the bay underneath them, including rotations, removal and round resets.
  const roofAssets = [['city-kit-industrial/water-tower', 3.2], ['space-kit/satelliteDish_detailed', 2.6], ['city-kit-industrial/detail-tank', 1.3], ['city-kit-industrial/solar-panel-flat', .3]];
@@ -64,6 +66,18 @@ export async function installRoofDressing(view){
   attachRoofProps(view, view.cells.filter(c => view.attachments.has(c.id)));
  }
  await Promise.all(tasks);
+}
+// Cheap visible proxies use the exact collision bounds. They follow their bay and
+// participate in fracture appearance, so mobile never gets invisible roof obstacles.
+function installSimpleRoofs(view){
+ const placements=[];for(const c of view.cells)for(const box of roofColliders(c))placements.push({c,box});
+ if(!placements.length)return;
+ const batch=view.batch(new T.BoxGeometry(1,1,1),new T.MeshBasicMaterial({color:0x86939a}),placements.length),cells=new Set();
+ placements.forEach(({c,box},index)=>{
+  const [x,y,z,hx,hy,hz]=box,local=new T.Matrix4().compose(new T.Vector3(x,y,z),new T.Quaternion(),new T.Vector3(hx*2,hy*2,hz*2));
+  if(!view.attachments.has(c.id))view.attachments.set(c.id,[]);view.attachments.get(c.id).push({batch,index,local});cells.add(c);
+ });
+ attachRoofProps(view,[...cells]);
 }
 // Attached props are re-posed whenever their bay moves; register them with the buildings layer.
 export function attachRoofProps(view, cells){
