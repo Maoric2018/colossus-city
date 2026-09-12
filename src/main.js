@@ -32,7 +32,7 @@ const renderer = gr.renderer, tier = gr.tier;
 const scene = new T.Scene(); scene.background = new T.Color(city.sky.horizon);
 const camera = new T.PerspectiveCamera(72, innerWidth / innerHeight, .05, tier.far), rig = new T.Group(); rig.add(camera); scene.add(rig);
 const cityView = new CityView(scene, city, {tier, quest});
-const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
+const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(scene), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
 const net = new Connection(onMessage, onDisconnect), hud = new HUD(), cameraRig = new CameraRig(camera, rig, cityView, shake, prediction);
 const players = new Map(), rags = new Map();
 let lastNow = performance.now(), lastHUD = 0, lastInput = 0, frameCount = 0, frameStart = performance.now(), lastReconciled = -1;
@@ -155,7 +155,7 @@ function frame(now, xrFrame){
   giant.update({head:[0, 24, 0], left:[-6, 13 + Math.sin(t * 5), -3], right:[6, 12 + Math.cos(t * 5), -4], bossYaw:-.35});
   cameraRig.intro(now, city);
  }
- missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
+ missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, state.role==='raider'&&prediction.active?localOverride:me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
  cityView.update(dt);cityView.cars.update(dt,fx); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
  renderer.info.reset();
  if(!(state.playing && state.role === 'spectator' && views.visible)) gr.render(scene, camera, dt);
@@ -166,7 +166,7 @@ window.addEventListener('resize', () => gr.resize(camera));
 input.bind();
 canvas.addEventListener('click', () => { if(state.playing && !renderer.xr.isPresenting && !document.pointerLockElement) pointer(); });
 document.addEventListener('pointerlockchange', () => { if(state.playing && !views.visible && !renderer.xr.isPresenting && !document.pointerLockElement){ input.reset(); hud.showOverlay('TAKE A BREATHER.', 'The room keeps running. Resume to control your character.', {renderer, net}); } });
-const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(`CITY READY · ${gr.tier.name} MODE ON ${gpuLabel(gr.gpu)} · CREATE A ROOM OR JOIN YOUR FRIENDS`); });
+const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, fx.ready, flightFX.ready, installDistrict(cityView, renderer), loadModel('/assets/imported/raider/armored-pilot.glb'), loadModel('/assets/imported/raider/armored-ragdoll.glb'), bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(() => { window.COLOSSUS_ART_READY = true; if(!state.playing) notice(`CITY READY · ${gr.tier.name} MODE ON ${gpuLabel(gr.gpu)} · CREATE A ROOM OR JOIN YOUR FRIENDS`); });
 if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.then(() => start(false, false, true));
 window.COLOSSUS_READY = true; notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test and profiling tools.

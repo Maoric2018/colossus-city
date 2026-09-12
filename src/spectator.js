@@ -70,7 +70,7 @@ export class SpectatorViews{
   this.lastFrame+=Math.max(1,Math.floor((now-this.lastFrame+.5)/interval))*interval;
   const captureStart=performance.now();try{
    if(headset){if(!this.captureXR())return;}
-   else{const source=this.renderer.domElement,aspect=source.width/source.height,w=Math.min(640,400*aspect),h=w/aspect,x=(640-w)/2,y=(400-h)/2;this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);this.context.drawImage(source,x,y,w,h);this.context.drawImage(document.getElementById('flight-effects'),x,y,w,h);this.drawHUD();}
+   else{const source=this.renderer.domElement,aspect=source.width/source.height,w=Math.min(640,400*aspect),h=w/aspect,x=(640-w)/2,y=(400-h)/2;this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);this.context.drawImage(source,x,y,w,h);this.drawHUD();}
    const info=JSON.stringify({type:'view-info',mode:headset?'Headset left eye':this.getMode(),paused:this.getPaused(),tracking:this.getTracking()});
    if(info!==this.lastInfo||now-(this.lastInfoAt||0)>1000){stream.send(JSON.parse(info));this.lastInfo=info;this.lastInfoAt=now;}
    stream.publish();if(now-(this.lastImage||0)>=1000/15){this.lastImage=now;stream.image();}

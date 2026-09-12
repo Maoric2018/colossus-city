@@ -6,7 +6,7 @@ import {v,len} from '../shared/math.js';
 import {C} from '../shared/config.js';
 import {Prediction} from '../src/app/prediction.js';
 import {flightRotation} from '../shared/flight.js';
-import {soarBreachCells,flightHalf} from '../shared/soar-breach.js';
+import {soarBreachCells,soarBreachVolume,flightHalf} from '../shared/soar-breach.js';
 import {box} from '../shared/giant-rig.js';
 await physicsReady;
 const socket={send(){},readyState:1};
@@ -19,8 +19,9 @@ test('soaring opens both sides of a building, keeps speed and health, and replic
  const {r,client,p,bounds}=setup();try{
   for(let i=0;i<45;i++){tick(r,client,{soar:true});const actual=p.body.collider(0).rotation(),expected=flightRotation(p,p.input);assert.ok(Math.abs(actual.x-expected.x)<.00001,'The prone collider rotation survives the physics step');}
   assert.ok(p.body&&p.body.translation().z<bounds[2]-3,'pilot exits the far wall');assert.equal(p.hp,100);assert.ok(len(p.body.linvel())>28);
-  const broken=r.cellsByBuilding[5].filter(c=>c.skin.parts?.length);assert.equal(broken.length,2,'only the two directly struck wall bays break');
-  for(const c of broken){assert.equal(c.lastHitBy,p.id);assert.ok([...r.shards.values()].some(e=>e.cell===c.id));assert.ok(!r.detached.has(c.id),'Only the flight corridor breaks');}
+  const broken=r.cellsByBuilding[5].filter(c=>c.skin.parts?.length);assert.ok(broken.length>2,'The field clears adjacent floors as well as the body-sized slot');
+  assert.ok(broken.length<r.cellsByBuilding[5].length/4,'The surrounding building stays intact');
+  for(const c of broken){assert.equal(c.lastHitBy,p.id);assert.ok([...r.shards.values()].some(e=>e.cell===c.id));}
   const events=r.drainEvents();assert.ok(events.some(e=>e.type==='soar-breach'&&e.player===p.id));assert.ok(events.some(e=>e.type==='fracture'));
   const late=r.welcome({id:99,role:'spectator'});for(const c of broken){assert.ok(late.shards.some(e=>e.cell===c.id));assert.ok(late.fractures.some(s=>s[0]===c.id));}
   for(let i=0;i<65;i++)tick(r,client,{soar:false,z:0});assert.equal(p.breachCells.size,0);r.spawn(p);assert.equal(p.breachCells.size,0);
@@ -53,7 +54,7 @@ test('breaching works in generated blocks and its holes survive unloading and re
 });
 test('breach grace filters only the owning pilot and expires in real Rapier contacts',()=>{
  const {r,client,p,cell}=setup();try{
-  tick(r,client,{soar:true});r.breakCells([cell.id],v());const e=r.debris.get(cell.entity);e.body.setBodyType(RAPIER.RigidBodyType.Fixed,true);const at=e.body.translation();
+  tick(r,client,{soar:false});r.breakCells([cell.id],v());const e=r.debris.get(cell.entity);e.body.setBodyType(RAPIER.RigidBodyType.Fixed,true);const at=e.body.translation();
   const other=r.attach(socket,'raider','other'),p2=r.players.get(other.id);r.spawn(p,at);r.spawn(p2,at);p.breachCells.set(cell.id,r.time+C.SOAR_DEBRIS_GRACE);
   const contact=pilot=>{let count=0;r.world.contactPair(pilot.body.collider(0),e.body.collider(0),m=>count+=m.numContacts());return count;};
   r.world.step(r.queue,r.physicsHooks);assert.equal(contact(p),0);assert.ok(contact(p2)>0,'other pilot still collides');
@@ -72,6 +73,18 @@ test('prediction crosses only swept building cells while leaving unrelated colli
  const city={handWorld:{*near(){yield wall;}},overlapBox(p,half,ignored){skipped=!!ignored?.has(12);return skipped?null:{center:v(0,10,-1.5),half:v(2,2,.02)};}},prediction=new Prediction(city);
  prediction.reset({p:[0,10,0],v:[0,0,-32],fuel:1});prediction.simulate({yaw:0,pitch:0,soar:true,z:-1,up:0,x:0,dodge:0});assert.ok(skipped);assert.ok(prediction.vel.z<-25);
  prediction.reset({p:[0,10,0],v:[0,0,-32],fuel:1});prediction.simulate({yaw:0,pitch:0,soar:false,z:-1,up:0,x:0,dodge:0});assert.equal(skipped,false);
+});
+
+test('the pressure field clears a camera-wide path before the pilot reaches a wall',()=>{
+ const {r,client,p,bounds}=setup();try{
+  tick(r,client,{soar:true});assert.ok(p.body.translation().z>bounds[5]+4,'Still more than four metres outside');
+  const holes=r.cellsByBuilding[5].filter(c=>c.skin.parts?.length);assert.ok(holes.length>=3,'Entry wall and adjacent floors already have holes');
+  const origin=p.body.translation();for(const e of r.shards.values()){const x=e.origin[0]-origin.x,y=e.origin[1]-origin.y,radius=Math.hypot(x,y);if(radius>.5)assert.ok((e.velocity[0]*x+e.velocity[1]*y)/radius>10,'Loose pieces are driven away from the flight corridor');}
+  const state={soaring:true},from=v(0,10,0),velocity=v(0,0,-32),input={yaw:0,pitch:0};
+  const objects=[box([2.6,10,-6],[.1,.1,.05],undefined,1),box([0,12.6,-6],[.1,.1,.05],undefined,2),box([3.2,10,-6],[.1,.1,.05],undefined,3),box([0,10,-10],[1,1,.05],undefined,4),box([0,7.5,-3],[20,.08,20])];
+  assert.deepEqual(soarBreachCells(state,from,velocity,input,{*near(){yield*objects;}}),[1,2],'Clears shoulders and camera height, stays bounded and ignores ground at its edge');
+  const volume=soarBreachVolume(state,from,velocity,input);assert.ok(volume.to[2]<-6&&volume.to[2]>-8);
+ }finally{r.dispose();}
 });
 
 test('empty fuel does not stop soaring or breaching, and the entry boom fires only on entry',()=>{

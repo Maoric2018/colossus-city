@@ -27,11 +27,11 @@ export function chipCell(room,c,point,radius,energy,by=0,direction=[0,0,0],all=f
  spawnShards(room,c,chosen,direction);return chosen;
 }
 export function spawnShards(room,c,pieces,direction=[0,0,0]){
- const clusters=new Map(),dir=Array.isArray(direction)?direction:arr(direction);
+ const clusters=new Map(),velocityAt=typeof direction==='function'?direction:null,dir=velocityAt?null:Array.isArray(direction)?direction:arr(direction);
  for(const p of pieces){const key=p.group+':'+p.material+':'+p.p.map(n=>Math.floor(n/1.05)).join(',');if(!clusters.has(key))clusters.set(key,[]);clusters.get(key).push(p);}
  for(const parts of clusters.values()){
   const lo=[0,1,2].map(k=>Math.min(...parts.map(p=>p.p[k]-p.size[k]/2))),hi=[0,1,2].map(k=>Math.max(...parts.map(p=>p.p[k]+p.size[k]/2))),center=lo.map((n,k)=>(n+hi[k])/2),id=room.nextShard++,rand=seeded(id+c.id),origin=c.p.map((n,k)=>n+center[k]);
-  const velocity=dir.map((n,k)=>Math.max(-7,Math.min(7,n))+(rand()-.5)*(k===1?1:2));velocity[1]+=1;
+  const limit=velocityAt?16:7,velocity=(velocityAt?velocityAt(origin,id):dir).map((n,k)=>Math.max(-limit,Math.min(limit,n))+(rand()-.5)*(k===1?1:2));velocity[1]+=1;
   const e={type:'shards',id,cell:c.id,pieces:parts.map(p=>p.id),origin,p:[...origin],q:[0,0,0,1],half:lo.map((n,k)=>Math.max(.035,(hi[k]-n)*.47)),material:parts[0].material,born:room.time,velocity,settled:false};
   room.shards.set(id,e);
   if(room.activeShards.size<MAX_ACTIVE_SHARDS){

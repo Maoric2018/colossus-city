@@ -281,7 +281,7 @@ export function breakCells(room, requested, kick = v(0, 0, 0), hint = {}){
  const unsupported = [];
  for(const b of buildings) unsupported.push(...unsupportedCells(room.cellsByBuilding[b], prospective));
  if(hint.granular||hits.some(id=>room.cellMap.get(id).skin.parts?.length)){
-  releaseFineCells(room,hits,arr(kick));
+  releaseFineCells(room,hits,hint.shardVelocity||arr(kick));
   // An unsupported tower sheds from the bottom upward. Keep each upper section
   // visible and solid until its pieces are released, avoiding a disappearing
   // tower or a multi-megabyte, single-frame avalanche of debris messages.
