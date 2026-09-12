@@ -100,3 +100,9 @@ body.touch #overlay p{font-size:12px}
 body.touch .primary,body.touch .secondary,body.touch #leave,body.touch #camera-toggle{min-height:46px}
 body.touch #lobby{max-height:calc(100dvh - 40px);overflow-y:auto}
 body.touch input{padding:15px 14px}
+/* The join modal follows the lobby palette. */
+#overlay{--acid:#d9c18d;--line:#d9c18d33}
+#overlay>div{background:#0b1410f2;border-color:#d9c18d33}
+#overlay .primary{background:#d9c18d;color:#20261c;border-color:#d9c18d}
+#overlay .primary:hover{background:#ecd9ad}
+#overlay h2{letter-spacing:-1px}

@@ -90,7 +90,7 @@ try{
  await raider.waitForFunction(()=>document.getElementById('boss-caption').textContent.includes('5,200'));
  const scaledBar=await raider.locator('#boss-fill').evaluate(e=>parseFloat(e.style.width));assert.ok(scaledBar>0&&scaledBar<=100);
  checks.push('Two raiders scale the colossus to 5,200 HP on all clients; the desktop health bar stays within 100%');
- const observerPromise=desktop.waitForEvent('page');await raider.bringToFront();await raider.keyboard.press('Escape');await raider.locator('#menu-spectator').click();const observer=await observerPromise;observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
+ await raider.bringToFront();await raider.keyboard.press('Escape');const observer=await desktop.newPage();await observer.goto(`${url}/?spectator=1&room=${room}`);observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
  await observer.waitForFunction(()=>window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.frames>=2&&c.transport==='video'&&c.video.videoWidth===640));
  assert.ok(await observer.evaluate(()=>[...window.__COLOSSUS.views.cards.values()].some(c=>c.mode==='Headset left eye')));
  await observer.screenshot({path:'artifacts/spectator-panel.png'});

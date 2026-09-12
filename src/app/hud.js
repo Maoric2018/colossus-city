@@ -14,6 +14,7 @@ export class HUD {
  showOverlay(title = 'READY TO DROP?', text = 'Click to capture your mouse. Escape releases it.', {renderer, net} = {}){
   if(renderer?.xr.isPresenting) return; state.paused = true; $('overlay-title').textContent = title; $('overlay-text').textContent = text; $('overlay').classList.remove('hidden');
   $('camera-toggle').classList.toggle('hidden', state.role !== 'raider'); $('camera-toggle').textContent = `${state.firstPerson ? 'SWITCH TO THIRD PERSON' : 'SWITCH TO FIRST PERSON'}${touch ? '' : ' · V'}`;
+  for(const id of ['menu-spectator', 'open-spectator']) $(id).classList.toggle('hidden', state.role !== 'spectator');
   $('resume').textContent = state.role === 'boss' ? 'DESKTOP CONTROLS ↗' : 'DEPLOY ↗'; $('restart').classList.toggle('hidden', !state.current?.phase || net?.id !== state.welcome?.host);
  }
  hideOverlay(){ state.paused = false; $('overlay').classList.add('hidden'); }
