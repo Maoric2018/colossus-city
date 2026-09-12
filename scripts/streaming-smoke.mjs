@@ -19,7 +19,8 @@ try{
    const {renderer,scene,camera,city,rig}=window.__COLOSSUS;rig.position.set(0,0,0);rig.scale.setScalar(1);camera.position.set(...position);camera.lookAt(...target);camera.updateMatrixWorld(true);
    for(let i=0;i<13;i++){renderer.render(scene,camera);await new Promise(r=>requestAnimationFrame(r));}
    const a=performance.now();for(let i=0;i<20;i++){renderer.info.reset();renderer.render(scene,camera);renderer.getContext().finish();}const renderMS=(performance.now()-a)/20;
-   return {views:city.stream.views.size,previews:city.stream.previews.size,detailBatches:city.buildings.components.batches.size,triangles:renderer.info.render.triangles,calls:renderer.info.render.calls,renderMS,geometries:renderer.info.memory.geometries};
+   const catalogLOD=[...city.stream.catalogLOD.batches.values()],catalogTriangles=catalogLOD.reduce((n,m)=>n+m.count*(m.geometry.index?.count??m.geometry.attributes.position.count)/3,0);
+   return {views:city.stream.views.size,previews:city.stream.previews.size,detailBatches:city.buildings.components.batches.size,catalogBatches:catalogLOD.length,catalogTriangles,triangles:renderer.info.render.triangles,calls:renderer.info.render.calls,renderMS,geometries:renderer.info.memory.geometries};
   },{position,target});stats.push({name,...sample});assert.ok(sample.views<=9&&sample.views>0);assert.ok(sample.previews<220);await page.screenshot({path:`artifacts/${name}.png`});
  }
  const culling=await page.evaluate(async()=>{

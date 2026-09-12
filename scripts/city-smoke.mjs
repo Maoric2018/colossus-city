@@ -1,6 +1,8 @@
 // Real rendered architectural kits, collapse attachments and persistent skin fragments.
 import assert from 'node:assert/strict';
 import {COMPONENTS} from '../shared/city/components.js';
+import {componentPlacements} from '../shared/city/components.js';
+import {generateCells,city} from '../shared/environment.js';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -41,7 +43,8 @@ try{
   camera.position.set(-50,12,90);camera.lookAt(-66,3,70);renderer.render(scene,camera);
   return {buildings:city.env.buildings.length,bays:city.cells.length,componentTypes:kit.batches.size,attached,count,settled,persists,reset,lateJoin,finalPose,failedAssets:window.__COLOSSUS.assetStatus.failed};
  });
- assert.ok(checks.attached&&checks.settled&&checks.persists&&checks.reset&&checks.lateJoin&&checks.finalPose);assert.equal(checks.componentTypes,Object.keys(COMPONENTS).length);assert.deepEqual(checks.failedAssets,[]);
+ const homeTypes=new Set(generateCells(city).flatMap(c=>componentPlacements(c,{interiors:false}).map(p=>p.type)));
+ assert.ok([...homeTypes].every(t=>COMPONENTS[t]));assert.ok(checks.attached&&checks.settled&&checks.persists&&checks.reset&&checks.lateJoin&&checks.finalPose);assert.ok(checks.componentTypes>=homeTypes.size&&checks.componentTypes<=Object.keys(COMPONENTS).length);assert.deepEqual(checks.failedAssets,[]);
  await page.screenshot({path:'artifacts/persistent-rubble.png'});assert.deepEqual(errors,[]);
  const report={result:'PASS',checks,stats,artifacts:[...views.map(v=>v[0]+'.png'),'persistent-rubble.png']};await writeFile('artifacts/city-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill('SIGTERM');}

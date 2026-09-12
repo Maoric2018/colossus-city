@@ -1,4 +1,5 @@
 import {chryslerLODGeometry} from '../render/chrysler-lod.js';
+import {CatalogLOD,catalogTint} from '../render/catalog-lod.js';
 import * as T from 'three';
 import {CityView} from './city.js';
 import {surface} from '../render/quality.js';
@@ -23,6 +24,7 @@ export class StreamedBlocks{
   };material.customProgramCacheKey=()=> 'streamed-facades-v1';
   this.lod=new T.InstancedMesh(new T.BoxGeometry(1,1,1),material,8192);this.lod.count=0;this.lod.frustumCulled=false;this.lod.receiveShadow=true;owner.root.add(this.lod);
   this.landmarkLOD=new T.InstancedMesh(chryslerLODGeometry(),surface(owner.tier,{vertexColors:true,roughness:.45}),256);this.landmarkLOD.count=0;this.landmarkLOD.frustumCulled=false;owner.root.add(this.landmarkLOD);
+  this.catalogLOD=new CatalogLOD(owner.root,owner.tier);
  }
  record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
  state(meta){
@@ -65,21 +67,26 @@ export class StreamedBlocks{
  }
  rebuildLOD(){
   let index=0,landmarks=0;
+  this.catalogLOD.reset();
   for(const env of this.previews.values()){
    if(this.views.has(env.key))continue;const record=this.records.get(env.key),gone=new Set([...(record?.cleared||[]),...[...(record?.entities.values()||[])].flatMap(e=>e.cells)]),collapsed=new Set();
-   if(gone.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i);if(mine.filter(c=>gone.has(c.id)).length>mine.length*.45)collapsed.add(i);}}
+   const damaged=new Map();if(gone.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i),broken=mine.filter(c=>gone.has(c.id));damaged.set(i,broken);if(broken.length>mine.length*.45)collapsed.add(i);}}
    for(const [i,b]of env.buildings.entries()){
+    if(collapsed.has(i))continue;
+    if(!damaged.get(i)?.length&&this.catalogLOD.building(b))continue;
+    this.catalogLOD.roofs(b,damaged.get(i)||[]);
     if(b.architecture==='chrysler'&&!collapsed.has(i)&&landmarks<this.landmarkLOD.instanceMatrix.count){
      const crown=gone.size?generateCells(env).find(c=>c.building===i&&c.chryslerCrown):null;
      if(!crown||!gone.has(crown.id)){dummy.position.set(b.x,.15+(b.tiers.reduce((n,t)=>n+t.floors,0)-.5)*b.story,b.z);dummy.rotation.set(0,0,0);dummy.scale.set(b.bay,b.story,b.bay);dummy.updateMatrix();this.landmarkLOD.setMatrixAt(landmarks++,dummy.matrix);}
     }
     const base=b.tiers[0];let floor=0;
     for(const t of b.tiers){const h=t.floors*b.story;dummy.position.set(b.x+(t.ix+(t.nx-base.nx)/2)*b.bay,.15+floor*b.story+h/2,b.z+(t.iz+(t.nz-base.nz)/2)*b.bay);dummy.rotation.set(0,0,0);dummy.scale.set(t.nx*b.bay,h,t.nz*b.bay);floor+=t.floors;
-     if(collapsed.has(i))continue;if(index>=this.lod.instanceMatrix.count)break;dummy.updateMatrix();this.lod.setMatrixAt(index,dummy.matrix);this.lod.setColorAt(index++,new T.Color(palette[b.material][b.variant%3]));
+     if(collapsed.has(i))continue;if(index>=this.lod.instanceMatrix.count)break;dummy.updateMatrix();this.lod.setMatrixAt(index,dummy.matrix);this.lod.setColorAt(index++,new T.Color(catalogTint(b.architecture)??palette[b.material][b.variant%3]));
     }
    }
   }
   this.landmarkLOD.count=landmarks;this.landmarkLOD.instanceMatrix.needsUpdate=true;
+  this.catalogLOD.commit();
   this.lod.count=index;this.lod.instanceMatrix.needsUpdate=true;if(this.lod.instanceColor)this.lod.instanceColor.needsUpdate=true;
  }
 }

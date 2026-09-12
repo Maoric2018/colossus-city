@@ -1,4 +1,5 @@
 import {modernColliders} from './city/modern-landmarks.js';
+import {catalogRoofColliders} from './city/catalog-components.js';
 import {chryslerColliders} from './city/chrysler.js';
 import {seeded} from './math.js';
 import {propBounds} from './prop-bounds.js';
@@ -16,7 +17,7 @@ export function roofProp(c){
  return {asset,height,scale,size,yaw:(c.roofYaw??c.building)*Math.PI/2};
 }
 export function roofColliders(c){
- const crown=c.architecture==='chrysler'?chryslerColliders(c):modernColliders(c);
+ const crown=[...(c.architecture==='chrysler'?chryslerColliders(c):modernColliders(c)),...catalogRoofColliders(c)];
  const spire=c.spire?[[0,c.size[1]/2+c.spire/2,0,.9,c.spire/2,.9]]:[];
  const p=roofProp(c);if(!p)return [...spire,...crown];const [w,h,d]=p.size,swap=(c.roofYaw??c.building)%2,base=c.size[1]/2+(c.roofAsset?.04:.02);
  // Quarter-turn roof placements allow exact axis-aligned bounds in bay space.

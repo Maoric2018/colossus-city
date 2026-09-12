@@ -68,7 +68,7 @@ function mergeFloor(room, f){
  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2, y = any.p[1], tag = {building:f.building, floor:f.floor};
  // Notched landmark shoulders have real empty corners. A bounding rectangle would
  // create invisible floors and walls across the cut; only these rare floors use bays.
- const rectangular=new Set(cells.map(c=>c.ix)).size*new Set(cells.map(c=>c.iz)).size===cells.length;
+ const rectangular=(Math.max(...cells.map(c=>c.ix))-Math.min(...cells.map(c=>c.ix))+1)*(Math.max(...cells.map(c=>c.iz))-Math.min(...cells.map(c=>c.iz))+1)===cells.length;
  f.notched=!rectangular;
  if(f.notched){
   // Greedily merge occupied runs into rectangles without spanning the empty notch.
@@ -79,7 +79,7 @@ function mergeFloor(room, f){
   const ox=any.p[0]-any.ix*w,oz=any.p[2]-any.iz*d;
   for(const r of rects)f.structure.push(staticCollider(room,body,[ox+(r.x0+r.x1)*w/2,y+h/2-slab,oz+(r.z0+r.z1)*d/2,(r.x1-r.x0+1)*w/2,slab,(r.z1-r.z0+1)*d/2],tag));
   for(const c of cells){
-   for(let side=0;side<4;side++)if(c.walls[side]){
+   for(let side=0;side<4;side++)if(c.walls[side]&&!c.openSkin){
     const a=side===0?[c.p[0],y,c.p[2]-d/2+.06,w/2-.3,h/2-.22,.06]:side===1?[c.p[0]+w/2-.06,y,c.p[2],.06,h/2-.22,d/2-.3]:side===2?[c.p[0],y,c.p[2]+d/2-.06,w/2-.3,h/2-.22,.06]:[c.p[0]-w/2+.06,y,c.p[2],.06,h/2-.22,d/2-.3];
     f.walls[side].push(staticCollider(room,body,a,{...tag,side}));
    }
@@ -90,6 +90,7 @@ function mergeFloor(room, f){
  f.structure.push(staticCollider(room, body, [cx, y + h / 2 - slab, cz, (maxX - minX) / 2, slab, (maxZ - minZ) / 2], tag));
 
  f.structureMerged = true;
+ if(cells.some(c=>c.openSkin)){for(const c of cells)for(let side=0;side<4;side++)attachWall(room,c,side);return;}
  const spans = [[cx, minZ + .06, (maxX - minX) / 2 - .3, .06], [maxX - .06, cz, .06, (maxZ - minZ) / 2 - .3], [cx, maxZ - .06, (maxX - minX) / 2 - .3, .06], [minX + .06, cz, .06, (maxZ - minZ) / 2 - .3]];
  for(let side = 0; side < 4; side++){ const [sx, sz, hx, hz] = spans[side]; f.walls[side].push(staticCollider(room, body, [sx, y, sz, hx, h / 2 - .22, hz], {...tag, side})); f.wallsMerged[side] = true; }
 }

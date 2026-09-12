@@ -1,5 +1,7 @@
 import {MODERN_LANDMARK_COMPONENTS,modernLandmark,modernPlacements} from './modern-landmarks.js';
 import {CHRYSLER_COMPONENTS,chryslerPlacements} from './chrysler.js';
+import {CATALOG_COMPONENTS,catalogPlacements} from './catalog-components.js';
+import {STYLE_BY_ID} from './catalog.js';
 // Architectural kit in normalized bay coordinates. Parts have distinct geometry and jobs;
 // structural assemblies share a physics bay, while facade/glass pieces follow their own skin.
 // All of these same assemblies remain attached when their bay falls or comes to rest.
@@ -8,7 +10,7 @@ const rail=(y,z=-.51)=>[box([.9,.024,.022],[0,y,z]),...[-.42,-.21,0,.21,.42].map
 const beam=(x=0,z=0)=>[box([.1,.86,.025],[x,-.025,z]),...[-.075,.075].map(d=>box([.1,.86,.02],[x,-.025,z+d]))];
 const kit=(label,material,parts)=>({label,material,parts});
 export const COMPONENTS=Object.freeze({
- ...CHRYSLER_COMPONENTS, ...MODERN_LANDMARK_COMPONENTS,
+ ...CHRYSLER_COMPONENTS, ...MODERN_LANDMARK_COMPONENTS, ...CATALOG_COMPONENTS,
  slabEdge:kit('Precast slab edge','stone',[box([1,.075,.07],[0,.46,-.48])]),
  iBeam:kit('Steel I girder','steel',[box([.96,.09,.024],[0,.38,-.38]),...[-.05,.05].map(y=>box([.96,.018,.075],[0,.38+y,-.38]))]),
  hColumn:kit('Flanged steel column','steel',beam(-.46,-.46)),
@@ -113,9 +115,27 @@ export const COMPONENTS=Object.freeze({
 });
 export function componentPlacements(c,{interiors=true}={}){
  const out=[],put=(type,side=-1,layer='frame')=>out.push({type,side,layer});
- const core=c.ix%2===0&&c.iz%2===0;
+ const core=c.ix%2===0&&c.iz%2===0||c.architecture==='citigroup'&&c.ix===1&&c.iz===1;
  if(core && (interiors || c.ground))for(const type of ['iBeam','hColumn','joists','coreWall','elevator','stairFlight','stairLanding','stairRail','pipe'])put(type);
  if(core&&c.floor%3===1)put('crossBrace');
+ const recipe=STYLE_BY_ID.get(c.architecture);
+ if(recipe){
+  if(core&&(interiors||c.ground))for(const t of ['ceilingLight','sprinkler','cableTray','partition','desk','serviceDoor','exitSign','stairStringer','conduit'])put(t);
+  for(let side=0;side<4;side++)if(c.walls[side]&&!c.openSkin){
+   const layer=c.material==='glass'?'glass':'facade';
+   if(interiors||c.floor<3||c.roof)for(const t of ['dripEdge','expansionJoint','panelBolts','transom','radiator'])put(t,side,layer);
+   if(!recipe.landmark){
+    put('mullion',side,'glass');put('slabEdge',side);
+    if(interiors||c.floor<3||c.roof)for(const t of ['windowRecess','sill','lintel','casement'])put(t,side,layer);
+    if(['residential','arts'].includes(recipe.neighborhood)&&c.floor===1)for(const t of ['frenchDoor','balcony','balconyRail'])put(t,side,layer);
+    if(recipe.material==='brick'&&side===1&&c.floor>0&&c.floor<4)for(const t of ['escapePlatform','escapeLadder'])put(t,side,layer);
+   }
+   if(c.ground)for(const t of ['door','shopfront','threshold','doorCloser','intercom','kickPlate'])put(t,side,layer);
+   if(c.roof)for(const t of ['parapet','roofDrain','gutter'])put(t,side);
+  }
+  if(c.roof&&(!recipe.landmark||!(c.topFloor&&c.catalogRoof!=='flat')))for(const t of ['roofHatch','ductFan','roofWalkway','utilityTank','lightningRod','louverScreen','duct','roofVent'])put(t);
+  catalogPlacements(c,put,{interiors});return out;
+ }
  if(modernLandmark(c.architecture)){
   if(core&&(interiors||c.ground))for(const t of ['ceilingLight','sprinkler','cableTray','partition','desk','serviceDoor','exitSign','stairStringer','conduit'])put(t);
   modernPlacements(c,put,{interiors});return out;

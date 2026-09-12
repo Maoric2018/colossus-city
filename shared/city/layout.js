@@ -1,5 +1,6 @@
 import {hudsonBuilding,vanderbiltBuilding} from './modern-landmarks.js';
 import {chryslerBuilding} from './chrysler.js';
+import {NEW_BUILDING_STYLES,NEIGHBORHOODS,catalogBuilding} from './catalog.js';
 // The only authoritative map definition. Visual assets never decide collisions.
 // MIDTOWN: a Manhattan-style grid of avenues (north-south) and streets (east-west) with
 // Dense blocks, landmark towers and street-front infill. Integer bay grids keep
@@ -80,7 +81,7 @@ for(let bz=0;bz<5;bz++)for(let bx=0;bx<5;bx++){
 
 // An address is derived from its grid coordinate, never from exploration order.
 export const BLOCK_SIZE=70, CELL_STRIDE=4096, STREAM_CELL_BASE=1000000;
-export const BUILDING_STYLES=Object.freeze([
+const LEGACY_BUILDING_STYLES=Object.freeze([
  {id:'brownstone',name:'BROWNSTONE',material:'brick',floors:[4,7]},
  {id:'tenement',name:'WALKUP',material:'brick',floors:[5,9]},
  {id:'warehouse',name:'WAREHOUSE',material:'brick',floors:[3,5]},
@@ -98,6 +99,10 @@ export const BUILDING_STYLES=Object.freeze([
  {id:'copper',name:'COPPER COURT',material:'stone',floors:[7,12]},
  {id:'modern',name:'DESIGN STUDIOS',material:'concrete',floors:[5,10]}
 ]);
+export const BUILDING_STYLES=Object.freeze([...LEGACY_BUILDING_STYLES,...NEW_BUILDING_STYLES]);
+const newUrban=NEW_BUILDING_STYLES.filter(s=>!s.landmark),landmarks=NEW_BUILDING_STYLES.filter(s=>s.landmark);
+const ordinary=[...LEGACY_BUILDING_STYLES,...newUrban];
+const districtPools=new Map(NEIGHBORHOODS.map(n=>[n,newUrban.filter(s=>s.neighborhood===n)]));
 const zig=n=>n>=0?n*2:-n*2-1,unzig=n=>n%2?-(n+1)/2:n/2;
 export const blockAt=(x,z)=>[Math.floor((x+35)/70),Math.floor((z+35)/70)];
 export const blockKey=(x,z)=>`${x},${z}`;
@@ -107,11 +112,17 @@ export function cellBlock(id){if(id<=STREAM_CELL_BASE)return null;const n=Math.f
 export function blockSeed(x,z,seed=90210){let h=(Math.imul(x,374761393)^Math.imul(z,668265263)^seed)>>>0;h=Math.imul(h^(h>>>13),1274126177);return (h^(h>>>16))>>>0;}
 export function generateBlock(x,z,seed=90210,{landmark}={}){
  const hash=blockSeed(x,z,seed);let state=hash||1;const random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
- const buildings=[],district=BUILDING_STYLES[Math.floor(random()*BUILDING_STYLES.length)].id;
+ // Adjacent blocks share a neighborhood bias, with mixed-use infill. The independent
+ // block seed still varies footprints, heights and selections within that neighborhood.
+ const buildings=[],district=NEIGHBORHOODS[blockSeed(Math.floor(x/3),Math.floor(z/3),seed+71)%NEIGHBORHOODS.length],used=new Set();
+ const landmarkPlot=hash%3===0?Math.floor(random()*8):-1;
  // Eight independent street addresses leave a central service courtyard and 2 m alleys.
  const plots=[[-18,-18],[0,-18],[18,-18],[-18,0],[18,0],[-18,18],[0,18],[18,18]];
  for(let i=0;i<plots.length;i++){
-  const style=BUILDING_STYLES[(hash+i*5+Math.floor(random()*4))%BUILDING_STYLES.length], [px,pz]=plots[i],variant=(hash+i*41)>>>0;
+  let pool=i===landmarkPlot?landmarks:random()<.55?districtPools.get(district):ordinary;
+  pool=pool.filter(s=>!used.has(s.id));if(!pool.length)pool=ordinary.filter(s=>!used.has(s.id));
+  const style=pool[Math.floor(random()*pool.length)], [px,pz]=plots[i],variant=Math.floor(random()*4294967296);used.add(style.id);
+  if(style.footprint){buildings.push(catalogBuilding(style,x*70+px,z*70+pz,{variant,random,district}));continue;}
   const footprint={brownstone:[1,3],tenement:[2,3],warehouse:[3,2],castiron:[3,2],beauxarts:[3,3],deco:[3,2],curtain:[2,2],terraced:[3,3],brutalist:[3,2],hotel:[3,2],apartment:[2,3],industrial:[3,2],market:[3,3],gothic:[2,3],copper:[3,3],modern:[3,2]}[style.id];
   const [nx,nz]=footprint,width=Math.max(nx,nz)===3?4.05+random()*.65:4.7+random()*1.5,floors=style.floors[0]+Math.floor(random()*(style.floors[1]-style.floors[0]+1));
   const setbacks=['deco','terraced','copper','modern','gothic'].includes(style.id), tiers=style.id==='terraced'?[box(3,3,Math.max(2,floors-4)),box(2,2,2,i%2,(i>>1)%2),box(1,1,2,1,1)]:setbacks?[box(nx,nz,Math.max(2,floors-3)),box(nx-1,nz-1,3,i%2,(i>>1)%2)]:[box(nx,nz,floors)];
@@ -124,4 +135,4 @@ export function generateBlock(x,z,seed=90210,{landmark}={}){
 // The original landmarks retain their special parts; ordinary home addresses now use the
 // same architectural families as the surrounding city, with stable per-building palettes.
 midtown.infinite=true;
-midtown.buildings.forEach((b,i)=>{b.variant??=i*37+11;if(!b.architecture)b.architecture=BUILDING_STYLES.filter(s=>s.material===b.material)[i%BUILDING_STYLES.filter(s=>s.material===b.material).length].id;});
+midtown.buildings.forEach((b,i)=>{b.variant??=i*37+11;if(!b.architecture)b.architecture=LEGACY_BUILDING_STYLES.filter(s=>s.material===b.material)[i%LEGACY_BUILDING_STYLES.filter(s=>s.material===b.material).length].id;});

@@ -1,4 +1,5 @@
 import {shapeModernCell,finishModernCells} from './modern-landmarks.js';
+import {shapeCatalogCell,finishCatalogCells} from './catalog.js';
 // A structural cell is one hollow storey bay: slab + four corner columns + exterior skins.
 // Cells form a support graph anchored at foundations. No triangle-mesh physics anywhere.
 import {C} from '../config.js';
@@ -22,6 +23,7 @@ export function generateCells(env){
       size:[b.bay, b.story, b.bay], walls:[false, false, false, false], neighbors:[], below:0, above:0, lateral:[],
       roof:false, stackAbove:0, frameScale:C.BUILDING_STRENGTH * (b.strength || 1) * Math.max(.55,Math.min(1.25,(b.bay/6)**1.25)) * (.68+.32*Math.min(1,totalFloors/16)) * (1 + .7 * (1 - floor / Math.max(1, totalFloors - 1)))};
      shapeModernCell(cell,b);
+     shapeCatalogCell(cell,b);
      ids.set(`${ix}:${floor}:${iz}`, cell.id); cells.push(cell);
     }
   });
@@ -40,14 +42,15 @@ export function generateCells(env){
   if(b.spire){const top=mine.filter(c=>c.roof).sort((a,b)=>b.p[1]-a.p[1])[0];if(top)top.spire=b.spire;}
   if(b.architecture==='chrysler'){const top=mine.find(c=>c.floor===totalFloors-1&&c.ix===2&&c.iz===2);if(top)top.chryslerCrown=true;for(const c of mine)delete c.roofAsset;}
   finishModernCells(mine,b);
+  finishCatalogCells(mine,b);
   for(const c of mine){ let n = 0, up = c.above; while(up){ n++; up = byId.get(up).above; } c.stackAbove = n; }
  });
  return cells;
 }
 // Per-cell mutable damage state, kept separately so the static cell table stays shareable.
 export function initialSkin(c){
- const m = MATERIALS[c.material], mask = c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
- return {glass:mask, facade:m.facadeHP > 0 ? mask : 0, hp:m.frameHP * c.frameScale, maxHp:m.frameHP * c.frameScale, glassHp:c.walls.map(w=>w?m.glassHP:0), facadeHp:c.walls.map(w => w ? m.facadeHP : 0)};
+ const m = MATERIALS[c.material], mask = c.openSkin?0:c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
+ return {glass:mask, facade:m.facadeHP > 0 ? mask : 0, hp:m.frameHP * c.frameScale, maxHp:m.frameHP * c.frameScale, glassHp:c.walls.map(w=>w&&!c.openSkin?m.glassHP:0), facadeHp:c.walls.map(w => w&&!c.openSkin ? m.facadeHP : 0)};
 }
 export const exteriorMask = c => c.walls.reduce((acc, w, side) => acc | (w ? sideBit(side) : 0), 0);
 // Cuboid components in LOCAL space: [center x,y,z, half x,y,z]. A wall is present only
@@ -56,7 +59,7 @@ export function cellColliders(c, skin){
  const [w, h, d] = c.size, slab = .13, col = .15, out = [];
  out.push([0, h / 2 - slab, 0, w / 2, slab, d / 2]);
  for(const x of [-1, 1]) for(const z of [-1, 1]) out.push([x * (w / 2 - col), 0, z * (d / 2 - col), col, h / 2 - .26, col]);
- const solid = side => c.walls[side] && (!skin || wallSolid(c.material, skin.glass, skin.facade, side));
+ const solid = side => !c.openSkin && c.walls[side] && (!skin || wallSolid(c.material, skin.glass, skin.facade, side));
  if(solid(0)) out.push([0, 0, -d / 2 + .06, w / 2 - .3, h / 2 - .22, .06]);
  if(solid(1)) out.push([w / 2 - .06, 0, 0, .06, h / 2 - .22, d / 2 - .3]);
  if(solid(2)) out.push([0, 0, d / 2 - .06, w / 2 - .3, h / 2 - .22, .06]);

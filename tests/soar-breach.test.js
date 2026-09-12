@@ -46,7 +46,9 @@ test('breaching works in generated blocks and its holes survive unloading and re
   const tile=r.stream.load(9,7),cell=tile.cells.find(c=>c.floor===2&&c.walls[2]),bounds=r.buildingBounds[cell.building];r.spawn(p,v(cell.p[0],cell.p[1],bounds[5]+3));p.body.setLinvel(v(0,0,-32),true);p.invulnerable=0;
   for(let i=0;i<60&&p.body&&p.body.translation().z>bounds[2]-2;i++)tick(r,client,{soar:true});
   assert.ok(p.body&&p.body.translation().z<bounds[2]-2);const broken=tile.cells.filter(c=>r.detached.has(c.id));assert.ok(broken.length>0);
-  const ids=broken.map(c=>c.id);r.stream.unload(tile.key);r.stream.load(9,7);for(const id of ids){assert.ok(r.detached.has(id));assert.equal(r.cellMap.get(id).skin.facade,0);}
+  // Directly breached bays lose their skins; connected fragments may fall with
+  // intact cladding. Both must reload their exact original state.
+  assert.ok(broken.some(c=>c.skin.facade===0));const saved=broken.map(c=>[c.id,structuredClone(c.skin)]);r.stream.unload(tile.key);r.stream.load(9,7);for(const [id,skin]of saved){assert.ok(r.detached.has(id));assert.deepEqual(r.cellMap.get(id).skin,skin);}
  }finally{r.dispose();}
 });
 test('breach grace filters only the owning pilot and expires in real Rapier contacts',()=>{
