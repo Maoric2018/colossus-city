@@ -16,3 +16,51 @@
 #scoreboard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;border-collapse:collapse;background:#0d212bf0;border:1px solid #abcdb733;font:12px monospace;letter-spacing:1px;min-width:420px}
 #scoreboard caption{padding:14px;color:var(--acid);font-size:14px;letter-spacing:3px;border-bottom:1px solid #abcdb733}#scoreboard th{color:var(--dim);font-weight:normal;font-size:9px;padding:8px 16px;text-align:left}#scoreboard td{padding:8px 16px;border-top:1px solid #abcdb71a}#scoreboard td:not(:first-child){text-align:right;color:var(--acid)}
 #flight-status{gap:4px}#flight-status #score-readout{color:var(--acid);font-size:9px}
+
+/* ---- Touch / mobile ------------------------------------------------------------------
+   Widgets live in #touch-layer above the canvas but below the overlay; the few HUD buttons
+   that must stay tappable are lifted above it. Everything keys off body.touch. */
+#touch-layer{position:fixed;inset:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);z-index:4;touch-action:none;-webkit-user-select:none;user-select:none}
+#tc-stick{position:absolute;left:0;top:0;width:0;height:0;opacity:0;transition:opacity .12s}
+#tc-stick.on{opacity:1}
+#tc-stick::before{content:'';position:absolute;left:-58px;top:-58px;width:116px;height:116px;border-radius:50%;border:2px solid #cfe9ff40;background:#0a1c2455}
+#tc-stick i{position:absolute;left:-26px;top:-26px;width:52px;height:52px;border-radius:50%;background:#cfe9ff30;border:2px solid #d8f0ffb0}
+#tc-stick.boost i{background:#ceff8350;border-color:var(--acid)}
+.tc-btn{position:absolute;border-radius:50%;border:2px solid #cfe9ff40;background:#0a1c2470;color:#dff0f5;font:11px/1 monospace;letter-spacing:1px;padding:0;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(2px)}
+.tc-btn.down{background:#ceff8340;border-color:var(--acid);color:#0d1a10}
+.tc-btn.on{border-color:var(--acid);color:var(--acid)}
+.tc-fire{right:18px;bottom:18px;width:104px;height:104px;font-size:13px}
+.tc-thrust{right:132px;bottom:26px;width:82px;height:82px}
+.tc-soar{right:28px;bottom:134px;width:74px;height:74px}
+.tc-dodge{right:136px;bottom:120px;width:68px;height:68px}
+.tc-heavy{right:226px;bottom:30px;width:72px;height:72px;font-size:10px}
+#rotate-hint{display:none;position:fixed;inset:0;z-index:11;background:#07151ceb;color:var(--acid);font:13px monospace;letter-spacing:3px;flex-direction:column;gap:18px;align-items:center;justify-content:center}
+#rotate-hint b{font-size:48px}
+body.touch.playing #rotate-hint{display:none}
+@media(orientation:portrait){body.touch.playing #rotate-hint{display:flex}}
+body.touch{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.touch #flight-effects,body.touch #brand,body.touch #status,body.touch #controls,body.touch #roster,body.touch #performance,body.touch #capture-status,body.touch #vr-button,body.touch #vr-settings,body.touch #scene-caption{display:none!important}
+body.touch #menu-button,body.touch #open-spectator{z-index:6;min-height:44px;padding:12px}
+body.touch #copy-link{display:none}
+body.touch #menu-button{top:auto;bottom:12px;left:12px;font-size:10px}
+body.touch #open-spectator{top:auto;bottom:12px;left:110px;right:auto}
+body.touch #boss-health{top:8px;width:54vw}
+body.touch #round-info{top:8px;right:12px;gap:2px}
+body.touch #timer{font-size:18px}
+body.touch #telemetry{left:12px;bottom:auto;top:56px;gap:14px}
+body.touch #telemetry b{font-size:18px}
+body.touch .fuel{width:74px}
+body.touch #score{right:12px;bottom:auto;top:52px;gap:3px}
+body.touch #score strong{font-size:20px}
+body.touch #score>span{font-size:8px}
+body.touch #flight-status{left:12px;right:auto;bottom:70px;transform:none;text-align:left;font-size:9px}
+body.touch #flight-mode{font-size:13px;letter-spacing:2px}
+body.touch #toast{top:16%;font-size:11px;width:70vw}
+body.touch #scoreboard{min-width:0;width:94vw;font-size:11px}
+body.touch #scoreboard th,body.touch #scoreboard td{padding:6px 10px}
+body.touch #overlay>div{width:min(470px,92vw);padding:22px;max-height:86dvh;overflow-y:auto}
+body.touch h2{font-size:24px}
+body.touch #overlay p{font-size:12px}
+body.touch .primary,body.touch .secondary,body.touch #leave,body.touch #camera-toggle{min-height:46px}
+body.touch #lobby{max-height:calc(100dvh - 40px);overflow-y:auto}
+body.touch input{padding:15px 14px}

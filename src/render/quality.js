@@ -2,6 +2,7 @@
 // the Q key only toggles the cheap runtime switches (shadows, bloom, pixel ratio).
 import * as T from 'three';
 export const TIERS = Object.freeze({
+ mobile: {name:'MOBILE',      pixelRatio:1,   antialias:false, shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.3,  rubble:180, skyline:.3, xrScale:.8,  textureSize:256, far:520},
  quest:  {name:'QUEST',       pixelRatio:1,   antialias:false, shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.45, rubble:260, skyline:.4, xrScale:.8,  textureSize:256, far:700},
  low:    {name:'PERFORMANCE', pixelRatio:1,   antialias:true,  shadows:false, shadowSize:0,    bloom:false, normalMaps:false, lambert:true,  particles:.7,  rubble:520, skyline:.6, xrScale:.85, textureSize:512, far:900},
  medium: {name:'BALANCED',    pixelRatio:1,   antialias:true,  shadows:true,  shadowSize:1024, bloom:false, normalMaps:true,  lambert:false, particles:1,   rubble:900, skyline:1,  xrScale:.85, textureSize:512, far:900},
@@ -16,10 +17,11 @@ export function gpuLabel(name){
  const angle = /^ANGLE \(([^,]+), ([^(]+)/.exec(name); const label = angle ? angle[2] : name;
  return label.replace(/\s*(Direct3D|OpenGL|Metal|Vulkan).*$/i, '').trim().slice(0, 30);
 }
-export function detectTier(renderer, quest){
+export function detectTier(renderer, quest, touch){
  const forced = new URLSearchParams(location.search).get('quality') || localStorage.getItem('colossus-tier');
  if(forced && TIERS[forced]) return forced;
  if(quest) return 'quest';
+ if(touch) return 'mobile';
  return INTEGRATED.test(gpuName(renderer)) ? 'low' : 'medium';
 }
 // Materials: integrated GPUs pay per pixel, so opaque surfaces use Lambert shading there while

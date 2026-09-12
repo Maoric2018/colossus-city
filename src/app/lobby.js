@@ -1,5 +1,5 @@
 // Lobby and menu DOM wiring. Pure UI: every action is a callback supplied by main.js.
-import {state, quest, $} from './state.js';
+import {state, quest, touch, $} from './state.js';
 export function bindLobby(actions){
  const setRole = r => { state.selectedRole = r; document.querySelectorAll('[data-role]').forEach(e => e.classList.toggle('active', e.dataset.role === r)); };
  document.querySelectorAll('[data-role]').forEach(e => e.onclick = () => setRole(e.dataset.role));
@@ -11,7 +11,8 @@ export function bindLobby(actions){
  const settings = () => { const turn = Number($('turn-speed').value), reach = Number($('hand-reach').value); actions.settings({turnDegrees:turn, reachGain:reach}); $('turn-value').textContent = `${turn}°/s`; $('reach-value').textContent = `${reach.toFixed(1)}× giant scale`; localStorage.setItem('colossus-turn', String(turn)); localStorage.setItem('colossus-reach', String(reach)); };
  $('turn-speed').value = localStorage.getItem('colossus-turn') || '90'; $('hand-reach').value = localStorage.getItem('colossus-reach') || '1'; $('turn-speed').oninput = settings; $('hand-reach').oninput = settings; settings();
  const params = new URLSearchParams(location.search); $('room-input').value = params.get('room') || ''; $('name').value = localStorage.getItem('colossus-name') || '';
- if(params.get('role') === 'boss' || quest) setRole('boss');
+ if(params.get('role') === 'boss' || (quest && !touch)) setRole('boss');
+ if(touch){ $('lobby').querySelector('[data-role="raider"] span').textContent = '01 / PHONE'; $('lobby').querySelector('[data-role="boss"] span').textContent = '02 / PHONE GIANT'; }
  return {setRole, params};
 }
 export function notice(text){ $('notice').textContent = text; }

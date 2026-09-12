@@ -66,6 +66,7 @@ fly status --app YOUR-UNIQUE-APP
 | Laptop raider | WASD move relative to view; mouse aim; hold Space to climb; hold either Shift to soar, release to hover; E + direction dodges; C descend; hold left mouse to fire; **hold right mouse to charge a breach shot**; V first/third person; Tab scores; Q quality; Escape releases the pointer. |
 | Quest giant | Move your head and both controllers to embody the giant. Swing into raiders and buildings; walk into a tower to shove through it. Left stick moves, right stick turns smoothly (90°/s default), either trigger launches a missile, right A recalibrates height. |
 | Desktop giant | WASD; mouse view; hold left click for a sweeping hand; Space for downward strikes; right click or R fires missiles. |
+| Phone / tablet | Left thumb is a floating stick; drag the right side to look. Pads: **FIRE** (hold, also aims), **THRUST**, **SOAR** (latches), **DODGE**, **BREACH**. Push the stick to the rim to boost. The giant gets SWEEP/SLAM/MISSILE, a spectator gets UP/DOWN. Landscape; `?touch=1` forces the layout on a desktop. |
 | Spectator | Live Views opens every player's camera feed; Free Camera flies with mouse + WASD, Space up, C down, Shift fast. |
 
 **Giant reach:** the 14× world scale maps a physical 0.5 m controller move to 7 m in the city. Open **Quest Controls** in the lobby to adjust turn speed or reach gain; A calibrates the scale for your standing height.

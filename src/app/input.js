@@ -6,6 +6,9 @@ import {state, $} from './state.js';
 export class Input {
  constructor(canvas, hooks = {}){
   this.canvas = canvas; this.hooks = hooks; this.keys = new Set(); this.firing = false; this.missileFiring = false; this.yaw = 0; this.pitch = 0; this.seq = 0; this.dodgeSeq = 0; this.heavySeq = 0; this.soar = false; this.chargeStart = 0; this.heavyReadyAt = 0;
+  // On-screen controls (src/app/touch.js) write here; held() merges it with the keyboard so a
+  // Bluetooth keyboard on a tablet keeps working. `onRelease` lets them clear their own widgets.
+  this.touch = {x:0, z:0, up:0, boost:false, fire:false, soar:false, missile:false}; this.onRelease = null;
  }
  bind(){
   window.addEventListener('keydown', e => {
@@ -29,17 +32,22 @@ export class Input {
   });
   window.addEventListener('mouseup', e => {
    if(e.button === 0) this.firing = false;
-   if(e.button === 2){ this.missileFiring = false; if(this.chargeStart){ const held = (performance.now() - this.chargeStart) / 1000; this.chargeStart = 0; if(held >= C.HEAVY_CHARGE_SECONDS){ this.heavySeq++; this.heavyReadyAt = performance.now() + C.HEAVY_COOLDOWN * 1000; this.hooks.onHeavyFire?.(); } else this.hooks.onChargeCancel?.(); } }
+   if(e.button === 2){ this.missileFiring = false; if(this.chargeStart){ const held = (performance.now() - this.chargeStart) / 1000; this.chargeStart = 0; if(held >= C.HEAVY_CHARGE_SECONDS) this.fireHeavy(); else this.hooks.onChargeCancel?.(); } }
   });
  }
  // 0..1 while charging the breach shot.
  get charge(){ return this.chargeStart ? Math.min(1, (performance.now() - this.chargeStart) / 1000 / C.HEAVY_CHARGE_SECONDS) : 0; }
- reset(){ this.soar = false; this.keys.clear(); this.firing = false; this.missileFiring = false; this.chargeStart = 0; }
+ // The single client-side breach gate, shared by the mouse charge and the touch pad.
+ fireHeavy(){
+  if(performance.now() < this.heavyReadyAt) return false;
+  this.heavySeq++; this.heavyReadyAt = performance.now() + C.HEAVY_COOLDOWN * 1000; this.hooks.onHeavyFire?.(); return true;
+ }
+ reset(){ this.soar = false; this.keys.clear(); this.firing = false; this.missileFiring = false; this.chargeStart = 0; Object.assign(this.touch, {x:0, z:0, up:0, boost:false, fire:false, soar:false, missile:false}); this.onRelease?.(); }
  // Current held state in the shared input shape (used by prediction every frame).
  held(){
-  const k = this.keys;
-  return {x:(k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0), z:(k.has('KeyS') ? 1 : 0) - (k.has('KeyW') ? 1 : 0), up:(k.has('Space') ? 1 : 0) - (k.has('KeyC') ? 1 : 0),
-   boost:state.role !== 'raider' && (k.has('ShiftLeft') || k.has('ShiftRight')), fire:this.firing, soar:state.role === 'raider' && (k.has('ShiftLeft') || k.has('ShiftRight')), dodge:this.dodgeSeq, heavy:this.heavySeq, missile:this.missileFiring || k.has('KeyR'), yaw:this.yaw, pitch:this.pitch};
+  const k = this.keys, t = this.touch, shift = k.has('ShiftLeft') || k.has('ShiftRight'), raider = state.role === 'raider';
+  return {x:((k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0)) || t.x, z:((k.has('KeyS') ? 1 : 0) - (k.has('KeyW') ? 1 : 0)) || t.z, up:((k.has('Space') ? 1 : 0) - (k.has('KeyC') ? 1 : 0)) || t.up,
+   boost:!raider && (shift || t.boost), fire:this.firing || t.fire, soar:raider && (shift || t.soar), dodge:this.dodgeSeq, heavy:this.heavySeq, missile:this.missileFiring || k.has('KeyR') || t.missile, yaw:this.yaw, pitch:this.pitch};
  }
  // Network packet. `aim` converts the camera crosshair into a convergent aim for the server.
  packet(aim){

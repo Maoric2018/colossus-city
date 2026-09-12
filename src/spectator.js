@@ -62,8 +62,9 @@ export class SpectatorViews{
    }}
    return;
   }
+  // Publishing costs a second scene render plus an encode every frame. A phone watches, never publishes.
   const stream=this.stream,headset=this.renderer.xr.isPresenting,interval=1000/(headset?24:30);
-  if(!this.active||!stream||now-this.lastFrame<interval-.5)return;
+  if(!this.active||!stream||this.noCapture||now-this.lastFrame<interval-.5)return;
   this.lastFrame+=Math.max(1,Math.floor((now-this.lastFrame+.5)/interval))*interval;
   try{
    if(headset){if(!this.captureXR())return;}

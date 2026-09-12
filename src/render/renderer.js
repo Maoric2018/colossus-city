@@ -8,11 +8,13 @@ import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {TIERS, detectTier, gpuName} from './quality.js';
 export class GameRenderer {
- constructor(canvas, {quest = false} = {}){
+ constructor(canvas, {quest = false, touch = false} = {}){
   let renderer;
-  try{ renderer = new T.WebGLRenderer({canvas, antialias:!quest, alpha:false, powerPreference:'high-performance', stencil:false}); }
+  try{ renderer = new T.WebGLRenderer({canvas, antialias:!quest && !touch, alpha:false, powerPreference:'high-performance', stencil:false}); }
   catch(e){ throw Error('WebGL 2 is unavailable. Enable hardware acceleration in your browser.'); }
-  this.renderer = renderer; this.quest = quest; this.tierName = detectTier(renderer, quest); this.tier = TIERS[this.tierName]; this.gpu = gpuName(renderer);
+  this.renderer = renderer; this.quest = quest; this.touch = touch; this.tierName = detectTier(renderer, quest, touch); this.tier = TIERS[this.tierName]; this.gpu = gpuName(renderer);
+  // A DPR-3 phone would otherwise shade nine times the pixels of its CSS viewport.
+  this.minScale = touch ? .5 : .6;
   this.cinematic = false; this.scale = 1; this.frameEMA = 16; this.lastAdjust = performance.now(); this.composer = null; this.adaptive = true;
   renderer.setSize(innerWidth, innerHeight); renderer.info.autoReset = false;
   renderer.shadowMap.enabled = this.tier.shadows; renderer.shadowMap.type = T.PCFShadowMap;
@@ -43,7 +45,7 @@ export class GameRenderer {
   this.frameEMA += (dt * 1000 - this.frameEMA) * .06;
   if(now - this.lastAdjust < 1200) return;
   const target = this.targetRatio();
-  if(this.frameEMA > 20 && this.scale > .6){ this.applyScale(Math.max(.6, this.scale - .1)); this.lastAdjust = now; }
+  if(this.frameEMA > 20 && this.scale > this.minScale){ this.applyScale(Math.max(this.minScale, this.scale - .1)); this.lastAdjust = now; }
   else if(this.frameEMA < 12.5 && this.scale < target){ this.applyScale(Math.min(target, this.scale + .05)); this.lastAdjust = now; }
  }
  render(scene, camera, dt){

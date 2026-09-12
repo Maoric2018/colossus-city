@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#09171d"><title>COLOSSUS / City Under Siege</title>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#09171d"><title>COLOSSUS / City Under Siege</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23c5ff72' d='M8 8h20v12H20v24h8v12H8zm28 0h20v48H36V44h8V20h-8z'/%3E%3C/svg%3E"><link rel="stylesheet" href="/src/style.css">
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script></head>
 <body>
@@ -35,6 +35,8 @@
 </section>
 <div id="overlay" class="hidden"><div><span class="eyebrow" id="overlay-kicker">CONNECTION ESTABLISHED</span><h2 id="overlay-title">READY TO DROP?</h2><p id="overlay-text">Click to capture your mouse. Escape releases it.</p><button id="camera-toggle" class="hidden">SWITCH TO THIRD PERSON · V</button><button class="primary" id="resume">DEPLOY ↗</button><button class="secondary" id="restart">NEW ROUND</button><button id="menu-spectator" class="secondary">LIVE VIEWS ↗</button><button id="leave">LEAVE ROOM</button></div></div>
 <table id="scoreboard" class="hidden"></table>
+<div id="touch-layer" class="hidden" aria-hidden="true"></div>
+<div id="rotate-hint"><b>↻</b>ROTATE TO LANDSCAPE</div>
 <section id="spectator-panel" class="hidden" aria-label="Live spectator views"><div class="spectator-toolbar"><div><span class="eyebrow">ROOM OBSERVATORY</span><h2>EVERY PILOT. EVERY ANGLE.</h2><p>Live video · select a screen to enlarge</p></div><div><button id="spectator-free" class="secondary">FREE CAMERA</button><button id="spectator-leave" class="secondary">LEAVE ROOM</button></div></div><div id="spectator-grid"></div></section>
 <div id="loading-error" class="hidden"></div>
 <script type="module" src="/src/main.js"></script>
