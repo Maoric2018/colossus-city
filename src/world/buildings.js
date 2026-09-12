@@ -3,6 +3,7 @@
 // their instance matrix to zero; moving bays reuse the same instances with a new transform.
 // Core batches plus the instanced architectural kit; count is independent of city size.
 import * as T from 'three';
+import {skinKey} from '../render/building-skin.js';
 import {Components} from './components.js';
 import {WORLD_STYLE_BY_ID} from '../../shared/city/world-landmarks.js';
 import {partialInstanceUpdates,commitInstances} from '../render/instances.js';
@@ -13,7 +14,7 @@ import {facadeMaps, roofTexture} from './textures.js';
 const temp = new T.Object3D(), matrix = new T.Matrix4(), local = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0);
 const sphere=new T.Sphere(),projection=new T.Matrix4(),eyePosition=new T.Vector3();
 const white=new T.Color(0xffffff),wtcGlass=new T.Color(0x718087);
-export const skinKey=c=>WORLD_STYLE_BY_ID.has(c.architecture)&&c.material==='glass'?'worldGlass':['empire','chrysler','hudson30','vanderbilt'].includes(c.architecture)?c.architecture:c.material;
+export {skinKey} from '../render/building-skin.js';
 const wallLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .5, 0, -Math.cos(a) * .5), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 // Masonry window panes sit just outside the facade box (which spans ±.011 around the wall plane).
 const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .514, 0, -Math.cos(a) * .514), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });

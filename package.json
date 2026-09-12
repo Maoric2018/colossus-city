@@ -36,7 +36,8 @@
     "test:cars": "node scripts/car-smoke.mjs",
     "test:flight-animation": "node scripts/flight-animation-smoke.mjs",
     "test:fine-destruction": "node scripts/fine-destruction-smoke.mjs",
-    "test:soar-breach": "node scripts/soar-breach-smoke.mjs"
+    "test:soar-breach": "node scripts/soar-breach-smoke.mjs",
+    "test:fracture-render": "node scripts/fracture-render-smoke.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.17.3",

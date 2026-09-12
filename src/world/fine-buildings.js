@@ -9,7 +9,11 @@ export class FineBuildings{
  source(c,resources){let s=this.sources.get(c.id);if(!s){s=appearanceSources(c,resources);this.sources.set(c.id,s);}return s;}
  add(draw){
   let pool=this.pools.get(draw.key);const n=draw.geometry.attributes.position.count;
-  if(!pool){const mat=draw.material.clone();mat.vertexColors=true;const mesh=new T.BatchedMesh(64,Math.max(4096,2**Math.ceil(Math.log2(n))),0,mat);mesh.frustumCulled=false;mesh.perObjectFrustumCulled=false;mesh.sortObjects=mat.transparent;mesh.castShadow=!!draw.castShadow;mesh.receiveShadow=true;this.root.add(mesh);pool={mesh,capacity:64,vertices:mesh.geometry.attributes.position?.count||Math.max(4096,2**Math.ceil(Math.log2(n))),allocated:0,live:0,count:0};this.pools.set(draw.key,pool);this.batches.set(draw.key,mesh);}
+  if(!pool){const mat=draw.material.clone();mat.vertexColors=true;mat.side=T.DoubleSide;mat.forceSinglePass=true;
+   // Exposed reverse faces retain the base texture/color rather than reflecting
+   // the bright sky like the polished outer skin of a metal/glass facade.
+   mat.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nif (!gl_FrontFacing) { metalnessFactor = 0.0; roughnessFactor = max(roughnessFactor, 0.8); }');};mat.customProgramCacheKey=()=> 'fracture-interior-v1';
+   const mesh=new T.BatchedMesh(64,Math.max(4096,2**Math.ceil(Math.log2(n))),0,mat);mesh.frustumCulled=false;mesh.perObjectFrustumCulled=true;mesh.sortObjects=mat.transparent;mesh.castShadow=!!draw.castShadow;mesh.receiveShadow=true;this.root.add(mesh);pool={mesh,capacity:64,vertices:mesh.geometry.attributes.position?.count||Math.max(4096,2**Math.ceil(Math.log2(n))),allocated:0,live:0,count:0};this.pools.set(draw.key,pool);this.batches.set(draw.key,mesh);}
   if(pool.allocated+n>pool.vertices){pool.mesh.optimize();pool.allocated=pool.live;if(pool.allocated+n>pool.vertices){pool.vertices=2**Math.ceil(Math.log2(pool.allocated+n));pool.mesh.setGeometrySize(pool.vertices,0);}}
   if(pool.count>=pool.capacity){pool.capacity*=2;pool.mesh.setInstanceCount(pool.capacity);}draw.geometryId=pool.mesh.addGeometry(draw.geometry);draw.index=pool.mesh.addInstance(draw.geometryId);draw.pool=pool;draw.vertices=n;pool.live+=n;pool.allocated+=n;pool.count++;draw.geometry.dispose();delete draw.geometry;return draw;
  }
@@ -30,7 +34,7 @@ export class FineBuildings{
  write(e){const pose=e.pose||e;matrix.compose(pose.p,pose.q,one);if(e.offset)matrix.multiply(offset.makeTranslation(-e.offset.x,-e.offset.y,-e.offset.z));for(const d of e.parts)d.pool.mesh.setMatrixAt(d.index,matrix);}
  select(camera){
   const view=camera.cameras?.[0]||camera;eye.setFromMatrixPosition(view.matrixWorld);
-  for(const e of this.cells.values()){const visible=!e.pose.hidden&&e.pose.inView!==false&&e.pose.p.distanceToSquared(eye)<230**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
+  for(const e of this.cells.values()){const visible=!e.pose.hidden&&e.pose.p.distanceToSquared(eye)<230**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
   for(const e of this.shards.values()){const visible=e.p.distanceToSquared(eye)<170**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
  }
  update(dt){this.time+=dt;for(const e of this.active){const pose=shardBallistic(e.meta,this.time);e.p.fromArray(pose.p);e.q.fromArray(pose.q);this.write(e);}this.commit();}
