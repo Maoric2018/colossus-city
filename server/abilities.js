@@ -10,9 +10,11 @@ export function fly(room, p, i){
  const at = p.body.translation(), lv = p.body.linvel();
  const {velocity, dodge} = flightStep(p, at, lv, i, room.time);
  if(dodge) room.event({type:'dodge', player:p.id, p:arr(at), direction:arr(dodge.direction)});
- p.body.setLinvel(velocity, true);
+ const moving=!!(i.x||i.z||i.up||i.boost||p.soaring||dodge);
+ p.body.setLinvel(velocity,moving);
  // Rotate the capsule with the prone pilot, keeping visible and physical bodies aligned.
- p.body.collider(0).setRotation(flightRotation(p, i));
+ const q=flightRotation(p,i),previous=p.colliderRotation;
+ if(!previous||q.x!==previous.x||q.y!==previous.y||q.z!==previous.z||q.w!==previous.w){p.body.collider(0).setRotation(q);p.colliderRotation=q;room.world.invalidateSceneQueries();}
 }
 export function launchMissile(room, side, aim){
  const b = room.boss; if(room.phase || room.time < b.missileReady || room.missiles.size >= C.MAX_MISSILES) return false;

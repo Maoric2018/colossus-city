@@ -14,6 +14,7 @@ export async function installDistrict(view, renderer){
   hdr.mapping = T.EquirectangularReflectionMapping; const pmrem = new T.PMREMGenerator(renderer), envMap = pmrem.fromEquirectangular(hdr); pmrem.dispose();
   view.scene.environment = envMap.texture; view.scene.environmentIntensity = tier.lambert ? .45 : .6; view.scene.background = env.infinite ? null : hdr; view.scene.backgroundIntensity = .8; view.scene.backgroundBlurriness = 0;
   view.scene.backgroundRotation.y = .4; view.scene.environmentRotation.y = .4; view.sky.visible = !!env.infinite; assetStatus.loaded.push(skyURL);
+  if(env.infinite)hdr.dispose(); // Reflections now use the filtered map; the raw panorama is not displayed.
  }).catch(error => { assetStatus.failed.push(skyURL); console.error('Sky panorama failed to load', error); }));
  // Lower tiers lean on the two low-detail models for the ring (they are 10x cheaper) and keep
  // only a few detailed skyscrapers for silhouette.

@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {markRange} from './render/instances.js';
 const MATERIAL_TINT = {glass:{dust:0xcfe9f2, spark:0xd8f6ff}, brick:{dust:0xa8705f, spark:0xffb27a}, stone:{dust:0xd6c8a6, spark:0xffd9a0}, concrete:{dust:0xb3b0a8, spark:0xffca76}, steel:{dust:0x8d9398, spark:0xffb040}, body:{dust:0x9aa3a6, spark:0xffe0b0}};
 const dummy=new T.Object3D(),up=new T.Vector3(0,1,0);
 class ParticlePool{
@@ -14,6 +15,7 @@ class ParticlePool{
  }
  add(p){if(this.items.length>=this.limit)this.items.shift();this.items.push({...p,age:0,spin:Math.random()*Math.PI*2});}
  update(dt){
+  if(!this.items.length){this.mesh.visible=false;return;}
   let n = 0; const a = this.attributes;
   for(let i = 0; i < this.items.length; i++){
    const p = this.items[i]; p.age += dt; if(p.age >= p.life) continue;
@@ -21,7 +23,7 @@ class ParticlePool{
    const t = Math.min(1, p.age / p.life); a.center.setXYZ(n, p.p.x, p.p.y, p.p.z); a.tint.setXYZ(n, p.color.r, p.color.g, p.color.b); a.lifeSize.setXY(n, (1 - t) * Math.min(1, p.age / .055) * p.opacity, p.size * (1 + t * p.growth)); a.spin.setX(n, p.spin + t * .3);
    this.items[n++] = p;
   }
-  this.items.length = n; for(const attribute of Object.values(a)) attribute.needsUpdate = true; this.mesh.geometry.instanceCount = n;
+  this.items.length = n;this.mesh.visible=n>0;if(n)for(const attribute of Object.values(a)){markRange(attribute,0,n);attribute.needsUpdate=true;}this.mesh.geometry.instanceCount = n;
  }
 }
 export class Effects{
@@ -80,7 +82,7 @@ export class Effects{
    dummy.position.copy(t.a).lerp(t.b,.5);dummy.quaternion.setFromUnitVectors(up,direction);dummy.scale.set(.026*fade,distance,.026*fade);dummy.updateMatrix();this.beams.setMatrixAt(i,dummy.matrix);
    dummy.scale.set(.115*fade,distance,.115*fade);dummy.updateMatrix();this.beamGlow.setMatrixAt(i,dummy.matrix);
    const front=Math.min(distance,t.age*330),length=Math.min(front,7);dummy.position.copy(t.a).addScaledVector(direction,front-length/2);dummy.scale.set(.065*fade,length,.065*fade);dummy.updateMatrix();this.bolts.setMatrixAt(i,dummy.matrix);
-  });for(const mesh of [this.beams,this.beamGlow,this.bolts]){mesh.count=this.tracers.length;mesh.instanceMatrix.needsUpdate=true;}
-  this.rings=this.rings.filter(r=>r.age<.28);this.rings.forEach((r,i)=>{r.age+=dt;const t=r.age/.28;dummy.position.copy(r.p);dummy.quaternion.copy(r.q);dummy.scale.setScalar((.12+t*.8)*Math.max(0,1-t));dummy.updateMatrix();this.ringMesh.setMatrixAt(i,dummy.matrix);});this.ringMesh.count=this.rings.length;this.ringMesh.instanceMatrix.needsUpdate=true;
+  });for(const mesh of [this.beams,this.beamGlow,this.bolts]){mesh.count=this.tracers.length;mesh.visible=mesh.count>0;if(mesh.count){markRange(mesh.instanceMatrix,0,mesh.count);mesh.instanceMatrix.needsUpdate=true;}}
+  this.rings=this.rings.filter(r=>r.age<.28);this.rings.forEach((r,i)=>{r.age+=dt;const t=r.age/.28;dummy.position.copy(r.p);dummy.quaternion.copy(r.q);dummy.scale.setScalar((.12+t*.8)*Math.max(0,1-t));dummy.updateMatrix();this.ringMesh.setMatrixAt(i,dummy.matrix);});this.ringMesh.count=this.rings.length;this.ringMesh.visible=this.rings.length>0;if(this.rings.length){markRange(this.ringMesh.instanceMatrix,0,this.rings.length);this.ringMesh.instanceMatrix.needsUpdate=true;}
  }
 }

@@ -37,17 +37,17 @@ export class SpectatorViews{
   finally{stream.send({type:'frame-ack',id});}
  }
  // Extra view rendering occurs only while somebody has the debug panel connected.
- renderCamera(camera,aspect=1.6){
-  const r=this.renderer,previous={target:r.getRenderTarget(),enabled:r.xr.enabled,viewport:r.getViewport(new T.Vector4()),scissor:r.getScissor(new T.Vector4()),test:r.getScissorTest(),shadows:r.shadowMap.autoUpdate};
+ renderCamera(camera,aspect=1.6,reuseCityVisibility=false){
+  const r=this.renderer,previous={target:r.getRenderTarget(),enabled:r.xr.enabled,viewport:r.getViewport(new T.Vector4()),scissor:r.getScissor(new T.Vector4()),test:r.getScissorTest(),shadows:r.shadowMap.autoUpdate,visibility:this.scene.userData.reuseCityVisibility};
   // The desktop framebuffer applies the same tone mapping as direct XR rendering.
   // Rendering to a normal texture target would bypass material tone mapping.
   const width=r.domElement.width,height=r.domElement.height,w=Math.min(width,640,height*aspect,400*aspect),h=w/aspect,vx=(width-w)/2,vy=(height-h)/2,dpr=r.getPixelRatio();
-  try{r.xr.enabled=false;r.shadowMap.autoUpdate=false;r.setRenderTarget(null);r.setViewport(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissor(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissorTest(true);r.clear();r.render(this.scene,camera);
+  try{this.scene.userData.reuseCityVisibility=reuseCityVisibility;r.xr.enabled=false;r.shadowMap.autoUpdate=false;r.setRenderTarget(null);r.setViewport(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissor(vx/dpr,vy/dpr,w/dpr,h/dpr);r.setScissorTest(true);r.clear();r.render(this.scene,camera);
    this.context.fillStyle='#030c10';this.context.fillRect(0,0,640,400);const dw=Math.min(640,400*aspect),dh=dw/aspect;
    this.context.drawImage(r.domElement,vx,height-vy-h,w,h,(640-dw)/2,(400-dh)/2,dw,dh);
-  }finally{r.setRenderTarget(previous.target);r.setViewport(previous.viewport);r.setScissor(previous.scissor);r.setScissorTest(previous.test);r.shadowMap.autoUpdate=previous.shadows;r.xr.enabled=previous.enabled;}
+  }finally{this.scene.userData.reuseCityVisibility=previous.visibility;r.setRenderTarget(previous.target);r.setViewport(previous.viewport);r.setScissor(previous.scissor);r.setScissorTest(previous.test);r.shadowMap.autoUpdate=previous.shadows;r.xr.enabled=previous.enabled;}
  }
- captureXR(){const eye=this.renderer.xr.getCamera().cameras[0];if(!eye)return false;this.mirror.copy(eye,false);this.mirror.matrixAutoUpdate=false;this.mirror.matrixWorldAutoUpdate=false;this.renderCamera(this.mirror,eye.viewport?eye.viewport.z/eye.viewport.w:eye.projectionMatrix.elements[5]/eye.projectionMatrix.elements[0]);return true;}
+ captureXR(){const eye=this.renderer.xr.getCamera().cameras[0];if(!eye)return false;this.mirror.copy(eye,false);this.mirror.matrixAutoUpdate=false;this.mirror.matrixWorldAutoUpdate=false;this.renderCamera(this.mirror,eye.viewport?eye.viewport.z/eye.viewport.w:eye.projectionMatrix.elements[5]/eye.projectionMatrix.elements[0],true);return true;}
  update(now){
   if(this.role==='spectator'){
    if(!this.visible)return;

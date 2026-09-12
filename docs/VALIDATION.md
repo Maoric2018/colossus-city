@@ -1,5 +1,13 @@
 # Validation record and acceptance gates
 
+## Performance optimization — September 12, 2026
+
+- **115 Node tests and 105 JavaScript modules: PASS.** Added coverage for deferred real-physics queries, same-tick wall openings, idle sleep and immediate wake, stable building/component slots, persistent-fragment growth, pending GPU writes and compressed/conditional HTTP responses.
+- **City, streaming, visual, cars, giant-contact, XR-view and multiplayer/browser regressions: PASS.** The final loading cleanup also passes desktop and emulated Quest rendering. No browser errors. Three concurrent local spectator feeds presented 24.1–29.4 fps with 61–83 ms capture-to-display p95.
+- **Matched measurements:** moving/turning graphics transfers fell 76–87%, mean sampled render CPU work fell 21–36%, and mean eight-raider server step/snapshot time fell 22–43%. Empty scene updates send no instance-buffer data. The final street scene retains nine detailed blocks with 185 tracked geometries instead of 238.
+- **Loading:** 15.30 MB of decoded resources transferred as 7.58 MB with compression; low tiers additionally skip approximately 2.32 MB of unused maps. Conditional responses avoid retransmitting unchanged scripts. Sample screenshots remain effectively unchanged.
+- **Remaining limits:** the final staged-collapse maximum is 27.72 ms, above the 16.67 ms server tick budget. No headset was detected by `quest:check`; physical Quest FPS and cross-device networking remain unmeasured. Methods, complete tables and raw report locations are in [PERFORMANCE.md](PERFORMANCE.md).
+
 ## Colossus health scaling — September 12, 2026
 
 - **108 Node tests and 98 JavaScript modules: PASS.** Real-room tests cover one through eight raiders, the empty-room baseline, spectators, practice-drone replacement, death/respawn, repeated joins/departures, zero-health victory and full round resets. Membership changes preserve the remaining health fraction.

@@ -122,6 +122,8 @@ Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remot
 
 Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1), `medium`, `high`. Adaptive resolution lowers the desktop pixel ratio under sustained load. All nearby blocks share the architectural detail batches; core geometry outside both headset views is removed from submitted instances. Render and physics neighborhoods follow players, while fog covers the distant cutoff. `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
 
+Building instances retain their slots while visible, upload only changed buffer ranges and reuse cached transforms. Empty effects skip rendering; persistent facade debris allocates storage on demand. Physics refreshes its ray-query tree only when gameplay needs it, and idle raiders can sleep. Assets use Brotli/gzip plus ETag validation; low tiers skip unused normal/roughness maps. See [measured before/after results and limits](docs/PERFORMANCE.md).
+
 ```sh
 npm run check          # Syntax and local import existence, no packages needed
 npm test               # Dependency-free unit tests (map, loads, codec, flight model)
@@ -139,6 +141,7 @@ npm run test:flight-animation # Soaring limbs, transitions, nozzles and animatio
 npm run test:xr-view   # Smooth yaw, rigid armor and local look-down body fade
 npm run bench          # Server physics: intact city, staged collapses, active hand contact
 npm run profile        # Real GPU frame times in a visible Chromium, per quality tier
+npm run profile:optimization # Repeatable city CPU/upload samples and asset transfer sizes
 ```
 
 Real desktop rendering and Quest 2 emulation test (starts its own isolated server):

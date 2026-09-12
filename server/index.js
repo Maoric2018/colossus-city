@@ -1,8 +1,9 @@
 import http from 'node:http';
 import {installViews} from './views.js';
 import https from 'node:https';
-import {readFile,stat} from 'node:fs/promises';
-import {readFileSync,createReadStream} from 'node:fs';
+import {stat} from 'node:fs/promises';
+import {readFileSync} from 'node:fs';
+import {serveStatic} from './static.js';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {randomBytes} from 'node:crypto';
@@ -25,12 +26,11 @@ const handler=async(req,res)=>{
   else{root=path.join(ROOT,'public');relative=p==='/'?'index.html':p.slice(1);}
   const target=path.resolve(root,relative);if(target!==root&&!target.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}
   const s=await stat(target);if(!s.isFile())throw Error('Not a file');
-  res.writeHead(200,{'Content-Type':mime[path.extname(target)]||'application/octet-stream',
+  await serveStatic(req,res,target,s,{'Content-Type':mime[path.extname(target)]||'application/octet-stream',
    'Cache-Control':p.startsWith('/assets/')?'public, max-age=3600':'no-cache',
    'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',
    'Permissions-Policy':'xr-spatial-tracking=(self), camera=(), microphone=()',
    'Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:; font-src 'self'; media-src 'self' blob:; object-src 'none'"});
-  if(req.method==='HEAD'){res.end();return;}createReadStream(target).pipe(res);
  }catch{res.writeHead(404,{'Content-Type':'text/plain'});res.end('Not found');}
 };
 const server=process.env.TLS_CERT&&process.env.TLS_KEY?https.createServer({cert:readFileSync(process.env.TLS_CERT),key:readFileSync(process.env.TLS_KEY)},handler):http.createServer(handler);
@@ -45,8 +45,8 @@ server.on('upgrade',(req,socket,head)=>{
   wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));
  }catch{socket.destroy();}
 });
-function send(ws,m){if(ws.readyState===WebSocket.OPEN){if(ws.bufferedAmount>1024*1024){ws.close(1013,'Connection too slow');return;}ws.send(JSON.stringify(m));}}
-function broadcast(room,m){for(const c of room.clients.values())send(c.ws,m);}
+function send(ws,m){if(ws.readyState===WebSocket.OPEN){if(ws.bufferedAmount>1024*1024){ws.close(1013,'Connection too slow');return;}ws.send(typeof m==='string'?m:JSON.stringify(m));}}
+function broadcast(room,m){const payload=JSON.stringify(m);for(const c of room.clients.values())send(c.ws,payload);}
 function freshCode(){let code;do{code=randomBytes(5).toString('hex').slice(0,6).toUpperCase();}while(rooms.has(code));return code;}
 wss.on('connection',ws=>{
  let room=null,client=null,window=Date.now(),messages=0;ws.alive=true;

@@ -47,7 +47,7 @@ export class CityStreaming{
    for(const local of saved.collapsed)r.collapsed.add(indices[local]);
    for(const [id,delay]of saved.failures)r.pendingFailures.set(id,r.time+delay);
   }
-  r.world.updateSceneQueries();r.event({type:'block-load',...this.meta(tile)});return tile;
+  r.world.invalidateSceneQueries();r.event({type:'block-load',...this.meta(tile)});return tile;
  }
  capture(tile){
   const r=this.room,damage=[];

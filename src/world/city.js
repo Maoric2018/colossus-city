@@ -31,12 +31,11 @@ export class CityView {
   for(const c of this.cells){ this.cellsByBuilding[c.building].push(c); const b = this.bounds[c.building]; for(let k = 0; k < 3; k++){ b[k] = Math.min(b[k], c.p[k] - c.queryHalf[k]); b[k + 3] = Math.max(b[k + 3], c.p[k] + c.queryHalf[k]); } }
   this.loader = parent?.loader || new T.TextureLoader();
   const t = env.textures, tex = (url, repeat, srgb = true) => url ? this.texture(url, repeat, srgb) : null;
-  this.textures = parent?.textures || {concrete:tex(t.concrete, 30), concreteNormal:tex(t.concreteNormal, 30, false), concreteRoughness:tex(t.concreteRoughness, 30, false), asphalt:tex(t.asphalt, 38), asphaltNormal:tex(t.asphaltNormal, 38, false), asphaltRoughness:tex(t.asphaltRoughness, 38, false)};
+  this.textures = parent?.textures || {concrete:tex(t.concrete, 30), concreteNormal:tex(tier.normalMaps&&t.concreteNormal, 30, false), concreteRoughness:tex(!tier.lambert&&t.concreteRoughness, 30, false), asphalt:tex(t.asphalt, 38), asphaltNormal:tex(tier.normalMaps&&t.asphaltNormal, 38, false), asphaltRoughness:tex(!tier.lambert&&t.asphaltRoughness, 38, false)};
   if(!parent)this.makeSkyAndLights(); this.ground = parent ? {update(){}} : buildGround(this.root, env, tier, this.textures);
   this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || this.texture(t.concrete, 1),resources:parent?.buildings,components:parent?.buildings.components});
   this.transforms = this.buildings.entries;
-  if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.commit();};
-  this.batches.push(...this.buildings.batches);
+  if(!parent)scene.onBeforeRender=(renderer,_scene,camera)=>{if(scene.userData.reuseCityVisibility)return;this.stream?.select(camera);const far=this.scene.fog.far||Infinity;this.buildings.select(camera,far,renderer.shadowMap.enabled);for(const v of this.stream?.views.values()||[])v.buildings.select(camera,far,renderer.shadowMap.enabled);this.buildings.components.select(camera);this.commit();};
   for(const c of this.cells){ const s = this.skins.get(c.id); this.buildings.setSkin(c.id, s.glass, s.facade); }
   this.buildings.commit(); this.rubble = parent?.rubble || new Rubble(scene, tier); this.fragments=new Fragments(this.root,this.cells,tier); this.cars=parent?{entries:new Map(),reset(){},*boxes(){}}:new CarsView(this.root,env,tier); this.ready = Promise.all([this.loadCustomAssets(),this.cars.ready]);
   if(!parent&&env.infinite)this.stream=new StreamedBlocks(this);

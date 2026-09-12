@@ -159,6 +159,10 @@ prism columns), one facade batch per masonry material, one glass batch per mater
 batch, plus roof props and spires attached to their bays. Broken layers get a zero matrix.
 The 101-type architectural kit uses one shared set of reusable instanced geometry across loaded blocks. Detail is selected within 64 m on Quest, 85 m on performance tier and 115 m on higher tiers; landmark-specific ribs and crowns extend to 230 m. Core batches compact visible instances without changing logical bay poses. Visibility uses the union of both XR eye frustums; desktop shadow rendering retains nearby offscreen casters. Nearby assemblies retain their skin masks and moving-bay transforms. Building names share one atlas and draw batch. No extra dynamic body is created for each ornament. See `CITY_COMPONENTS.md`.
 
+Visible core/detail instances retain their slots; removing one swaps only the last affected slot. Unchanged camera matrices skip core visibility scans, and detail world matrices are cached per bay pose. `render/instances.js` merges changed attribute ranges until Three uploads them, including multiple commits before an XR/capture render. Growing detail buffers copy existing transforms and release the old instance buffer. Empty effects submit no draws or buffer updates. Persistent facade fragments allocate power-of-two capacity only after damage, retaining every existing fragment when growing. City dressing and structural batches have separate ownership to avoid retaining replaced buffers.
+
+The exact left-eye spectator mirror reuses visibility from the just-rendered stereo frame. Independent bot/free cameras still select their own view. Nearby block construction uses a queue rebuilt at block boundaries instead of sorting all preview blocks every frame. Low tiers avoid fetching maps their materials do not use, and the infinite city's source HDR texture is released after preparing its reflection map.
+
 Linear fog covers 105–230 m on Quest and 140–340 m on desktop. The moving sky uses the same horizon color and output color space as full fog, hiding the terrain and silhouette cutoff. A world-space road shader repeats the street grid over a moving plane using downloaded asphalt/concrete textures. Nearby roof equipment reuses the existing downloaded models and rides destructible bays. Generated blocks replace the old decorative skyline ring and harbor boundary.
 
 XR uses the tier's framebuffer scale (0.8 on Quest) and foveation; the camera is never shaken
@@ -167,6 +171,10 @@ headset FPS: `npm run profile` measures a laptop GPU with a visible Chromium; th
 device.
 
 ## Scaling and operations
+
+Rapier 0.17.3 normally rebuilds its scene-query acceleration tree after every solver step. `server/queries.js` uses the same public physics pipeline call, preserving collision resolution, CCD and events, and defers the separate query-tree refresh until a ray/shape/point query. Creation/removal, the start/end of a tick, streamed blocks and changed collider shapes invalidate it. Code that changes an existing pose or shape and queries it in the same tick must call `world.invalidateSceneQueries()`; explicit `world.updateSceneQueries()` remains available. Recheck the adapter when upgrading the pinned Rapier version. Idle flight updates no longer force sleeping bodies awake; movement and dodge still wake immediately.
+
+Static delivery compresses eligible files asynchronously and caches at most 16 MiB / 128 compressed entries across the process. ETags revalidate unchanged files, including scripts with `no-cache`; HEAD and compression negotiation preserve response metadata. Event broadcasts serialize once per room rather than per recipient. Binary snapshots and spectator transport remain unchanged. Benchmark methods and remaining limits are in `PERFORMANCE.md`.
 
 One process owns all rooms; exactly one Fly Machine. World creation builds the merged structural colliders plus the shared prop and hand caches. Profile creation and round resets on the hosting machine. No persistence, accounts or reconnect
 identity. First escalation after measurement: delta/prioritised snapshots, worker processes per

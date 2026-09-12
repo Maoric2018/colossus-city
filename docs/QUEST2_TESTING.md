@@ -17,7 +17,7 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 
 ## What passed locally
 
-- 108 automated Node tests, including real server physics, multiplayer, generated-block IDs, damage archives, distant movement, separated players and colossus health scaling.
+- 115 automated Node tests, including real server physics, multiplayer, generated-block IDs, damage archives, distant movement, separated players, colossus health scaling, deferred collision queries, incremental instance buffers and compressed asset delivery.
 - Colossus health scales by the raider roster; two-raider browser checks receive 5,200 maximum HP on every client. Quest and spectator HUD checks use the same scaled fraction and keep bars within their bounds. Joins/departures preserve damage percentage, and dead raiders awaiting respawn still count.
 - Movable-car checks: gentle pushes, hard strikes, missile blasts, matching crushed collision/rendering, persistent wrecks, sleeping pose traffic, late spectators and round reset.
 - Real Chromium rendering, mouse capture and keyboard movement with the downloaded visual upgrade.
@@ -26,7 +26,7 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 - All 64 bundled asset files pass hash verification. Downloaded roof equipment follows real Rapier collapse, removal and reset; smoke/impact sprites render without errors.
 - Infinite-city emulated stereo travel: crossed the old boundary onto generated streets with both eyes rendering. The sampled expanded scene submitted about 1.53 million triangles across both eyes after visibility compaction (down from 3.85 million before it). This is a renderer count, not a physical headset frame-time measurement. All loaded blocks share the 101-part detail kit.
 - Meta IWER's Quest 2 profile: stereo VR, Touch mapping, movement, proportional smooth turns, giant reach, missile triggers, calibration, controller loss/recovery, suspension, recentering and repeated entry/exit.
-- Eight-player server collapse benchmark: 10.13 ms p95, with a 32.75 ms maximum spike in the final run on this Mac (an earlier run reached 52.53 ms). Collapse spikes still exceed the 16.67 ms budget; this does not measure headset rendering.
+- Eight-player server collapse benchmark after optimization: 7.23 ms p95, with a 27.72 ms maximum spike on this Mac. Collapse spikes still exceed the 16.67 ms budget; this does not measure headset rendering. See [PERFORMANCE.md](PERFORMANCE.md) for the matched comparison.
 - Articulated soaring animation: forward head/weapon arm, balancing arm, knee corrections, banking, nozzle motion and smooth transitions. The 30/144 fps transition comparison and matching ragdoll surface check pass.
 - The same armored pilot renders as a skinned ragdoll in emulated Quest stereo; real Rapier poses, late joining and removal pass the dedicated browser check.
 - Real hold-Shift soaring, release/focus-loss return to hover, and directional dodge controls and a live spectator panel with two raiders and the headset view. Opening and closing the panel starts and stops player capture.

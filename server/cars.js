@@ -19,7 +19,7 @@ export function carMeta(room,c){const p=c.body?.translation(),q=c.body?.rotation
 export function damageCar(room,c,damage){
  if(!c?.body||c.wreck||damage<=0)return false;c.hp-=damage;
  if(c.hp>0)return false;
- c.hp=0;c.wreck=true;c.explodedAt=room.time;c.armed=true;
+ room.world.invalidateSceneQueries();c.hp=0;c.wreck=true;c.explodedAt=room.time;c.armed=true;
  const shape=carShape(c.size,true);c.collider.setShape(new RAPIER.Cuboid(...shape.half));c.collider.setTranslationWrtParent(vec(shape.offset));c.collider.setFriction(.82);
  c.body.setLinvel(add(c.body.linvel(),v(0,3.5,0)),true);c.body.setAngvel(add(c.body.angvel(),v(.8,0,.55)),true);
  room.event({...carMeta(room,c),type:'car-explode'});return true;

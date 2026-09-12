@@ -21,6 +21,8 @@ shared/            pure, dependency-free logic imported by BOTH server and brows
 
 server/            authoritative simulation (Node + Rapier). Nothing here renders.
   index.js         HTTP static hosting, WebSocket upgrade, rate limits, tick loop, snapshots
+  static.js        bounded Brotli/gzip asset cache, ETag validation and HEAD responses
+  queries.js       lazy Rapier scene-query refresh; solver still runs every physics tick
   room.js          one match: world creation, membership, input routing, step order, snapshot
   streaming.js     moving physics neighborhoods, sparse damage archives, reload and ray preload
   boss.js          giant locomotion (VR pose / desktop / AI), hand sweeps, torso shove, combos
@@ -44,6 +46,7 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
   app/lobby.js     lobby/menu DOM wiring (pure UI, callbacks from main.js)
   render/quality.js GPU tier detection + material factories (Lambert on integrated GPUs)
   render/renderer.js WebGL renderer, bloom composer, adaptive resolution, Q toggle
+  render/instances.js partial GPU update ranges retained until upload
   world/city.js    CityView: sky, lights, ground, buildings, debris poses, skins, rubble,
                    spatial queries (rayDistance, overlapBox, cellsAlongSegment)
   world/cars.js    instanced imported cars and crushed wrecks, moving query boxes, smoke
@@ -54,6 +57,7 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
   world/ground.js  avenues/streets/sidewalks/plaza/spawn pads/lamps/water/bridges
   world/textures.js procedural brick/stone/concrete/glass facade maps
   world/rubble.js  cosmetic instanced bricks/shards (client only, bounded per tier)
+  world/fragments.js persistent facade remains, lazy capacity growth and settled transforms
   district.js      downloaded HDR lighting and roof props/spires shared by generated blocks
   avatars.js       giant (mech armour), raiders, ragdoll parts
   effects.js       sprite particle pools and tracers
@@ -64,7 +68,8 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
 tests/             node --test. unit (pure shared), physics (real Rapier rooms), abilities,
                    network (real server + sockets), xr (fake frames, real Three math)
 scripts/           check (syntax/imports), benchmark (server CPU), profile (real GPU, headed
-                   Chromium), browser-smoke (Playwright + IWER Quest 2 emulation), quest-usb
+                   Chromium), optimization-profile (matched city CPU/upload samples),
+                   browser-smoke (Playwright + IWER Quest 2 emulation), quest-usb
 ```
 
 ## Rules of the road

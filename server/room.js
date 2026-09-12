@@ -2,6 +2,7 @@
 // Room orchestrates; the mechanics live in boss.js, players.js, combat.js, destruction.js
 // and abilities.js so they can be changed and tested independently.
 import {CityStreaming} from './streaming.js';
+import {lazySceneQueries} from './queries.js';
 import {GIANT, handQuaternion, identity} from '../shared/giant-rig.js';
 import {HandWorld} from '../shared/hand-world.js';
 import {buildCars,carMeta,updateCars,crashCar,carSnapshots} from './cars.js';
@@ -32,7 +33,7 @@ export class Room {
   // Old body wrappers refer to the old WASM sets, not to the next world.
   for(const p of this.players.values()){ p.body = null; p.rag = null; }
   this.world?.free(); this.queue?.free();
-  this.world = new RAPIER.World(v(0, C.GRAVITY, 0)); this.world.timestep = C.TICK;
+  this.world = lazySceneQueries(new RAPIER.World(v(0, C.GRAVITY, 0))); this.world.timestep = C.TICK;
   this.world.integrationParameters.numSolverIterations = 5;
   this.queue = new RAPIER.EventQueue(true); this.colliderTags = new Map(); this.cells = generateCells(this.env);
   this.cellMap = new Map(); this.detached = new Set(); this.debris = new Map(); this.settled = new Map(); this.nextDebris = 1000; this.missiles = new Map(); this.nextMissile = 20000; this.rags = new Map(); this.events = [];
@@ -129,7 +130,7 @@ export class Room {
  }
  // ---- simulation ----
  step(){
-  this.tick++; this.time += C.TICK;
+  this.tick++; this.time += C.TICK;this.world.invalidateSceneQueries();
   if(this.phase){ this.world.step(this.queue); this.queue.drainCollisionEvents(() => {}); updateCars(this); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
   // Wait for at least one raider. An AI giant fills an empty boss seat; it is not a second authority.
   if(this.players.size) this.remaining = Math.max(0, C.MATCH_SECONDS - (this.time - this.startTime)); else this.startTime = this.time;

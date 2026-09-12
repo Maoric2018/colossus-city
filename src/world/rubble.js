@@ -1,6 +1,7 @@
 // Client-side cosmetic rubble: bricks, stone blocks, concrete chunks, glass shards and steel
 // splinters. Purely visual, never replicated, bounded per tier. One instanced draw call per kind.
 import * as T from 'three';
+import {markRange} from '../render/instances.js';
 import {seeded} from '../../shared/math.js';
 const KINDS = {
  brick:    {geometry:() => new T.BoxGeometry(.32, .14, .16), color:0x9a5a48, gravity:-14, bounce:.25, life:[3.5, 5.5], count:1},
@@ -17,7 +18,7 @@ class Pool {
    : tier.lambert ? new T.MeshLambertMaterial({color:spec.color}) : new T.MeshStandardMaterial({color:spec.color, roughness:.85, metalness:kind === 'steel' ? .7 : .05});
   this.mesh = new T.InstancedMesh(spec.geometry(), material, limit); this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); this.mesh.frustumCulled = false; this.mesh.castShadow = false; this.mesh.receiveShadow = !tier.lambert;
   for(let i = 0; i < limit; i++) this.mesh.setMatrixAt(i, zero);
-  this.mesh.count = limit; scene.add(this.mesh);
+  this.mesh.count = 0; scene.add(this.mesh);
  }
  // Live items are kept compact at the front of the array; the oldest piece is recycled when full.
  spawn(p, v, scale){
@@ -28,12 +29,13 @@ class Pool {
   item.age = 0; item.life = spec.life[0] + Math.random() * (spec.life[1] - spec.life[0]); item.scale = scale; item.rest = false; item.dead = false;
  }
  update(dt){
-  const spec = this.spec, m = this.mesh; let live = 0, changed = false;
+  const spec = this.spec, m = this.mesh; let live = 0, changed = false,drawCount=0;
   for(let i = 0; i < this.items.length; i++){
    const it = this.items[i];
    if(it.dead) continue;
    it.age += dt;
    if(it.age >= it.life){ it.dead = true; m.setMatrixAt(i, zero); changed = true; continue; }
+   drawCount=i+1;
    if(!it.rest){
     it.v.y += spec.gravity * dt; it.p.addScaledVector(it.v, dt);
     const floor = .1 * it.scale;
@@ -43,7 +45,7 @@ class Pool {
    const fade = it.life - it.age < .6 ? (it.life - it.age) / .6 : 1;
    dummy.position.copy(it.p); dummy.quaternion.copy(it.q); dummy.scale.setScalar(it.scale * fade); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); live++; changed = true;
   }
-  if(changed) m.instanceMatrix.needsUpdate = true;
+  m.count=drawCount;m.visible=drawCount>0;if(changed&&drawCount){markRange(m.instanceMatrix,0,drawCount);m.instanceMatrix.needsUpdate=true;}
   if(!live && this.items.length){ this.items.length = 0; this.cursor = 0; }
   return live;
  }

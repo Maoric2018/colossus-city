@@ -4,6 +4,7 @@
 // Core batches plus the instanced architectural kit; count is independent of city size.
 import * as T from 'three';
 import {Components} from './components.js';
+import {partialInstanceUpdates,commitInstances} from '../render/instances.js';
 import {mergeParts} from '../art.js';
 import {MATERIALS, sideBit} from '../../shared/city/materials.js';
 import {surface, glassMaterial} from '../render/quality.js';
@@ -18,7 +19,7 @@ const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; retur
 function colored(geometry, color){ const c = new T.Color(color), n = geometry.attributes.position.count, colors = new Float32Array(n * 3); for(let i = 0; i < n; i++) c.toArray(colors, i * 3); geometry.setAttribute('color', new T.BufferAttribute(colors, 3)); return geometry; }
 export class Buildings {
  constructor(root, cells, tier, {concrete,resources=null,components=null}){
-  this.root = root; this.cells = cells; this.tier = tier; this.entries = new Map(); this.dirty = new Set(); this.batches = [];
+  this.root = root; this.cells = cells; this.tier = tier; this.entries = new Map(); this.dirty = new Set(); this.batches = [];this.slots={frame:[],empire:[],roof:[],walls:{}};this.selectionDirty=true;this.lastViews=[];
   // Columns are open-ended prisms (no caps): 8 triangles each instead of 12, times 2,500 bays.
   const column = () => new T.CylinderGeometry(.039, .039, .925, 4, 1, true).rotateY(Math.PI / 4);
   const frameGeometry = resources?.frame.geometry || mergeParts([
@@ -39,25 +40,29 @@ export class Buildings {
    this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * .45, color:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02}), walls);
    this.glass[name].castShadow = false;
   }
-  let roofIndex = 0,empireIndex=0;
+
   cells.forEach((c, i) => {
-   const e = {index:i, empireIndex:c.architecture==='empire'?empireIndex++:-1, walls:[], size:new T.Vector3(...c.size), roofIndex:c.roof ? roofIndex++ : -1, glassMask:0, facadeMask:0, hidden:false, p:new T.Vector3(...c.p), q:new T.Quaternion()};
+   const e = {cell:c,index:i,frameIndex:-1,empireIndex:-1,walls:[],size:new T.Vector3(...c.size),roofIndex:-1,radius:Math.hypot(...(c.queryHalf||c.size.map(v=>v/2)))+1,revision:0, glassMask:0, facadeMask:0, hidden:false, p:new T.Vector3(...c.p), q:new T.Quaternion()};
    e.tint=new T.Color().setHSL(((c.variant%29)-14)*.001+.08,.06+(c.variant%5)*.015,.79+(c.variant%7)*.025);
-   c.walls.forEach((exterior, side) => { if(exterior) e.walls.push({side, index:this.wallCount[skinKey(c)]++}); });
+   c.walls.forEach((exterior, side) => { if(exterior) e.walls.push({side,index:-1,owner:e}); });
    this.entries.set(c.id, e);
   });
+  for(const mesh of this.batches)mesh.count=0;
   this.components=components||new Components(this,cells,tier,concrete);if(components)components.register(this,cells);
   for(const c of cells) this.setCell(c.id, null, null, false);
  }
  batch(geometry, material, count){
   const b = new T.InstancedMesh(geometry, material, Math.max(1, count)); b.count=count; b.instanceMatrix.setUsage(T.DynamicDrawUsage); b.frustumCulled = false; b.castShadow = true; b.receiveShadow = true;
-  this.root.add(b); this.batches.push(b); this.dirty.add(b); return b;
+  this.root.add(b); this.batches.push(b); return partialInstanceUpdates(b,this.dirty);
  }
- setSkin(id, glassMask, facadeMask){ const e = this.entries.get(id); if(!e) return; e.glassMask = glassMask; e.facadeMask = facadeMask; this.setCell(id, null, null, e.hidden); }
+ setSkin(id, glassMask, facadeMask){ const e = this.entries.get(id); if(!e) return; if(e.glassMask===glassMask&&e.facadeMask===facadeMask)return;e.glassMask = glassMask; e.facadeMask = facadeMask;e.skinDirty=true; this.setCell(id, null, null, e.hidden); }
  // p/q null keeps the stored transform. Zero-scale matrices hide layers cheaply.
  setCell(id, p, q, hidden){
   const e = this.entries.get(id); if(!e) return;
   const c = this.cells[e.index];
+  const moved=(p&&!e.p.equals(p))||(q&&!e.q.equals(q));
+  if(!moved&&e.hidden===hidden&&!e.skinDirty&&e.initialized)return;
+  if(moved||!e.initialized)e.revision++;e.initialized=true;e.skinDirty=false;this.selectionDirty=true;
   if(p) e.p.copy(p); if(q) e.q.copy(q); e.hidden = hidden;
   this.writeCore(c,e);
   this.components?.setCell(c,e);
@@ -65,31 +70,44 @@ export class Buildings {
  // Compact only render slots. Cell identities, collision geometry and attachments
  // retain their world transforms even while a bay is behind the headset.
  select(camera,far=Infinity,shadows=this.tier.shadows){
-  const eyes=camera.cameras?.length?camera.cameras:[camera];
+  const eyes=camera.cameras?.length?camera.cameras:[camera];let changed=this.selectionDirty||this.eyeCount!==eyes.length||this.lastFar!==far||this.lastShadows!==shadows;
   this.frustums||=[];
-  eyes.forEach((eye,i)=>{const f=this.frustums[i]||=new T.Frustum();f.setFromProjectionMatrix(projection.multiplyMatrices(eye.projectionMatrix,eye.matrixWorldInverse));for(const plane of f.planes)plane.constant+=2;});
-  eyePosition.setFromMatrixPosition(eyes[0].matrixWorld);let changed=!this.packed;
-  for(const c of this.cells){
-   const e=this.entries.get(c.id);sphere.center.copy(e.p);sphere.radius=Math.hypot(...(c.queryHalf||c.size.map(v=>v/2)))+1;
-   const near=e.p.distanceToSquared(eyePosition)<(far+sphere.radius)**2;
-   e.inView=near&&eyes.some((_,i)=>this.frustums[i].intersectsSphere(sphere));
-   // Desktop shadow maps also need the nearby buildings behind the camera.
+  for(let i=0;i<eyes.length;i++){
+   projection.multiplyMatrices(eyes[i].projectionMatrix,eyes[i].matrixWorldInverse);
+   const last=this.lastViews[i]||=new Float64Array(16);for(let k=0;k<16;k++)if(last[k]!==projection.elements[k]){changed=true;last[k]=projection.elements[k];}
+   const f=this.frustums[i]||=new T.Frustum();f.setFromProjectionMatrix(projection);for(const plane of f.planes)plane.constant+=2;
+  }
+  if(!changed)return;this.selectionDirty=false;this.eyeCount=eyes.length;this.lastFar=far;this.lastShadows=shadows;
+  eyePosition.setFromMatrixPosition(eyes[0].matrixWorld);
+  for(const e of this.entries.values()){
+   sphere.center.copy(e.p);sphere.radius=e.radius;const near=e.p.distanceToSquared(eyePosition)<(far+e.radius)**2;
+   e.inView=false;if(near)for(let i=0;i<eyes.length;i++)if(this.frustums[i].intersectsSphere(sphere)){e.inView=true;break;}
    const rendered=!e.hidden&&near&&(shadows||e.inView);
-   if(rendered!==e.rendered){e.rendered=rendered;changed=true;}
+   if(rendered===e.rendered)continue;e.rendered=rendered;
+   if(rendered)this.show(e);else this.hide(e);
   }
-  if(!changed)return;this.packed=true;
-  let frame=0,empire=0,roof=0;const walls={};
-  for(const c of this.cells){
-   const e=this.entries.get(c.id),visible=e.rendered,name=skinKey(c);
-   e.frameIndex=visible&&c.architecture!=='empire'?frame++:-1;
-   e.empireIndex=visible&&c.architecture==='empire'?empire++:-1;
-   e.roofIndex=visible&&c.roof?roof++:-1;
-   for(const wall of e.walls){wall.index=visible?(walls[name]||0):-1;if(visible)walls[name]=wall.index+1;}
-   if(visible)this.writeCore(c,e);
-  }
-  this.frame.count=frame;this.empireFrame.count=empire;this.roof.count=roof;
-  for(const name of Object.keys(this.glass)){this.glass[name].count=walls[name]||0;if(this.facade[name])this.facade[name].count=walls[name]||0;}
  }
+ show(e){
+  const c=e.cell,kind=c.architecture==='empire'?'empire':'frame',field=kind==='empire'?'empireIndex':'frameIndex';
+  e[field]=this.slots[kind].length;this.slots[kind].push(e);(kind==='empire'?this.empireFrame:this.frame).count=this.slots[kind].length;
+  if(c.roof){e.roofIndex=this.slots.roof.length;this.slots.roof.push(e);this.roof.count=this.slots.roof.length;}
+  const name=skinKey(c),walls=this.slots.walls[name]||=[];
+  for(const wall of e.walls){wall.index=walls.length;walls.push(wall);}
+  if(this.glass[name])this.glass[name].count=walls.length;if(this.facade[name])this.facade[name].count=walls.length;
+  this.writeCore(c,e);
+ }
+ removeSlot(slots,item,field,mesh){
+  const index=item[field];if(index<0)return;const last=slots.pop();
+  if(last!==item){slots[index]=last;last[field]=index;this.writeCore(last.cell,last);}
+  item[field]=-1;mesh.count=slots.length;
+ }
+ hide(e){
+  this.removeSlot(this.slots.frame,e,'frameIndex',this.frame);this.removeSlot(this.slots.empire,e,'empireIndex',this.empireFrame);this.removeSlot(this.slots.roof,e,'roofIndex',this.roof);
+  const name=skinKey(e.cell),slots=this.slots.walls[name];if(!slots)return;
+  for(const wall of e.walls){if(wall.index<0)continue;const index=wall.index,last=slots.pop();if(last!==wall){slots[index]=last;last.index=index;this.writeCore(last.owner.cell,last.owner);}wall.index=-1;}
+  if(this.glass[name])this.glass[name].count=slots.length;if(this.facade[name])this.facade[name].count=slots.length;
+ }
+
  writeCore(c,e){
   temp.position.copy(e.p); temp.quaternion.copy(e.q); temp.scale.copy(e.size); temp.updateMatrix();
   const hidden=e.hidden,m = hidden ? zero : temp.matrix,frameIndex=e.frameIndex??e.index;
@@ -105,7 +123,7 @@ export class Buildings {
    if(glass){ matrix.multiplyMatrices(m, facade ? paneLocal[w.side] : wallLocal[w.side]); glass.setMatrixAt(w.index, (hidden || !(e.glassMask & bit)) ? zero : matrix); this.dirty.add(glass); }
   }
  }
- commit(){ for(const b of this.dirty){b.instanceMatrix.needsUpdate = true;if(b.instanceColor)b.instanceColor.needsUpdate=true;} this.dirty.clear(); }
+ commit(){for(const mesh of this.batches)mesh.visible=mesh.count>0;commitInstances(this.dirty);}
  // Current transform of a bay (shared object, do not mutate).
  pose(id){ return this.entries.get(id); }
 }

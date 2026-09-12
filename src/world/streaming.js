@@ -9,7 +9,7 @@ const dummy=new T.Object3D(),palette={brick:[0x956350,0x795850,0xaf7e63],stone:[
 const keyOf=id=>{const p=cellBlock(id);return p?blockKey(...p):null;};
 export class StreamedBlocks{
  constructor(owner){
-  this.owner=owner;this.views=new Map();this.previews=new Map();this.records=new Map();this.entityOwners=new Map();this.lastKey='';this.needsLOD=true;this.lastBuild=-Infinity;
+  this.owner=owner;this.views=new Map();this.previews=new Map();this.records=new Map();this.entityOwners=new Map();this.lastKey='';this.needsLOD=true;this.lastBuild=-Infinity;this.pending=[];this.position=new T.Vector3();
   this.ground=streamGround(owner.root,owner.tier,owner.textures);
   const material=surface(owner.tier,{color:0xffffff,roughness:.85});
   material.onBeforeCompile=shader=>{
@@ -41,7 +41,7 @@ export class StreamedBlocks{
  getCell(id){return this.views.get(keyOf(id))?.byId.get(id);}
  reset(){for(const view of this.views.values()){this.owner.handWorld.children.delete(view.handWorld);view.dispose();}this.views.clear();this.records.clear();this.entityOwners.clear();this.lastKey='';this.needsLOD=true;}
  select(camera){
-  const viewCamera=camera.cameras?.[0]||camera,p=new T.Vector3().setFromMatrixPosition(viewCamera.matrixWorld),[cx,cz]=blockAt(p.x,p.z),key=blockKey(cx,cz),now=performance.now();
+  const viewCamera=camera.cameras?.[0]||camera,p=this.position.setFromMatrixPosition(viewCamera.matrixWorld),[cx,cz]=blockAt(p.x,p.z),key=blockKey(cx,cz),now=performance.now();
   this.ground.update(p);this.owner.sky.position.copy(p);this.owner.sun.position.set(p.x-120,160,p.z-90);this.owner.sun.target.position.set(p.x,0,p.z);this.owner.sun.target.updateMatrixWorld();
   const far=this.owner.scene.fog.far||340,radius=Math.ceil(far/70)+1;
   if(key!==this.lastKey){
@@ -49,15 +49,15 @@ export class StreamedBlocks{
    for(const [k,env]of this.previews)if(Math.abs(env.block[0]-cx)>radius+1||Math.abs(env.block[1]-cz)>radius+1)this.previews.delete(k);
    for(const [k,v]of this.views)if(Math.abs(v.env.block[0]-cx)>1||Math.abs(v.env.block[1]-cz)>1){this.owner.handWorld.children.delete(v.handWorld);v.dispose();this.views.delete(k);}
    for(let z=cz-radius;z<=cz+radius;z++)for(let x=cx-radius;x<=cx+radius;x++)if(!homeBlock(x,z)&&Math.hypot(x*70-p.x,z*70-p.z)<far+100){const k=blockKey(x,z);if(!this.previews.has(k))this.previews.set(k,generateBlock(x,z,this.owner.env.seed));}
+   this.pending=[...this.previews.values()].filter(e=>Math.abs(e.block[0]-cx)<=1&&Math.abs(e.block[1]-cz)<=1&&!this.views.has(e.key)).sort((a,b)=>Math.hypot(a.center[0]-p.x,a.center[1]-p.z)-Math.hypot(b.center[0]-p.x,b.center[1]-p.z));
   }
   // One nearby block per rendered frame avoids building a complete district in one frame.
-  if(now-this.lastBuild>12){
-   const missing=[...this.previews.values()].filter(e=>Math.abs(e.block[0]-cx)<=1&&Math.abs(e.block[1]-cz)<=1&&!this.views.has(e.key)).sort((a,b)=>Math.hypot(a.center[0]-p.x,a.center[1]-p.z)-Math.hypot(b.center[0]-p.x,b.center[1]-p.z));
-   if(missing.length){const env=missing[0],view=new CityView(this.owner.scene,env,{tier:this.owner.tier,quest:this.owner.quest,parent:this.owner});this.views.set(env.key,view);this.owner.handWorld.children.add(view.handWorld);const record=this.records.get(env.key);if(record)this.apply(view,record);installRoofDressing(view).catch(error=>console.error('Streamed roof assets failed',error));this.lastBuild=now;this.needsLOD=true;}
+  if(this.pending.length&&now-this.lastBuild>12){
+   const env=this.pending.shift(),view=new CityView(this.owner.scene,env,{tier:this.owner.tier,quest:this.owner.quest,parent:this.owner});this.views.set(env.key,view);this.owner.handWorld.children.add(view.handWorld);const record=this.records.get(env.key);if(record)this.apply(view,record);installRoofDressing(view).catch(error=>console.error('Streamed roof assets failed',error));this.lastBuild=now;this.needsLOD=true;
   }
   if(this.needsLOD){this.rebuildLOD();this.needsLOD=false;}
   const homeVisible=Math.max(Math.abs(p.x)-175,Math.abs(p.z)-175)<far;
-  for(const mesh of [...this.owner.buildings.batches,...this.owner.batches])if(!mesh.userData.component)mesh.visible=homeVisible;
+  for(const mesh of this.owner.batches)mesh.visible=homeVisible;
  }
  rebuildLOD(){
   let index=0;

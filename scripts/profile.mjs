@@ -25,7 +25,7 @@ try{
   const sample = async (label, seconds) => {
    const r = await page.evaluate(async seconds => {
     const c = window.__COLOSSUS, frames = []; let last = performance.now();
-    await new Promise(resolve => { const tick = t => { frames.push(t - last); last = t; if(t - frames[0] < 0 || frames.length < seconds * 200 && performance.now() - start < seconds * 1000) requestAnimationFrame(tick); else resolve(); }; const start = performance.now(); requestAnimationFrame(tick); });
+    await new Promise(resolve => { const start=performance.now();const tick=t=>{frames.push(t-last);last=t;if(t-start<seconds*1000)requestAnimationFrame(tick);else resolve();};requestAnimationFrame(tick); });
     frames.shift(); frames.sort((a, b) => a - b);
     const p = q => frames[Math.min(frames.length - 1, Math.floor(frames.length * q))];
     return {fps:Math.round(1000 / (frames.reduce((s, x) => s + x, 0) / frames.length)), p50:+p(.5).toFixed(1), p95:+p(.95).toFixed(1), p99:+p(.99).toFixed(1), calls:c.renderer.info.render.calls, triangles:c.renderer.info.render.triangles, scale:c.gameRenderer.scale, shadows:c.gameRenderer.shadows, bloom:c.gameRenderer.bloom};
@@ -33,7 +33,7 @@ try{
    console.log(tier, label, JSON.stringify(r)); return r;
   };
   const lobby = await sample('lobby', 3);
-  await page.locator('#name').fill('PROFILE'); await page.locator('#practice').click(); await page.waitForFunction(() => window.__COLOSSUS.state !== null);
+  await page.locator('[data-role="raider"]').click();await page.locator('#name').fill('PROFILE'); await page.locator('#practice').click(); await page.waitForFunction(() => window.__COLOSSUS.state !== null);
   await page.locator('#resume').click(); await page.waitForTimeout(500);
   await page.keyboard.down('Space'); await page.keyboard.down('KeyW'); await page.waitForTimeout(1500);
   const flight = await sample('flight', 4);
