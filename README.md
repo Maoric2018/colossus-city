@@ -3,7 +3,7 @@
 
 Asymmetric multiplayer prototype for a **Meta Quest 2 giant** and **laptop raiders**. Three.js renders a Manhattan-style district; one Node.js server runs Rapier physics; WebSockets carry inputs, tracked poses, world snapshots and reliable destruction events.
 
-**Validation status (September 11, 2026):** 62 Node tests pass (real Rapier physics, real WebSocket multiplayer, XR lifecycle). The Playwright smoke test drives real Chromium rendering plus Meta IWER's Quest 2 profile (stereo, Touch input, tracking loss, calibration, re-entry). On an Intel Iris Xe laptop `npm run profile` measures **55–58 fps vsync-locked (~7.7 ms of frame work)** in the default performance tier; the server's eight-player six-tower-collapse benchmark averages **7.2 ms per 16.7 ms tick** (1.7 ms with the city intact). **No physical Quest 2 was connected: headset frame rate, tracking, haptics and comfort remain unverified.** See [docs/VALIDATION.md](docs/VALIDATION.md) and [docs/QUEST2_TESTING.md](docs/QUEST2_TESTING.md).
+**Validation status (September 11, 2026):** 63 Node tests pass (real Rapier physics, real WebSocket multiplayer, XR lifecycle). The Playwright smoke test drives real Chromium rendering plus Meta IWER's Quest 2 profile (stereo, Touch input, tracking loss, calibration, re-entry). On an Intel Iris Xe laptop `npm run profile` measures **55–58 fps vsync-locked (~7.7 ms of frame work)** in the default performance tier; the server's eight-player six-tower-collapse benchmark averages **7.2 ms per 16.7 ms tick** (1.7 ms with the city intact). **No physical Quest 2 was connected: headset frame rate, tracking, haptics and comfort remain unverified.** See [docs/VALIDATION.md](docs/VALIDATION.md) and [docs/QUEST2_TESTING.md](docs/QUEST2_TESTING.md).
 
 ## 1. Start on a laptop
 
@@ -61,7 +61,7 @@ fly status --app YOUR-UNIQUE-APP
 
 | Player | Controls |
 | --- | --- |
-| Laptop raider | WASD move relative to view; mouse aim; hold Space to climb; F toggles hover/soar; E + direction dodges; Shift boost; C descend; hold left mouse to fire; **hold right mouse to charge a breach shot**; V first/third person; Tab scores; Q quality; Escape releases the pointer. |
+| Laptop raider | WASD move relative to view; mouse aim; hold Space to climb; F toggles hover/soar; E + direction dodges; Shift boost; C descend; hold left mouse to fire; **right mouse fires a rocket**; V first/third person; Tab scores; Q quality; Escape releases the pointer. |
 | Quest giant | Move your head and both controllers to embody the giant. Swing into raiders and buildings; walk into a tower to shove through it. Left stick moves, right stick turns smoothly (90°/s default), either trigger launches a missile, right A recalibrates height. |
 | Desktop giant | WASD; mouse view; hold left click for a sweeping hand; Space for downward strikes; right click or R fires missiles. |
 | Spectator | Live Views opens every player's camera feed; Free Camera flies with mouse + WASD, Space up, C down, Shift fast. |
@@ -70,7 +70,7 @@ fly status --app YOUR-UNIQUE-APP
 
 **Flight:** hold Space to take off, F to soar. Soaring flies prone at 32 m/s (42 boosted) along the mouse; S brakes. Hover is 11 m/s (20 boosted). A full tank of hover thrust climbs about 115 m; soaring with the nose up climbs cheaper. E dodges (12 % thrust, 1.2 s cooldown). Passing within a few metres of a swinging hand without being hit is a **close call** that refills thrust.
 
-**Breach shot:** hold right mouse for 0.7 s and release. The bolt cracks the bay it hits (and its neighbours), costs 22 % thrust and has a 3 s cooldown. Against the giant it deals 42 (76 on the head) and **staggers** it, which exposes the core: all raider damage gets +60 % while the giant is staggered.
+**Rocket:** right click fires a shoulder rocket. It flies at 55 m/s, explodes on the first thing it touches and blows the structure out of every bay within 7 m — one hit into the base of a small tower takes the whole thing down. It costs 16 % thrust and has a 2.2 s cooldown, never hurts your squad, and a hit on the giant deals up to 60 and **staggers** it, which exposes the core: all raider damage gets +60 % while the giant is staggered.
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode on scenery or raiders and blow a hole through most bays. Shared 0.8 s cooldown, eight-projectile cap.
 
@@ -92,7 +92,7 @@ This is a game structural model, not engineering analysis: no bending moments, f
 
 ### Game feel
 
-Client-side prediction runs the shared flight model locally against the held input and reconciles with each snapshot, so the raider's own movement has no interpolation lag; the desktop giant camera is dead-reckoned. Procedural Web Audio (no audio files) covers weapons, glass, masonry, steel, creaks, collapses, thrust and wind with distance attenuation. Trauma camera shake (desktop only), hit markers, floating damage numbers, an announcer feed (tower down, close call, core exposed, combos), material-specific haptics for the giant, a camera-locked damage vignette in VR (the VR camera is never shaken), and a round-end scoreboard.
+Client-side prediction runs the shared flight model locally against the held input and reconciles with each snapshot, so the raider's own movement has no interpolation lag; the desktop giant camera is dead-reckoned. Rockets recoil the camera and their blast shakes it from a distance. Procedural Web Audio (no audio files) covers weapons, glass, masonry, steel, creaks, collapses, thrust and wind with distance attenuation. Trauma camera shake (desktop only), hit markers, floating damage numbers, an announcer feed (tower down, close call, core exposed, combos), material-specific haptics for the giant, a camera-locked damage vignette in VR (the VR camera is never shaken), and a round-end scoreboard.
 
 ## 3. Performance and verification
 

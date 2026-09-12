@@ -2,13 +2,13 @@
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {C, group} from '../shared/config.js';
 import {v, sub, norm, vec, clamp} from '../shared/math.js';
-import {fly} from './abilities.js';
+import {fly, launchRocket} from './abilities.js';
 import {shoot, knockdown, removeRag} from './combat.js';
 import {removeBody} from './destruction.js';
 const G = C.COLLISION;
-export const noInput = () => ({x:0, z:0, up:0, boost:false, fire:false, soar:false, missile:false, dodge:0, heavy:0, yaw:0, pitch:0, seq:0});
+export const noInput = () => ({x:0, z:0, up:0, boost:false, fire:false, soar:false, missile:false, dodge:0, rocket:0, yaw:0, pitch:0, seq:0});
 export function newPlayer(room, id, name, bot){
- return {id, name, bot, input:noInput(), lastInput:bot ? room.time : -100, kills:0, damage:0, score:0, heavyReady:0, lastHeavySeq:0, closeCallAt:-10};
+ return {id, name, bot, input:noInput(), lastInput:bot ? room.time : -100, kills:0, damage:0, score:0, rocketReady:0, lastRocketSeq:0, closeCallAt:-10};
 }
 export function spawn(room, p, at){
  if(p.body) removeBody(room, p.body);
@@ -16,7 +16,7 @@ export function spawn(room, p, at){
  p.body = room.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(spawnPoint.x, Math.max(1.2, spawnPoint.y), spawnPoint.z).lockRotations().setLinearDamping(.12).setCcdEnabled(true));
  const co = room.world.createCollider(RAPIER.ColliderDesc.capsule(.8, .34).setMass(70).setFriction(.05).setRestitution(0).setCollisionGroups(group(G.PLAYER, G.WORLD | G.DEBRIS)).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), p.body);
  room.colliderTags.set(co.handle, {player:p.id});
- p.hp = C.PLAYER_HP; p.fuel = 1; p.rag = null; p.deadUntil = 0; p.recoverAt = 0; p.invulnerable = room.time + C.INVULNERABLE_SECONDS; p.lastShot = -1; p.soaring = false; p.dodgeUntil = 0; p.dodgeReady = 0; p.lastDodgeSeq = p.input.dodge || 0; p.lastHeavySeq = p.input.heavy || 0;
+ p.hp = C.PLAYER_HP; p.fuel = 1; p.rag = null; p.deadUntil = 0; p.recoverAt = 0; p.invulnerable = room.time + C.INVULNERABLE_SECONDS; p.lastShot = -1; p.soaring = false; p.dodgeUntil = 0; p.dodgeReady = 0; p.lastDodgeSeq = p.input.dodge || 0; p.lastRocketSeq = p.input.rocket || 0;
 }
 export function removePlayer(room, id){
  const p = room.players.get(id); if(!p) return;
@@ -41,16 +41,13 @@ export function updatePlayer(room, p){
  if(at.y < -8 || Math.abs(at.x) > C.KILL_HALF || Math.abs(at.z) > C.KILL_HALF){ knockdown(room, p, v(0, 4, 0), 200); return; }
  fly(room, p, i);
  if(i.fire && room.time - p.lastShot > C.FIRE_INTERVAL){ p.lastShot = room.time; shoot(room, p); }
- if(i.heavy > p.lastHeavySeq){
-  p.lastHeavySeq = i.heavy;
-  if(room.time >= p.heavyReady && p.fuel >= C.HEAVY_FUEL){ p.heavyReady = room.time + C.HEAVY_COOLDOWN; p.fuel -= C.HEAVY_FUEL; shoot(room, p, true); }
- }
+ if(i.rocket > p.lastRocketSeq){ p.lastRocketSeq = i.rocket; launchRocket(room, p); }
 }
 function driveBot(room, p){
  const at = p.body.translation(), target = room.boss.head, angle = room.time * .18 + p.id * 2;
  const goal = v(room.boss.x + Math.sin(angle) * 22, 14 + Math.sin(room.time * .45 + p.id) * 7, room.boss.z + Math.cos(angle) * 22);
  const dir = norm(sub(goal, at)), aim = sub(target, at);
- p.input = {x:dir.x, z:dir.z, world:true, up:clamp((goal.y - at.y) / 4, -1, 1), boost:false, fire:true, heavy:0, dodge:0,
+ p.input = {x:dir.x, z:dir.z, world:true, up:clamp((goal.y - at.y) / 4, -1, 1), boost:false, fire:true, rocket:0, dodge:0,
   yaw:Math.atan2(-aim.x, -aim.z), pitch:Math.atan2(aim.y, Math.hypot(aim.x, aim.z)), seq:0};
  p.lastInput = room.time;
 }

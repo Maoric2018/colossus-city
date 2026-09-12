@@ -20,8 +20,8 @@ server/            authoritative simulation (Node + Rapier). Nothing here render
   room.js          one match: world creation, membership, input routing, step order, snapshot
   boss.js          giant locomotion (VR pose / desktop / AI), hand sweeps, torso shove, combos
   players.js       raider spawn/lifecycle, per-tick input, practice drones
-  combat.js        rifle + breach shot, knockdowns, ragdolls
-  abilities.js     flight (calls shared/flight.js), missiles
+  combat.js        rifle, knockdowns, ragdolls
+  abilities.js     flight (shared/flight.js), giant missiles and raider rockets
   destruction.js   layered damage (glass -> facade -> frame), collapse scheduling, islands,
                    topple, secondary fracture, crumble, debris vs buildings / giant
   views.js         spectator image channel (/views)
@@ -29,7 +29,7 @@ server/            authoritative simulation (Node + Rapier). Nothing here render
 src/               browser client (Three.js). Reads snapshots/events; never decides gameplay.
   main.js          bootstrap and the frame loop only. Wires the modules below together.
   app/state.js     shared client state object + $ helper
-  app/input.js     keyboard/mouse -> input packets, breach charge, sequence counters
+  app/input.js     keyboard/mouse -> input packets, ability sequence counters
   app/prediction.js client-side prediction + reconciliation for the local raider
   app/camera.js    desktop cameras (predicted raider, dead-reckoned giant, spectator, intro)
   app/shake.js     trauma camera shake (desktop only; never in XR)

@@ -105,8 +105,8 @@ export class Room {
  hurtBoss(damage, info = {}){
   if(this.phase || damage <= 0) return;
   this.bossHP = Math.max(0, this.bossHP - damage);
-  if(info.kind === 'debris' || info.kind === 'heavy') this.boss.stagger = Math.min(1, this.boss.stagger + damage / 260);
-  if(info.by > 0 && info.kind === 'debris'){ const p = this.players.get(info.by); if(p) p.score += damage; }
+  if(info.kind === 'debris' || info.kind === 'rocket') this.boss.stagger = Math.min(1, this.boss.stagger + damage / 260);
+  if(info.by > 0){ const p = this.players.get(info.by); if(p) p.score += damage; }
   if(info.kind !== 'shot') this.event({type:'gianthit', kind:info.kind, p:info.p, power:info.power || .3, damage:Math.round(damage)});
  }
  // ---- simulation ----
@@ -155,7 +155,7 @@ export class Room {
   const b = this.boss;
   return {tick:this.tick, time:this.time, bossHP:this.bossHP, remaining:this.remaining, kills:this.kills, head:arr(b.head), left:arr(b.left), right:arr(b.right), bossYaw:b.yaw, bossX:b.x, bossZ:b.z,
    damage:this.detached.size / this.cells.length * 100, phase:this.phase, round:this.round, bossStagger:b.stagger, towersDown:this.towersDown,
-   players:[...this.players.values()].map(p => { const rb = p.body || this.rags.get(p.rag)?.parts[0].body; return {id:p.id, flags:(p.rag ? F.RAG : 0) | (p.hp <= 0 ? F.DEAD : 0) | (this.time < p.invulnerable ? F.SHIELD : 0) | (p.bot ? F.BOT : 0) | (p.soaring ? F.SOAR : 0) | (this.time < p.dodgeUntil ? F.DODGE : 0), p:rb ? arr(rb.translation()) : [0, -20, 0], v:rb ? arr(rb.linvel()) : [0, 0, 0], yaw:p.input.yaw, hp:p.hp, fuel:p.fuel, seq:p.input.seq, pitch:p.input.pitch, dodgeCooldown:Math.max(0, p.dodgeReady - this.time), heavyCooldown:Math.max(0, p.heavyReady - this.time), score:p.score}; }),
+   players:[...this.players.values()].map(p => { const rb = p.body || this.rags.get(p.rag)?.parts[0].body; return {id:p.id, flags:(p.rag ? F.RAG : 0) | (p.hp <= 0 ? F.DEAD : 0) | (this.time < p.invulnerable ? F.SHIELD : 0) | (p.bot ? F.BOT : 0) | (p.soaring ? F.SOAR : 0) | (this.time < p.dodgeUntil ? F.DODGE : 0), p:rb ? arr(rb.translation()) : [0, -20, 0], v:rb ? arr(rb.linvel()) : [0, 0, 0], yaw:p.input.yaw, hp:p.hp, fuel:p.fuel, seq:p.input.seq, pitch:p.input.pitch, dodgeCooldown:Math.max(0, p.dodgeReady - this.time), rocketCooldown:Math.max(0, p.rocketReady - this.time), score:p.score}; }),
    bodies:[...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
   };
  }
@@ -172,7 +172,7 @@ export class Room {
  makeRag(p, at, velocity){ return makeRag(this, p, at, velocity); }
  removeRag(id){ return removeRag(this, id); }
  removeBody(body){ return removeBody(this, body); }
- shoot(p, heavy){ return shoot(this, p, heavy); }
+ shoot(p){ return shoot(this, p); }
  debrisMeta(e){ return debrisMeta(e); }
  ragMeta(r){ return ragMeta(r); }
 }

@@ -33,16 +33,29 @@ test('missiles collide with buildings, explode and detach supported structure',(
  for(let i=0;i<90&&r.missiles.size;i++){r.time+=C.TICK;updateMissiles(r);r.world.step();}assert.equal(r.missiles.size,0);assert.ok(r.detached.size>0);assert.ok(r.drainEvents().some(e=>e.type==='detonate'));
  }finally{r.dispose();}
 });
-test('a charged breach shot cracks structure, hurts the giant more and respects its cooldown',()=>{
+test('a raider rocket flies from the pilot, explodes on a building and respects its cooldown',()=>{
  const {r,c,p}=raider();try{
-  r.spawn(p,v(0,6,-40));p.invulnerable=0;const hp=r.bossHP;
-  // Aim straight at MERIDIAN ONE's south face.
-  r.input(c,{type:'input',yaw:0,pitch:0,heavy:1});r.step();
-  const heavy=r.drainEvents().find(e=>e.type==='heavy');assert.ok(heavy&&heavy.structure,'the bolt hit a bay');assert.ok(p.fuel<1);assert.ok(p.heavyReady>r.time);
-  r.input(c,{type:'input',yaw:0,pitch:0,heavy:2});r.step();assert.equal(r.drainEvents().filter(e=>e.type==='heavy').length,0,'cooldown blocks a second bolt');
-  r.spawn(p,v(0,20,30));p.invulnerable=0;p.heavyReady=0;p.fuel=1;const aim=sub(r.boss.head,v(0,19.5,30));
-  r.input(c,{type:'input',yaw:Math.atan2(-aim.x,-aim.z),pitch:Math.atan2(aim.y,Math.hypot(aim.x,aim.z)),heavy:3});r.step();
-  assert.ok(hp-r.bossHP>=C.HEAVY_DAMAGE-1,'a headshot bolt deals heavy damage');assert.ok(r.boss.stagger>0);
+  // Facing -z from the plaza edge: MERIDIAN ONE's south face is 21 m ahead.
+  r.spawn(p,v(0,6,-40));p.invulnerable=0;
+  r.input(c,{type:'input',yaw:0,pitch:0,rocket:1});r.step();
+  assert.equal(r.missiles.size,1);assert.ok(p.fuel<1,'the rocket costs thrust');assert.ok(p.rocketReady>r.time);
+  const launch=r.drainEvents().find(e=>e.type==='missile');assert.equal(launch.owner,p.id);
+  r.input(c,{type:'input',yaw:0,pitch:0,rocket:2});r.step();assert.equal(r.missiles.size,1,'cooldown blocks a second rocket');
+  for(let i=0;i<90&&r.missiles.size;i++)r.step();
+  assert.equal(r.missiles.size,0,'the rocket detonated instead of flying forever');
+  assert.equal(p.hp,100,'a raider rocket never hurts the squad');
+  assert.ok(r.detached.size>0,'the blast blew structure out of the tower');
+  assert.ok(r.drainEvents().some(e=>e.type==='detonate'));
+ }finally{r.dispose();}
+});
+test('a rocket into the giant damages it, staggers it and scores for the pilot',()=>{
+ const {r,c,p}=raider();try{
+  r.spawn(p,v(0,16,40));p.invulnerable=0;const hp=r.bossHP;
+  r.input(c,{type:'input',yaw:0,pitch:0,rocket:1});r.step();
+  for(let i=0;i<90&&r.missiles.size;i++)r.step();
+  assert.ok(hp-r.bossHP>=C.ROCKET_GIANT_DAMAGE*.3,'the warhead hurt the core');
+  assert.ok(r.boss.stagger>0,'a rocket staggers the giant');assert.ok(p.score>0);
+  assert.ok(r.drainEvents().some(e=>e.type==='gianthit'&&e.kind==='rocket'));
  }finally{r.dispose();}
 });
 test('missiles hit a raider, respect spawn protection and reset with the round',()=>{

@@ -1,5 +1,5 @@
-// Desktop HUD: bars, telemetry, announcer feed, floating damage numbers, breach-charge ring,
-// scoreboard and the pause overlay. Updated at 10 Hz except for the cheap per-frame bits.
+// Desktop HUD: bars, telemetry, announcer feed, floating damage numbers, scoreboard and the
+// pause overlay. Updated at 10 Hz except for the cheap per-frame bits.
 import * as T from 'three';
 import {C, F} from '../../shared/config.js';
 import {state, me, $} from './state.js';
@@ -35,7 +35,7 @@ export class HUD {
  }
  setScoreboardVisible(visible){ if(!visible){ $('scoreboard').classList.add('hidden'); return; } const s = state.current; if(!s) return; this.scoreboard(s.players.map(p => ({id:p.id, name:state.welcome?.roster?.find(r => r.id === p.id)?.name || `PILOT ${p.id}`, bot:!!(p.flags & F.BOT), kills:0, damage:Math.round(p.score), score:Math.round(p.score)})), null); }
  // Ten times per second.
- refresh(s, now, {net, renderer, input}){
+ refresh(s, now, {net, renderer}){
   $('boss-percent').textContent = `${Math.ceil(s.bossHP / C.BOSS_HP * 100)}%`; $('boss-fill').style.width = `${s.bossHP / C.BOSS_HP * 100}%`;
   const exposed = s.bossStagger > .35; $('boss-caption').classList.toggle('exposed', exposed); if(exposed && this.lastStagger <= .35 && state.role === 'raider') this.feed('CORE EXPOSED · BONUS DAMAGE', 'good'); this.lastStagger = s.bossStagger;
   const sec = Math.max(0, Math.ceil(s.remaining)); $('timer').textContent = `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
@@ -45,7 +45,7 @@ export class HUD {
    $('hp').textContent = Math.ceil(p.hp); $('fuel-fill').style.width = `${p.fuel * 100}%`; $('altitude').textContent = `${Math.max(0, p.p[1]).toFixed(0).padStart(2, '0')}m`;
    $('flight-mode').textContent = p.flags & F.DODGE ? 'DODGE' : p.flags & F.SOAR ? 'SOARING' : 'HOVER'; $('speed-readout').textContent = `${Math.round(Math.hypot(...p.v))} m/s`;
    $('dodge-readout').textContent = p.dodgeCooldown > 0 ? `DODGE ${p.dodgeCooldown.toFixed(1)}s` : p.fuel < C.DODGE_FUEL ? 'DODGE · RECHARGING' : 'DODGE READY · E';
-   $('heavy-readout').textContent = p.heavyCooldown > 0 ? `BREACH ${p.heavyCooldown.toFixed(1)}s` : p.fuel < C.HEAVY_FUEL ? 'BREACH · LOW THRUST' : 'BREACH READY · HOLD RIGHT CLICK';
+   $('rocket-readout').textContent = p.rocketCooldown > 0 ? `ROCKET ${p.rocketCooldown.toFixed(1)}s` : p.fuel < C.ROCKET_FUEL ? 'ROCKET · LOW THRUST' : 'ROCKET READY · RIGHT CLICK';
    $('score-readout').textContent = `SCORE ${Math.round(p.score)}`;
    if(p.hp < this.lastHP) this.flash(240); this.lastHP = p.hp;
   }
@@ -56,12 +56,11 @@ export class HUD {
  }
  // Every frame: cheap fades and projected labels. DOM is only touched when a value changes.
  set(id, prop, value){ const key = id + prop; if(this.cache[key] === value) return; this.cache[key] = value; $(id).style[prop] = value; }
- frame(now, input){
+ frame(now){
   this.cache ??= {};
   this.set('hit-marker', 'opacity', now < this.hitUntil ? '1' : '0'); this.set('damage-flash', 'opacity', now < this.flashUntil ? '.65' : '0');
   if(now > this.toastUntil && this.toastShown){ $('toast').textContent = ''; this.toastShown = false; } else if(now <= this.toastUntil) this.toastShown = true;
   this.set('combo', 'opacity', now < this.comboUntil ? '1' : '0');
-  const charge = state.role === 'raider' ? input.charge : 0; this.set('charge', 'opacity', charge > 0 ? '1' : '0'); if(charge > 0 || this.cache.charge){ $('charge').style.setProperty('--charge', charge); this.cache.charge = charge > 0; }
   for(let i = this.feedItems.length - 1; i >= 0; i--){ const f = this.feedItems[i]; if(now > f.until){ f.el.remove(); this.feedItems.splice(i, 1); } else f.el.style.opacity = Math.min(1, (f.until - now) / 500); }
   const w = innerWidth, h = innerHeight;
   for(let i = this.numbers.length - 1; i >= 0; i--){

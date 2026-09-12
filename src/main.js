@@ -39,7 +39,7 @@ const input = new Input(canvas, {
  onSoar(on){ const pilot = me(state.current); hud.toast(on ? (pilot?.p[1] > 2 ? 'SOARING · MOUSE STEERS · S BRAKES' : 'SOAR ARMED · SPACE TO LIFT OFF') : 'HOVER · PRECISION FLIGHT'); audio.play('ui'); },
  onCamera(){ state.firstPerson = !state.firstPerson; },
  onQuality(){ if(renderer.xr.isPresenting) return; const name = gr.toggleCinematic(); cityView.sun.castShadow = gr.shadows; hud.toast(`QUALITY / ${name}`); },
- onChargeStart(){ audio.play('charge'); }, onHeavyFire(){}, onChargeCancel(){ hud.toast('BREACH NEEDS A FULL CHARGE', 1); },
+ onRocket(){ audio.unlock(); },
  onScoreboard(show){ if(state.playing && !state.current?.phase) hud.setScoreboardVisible(show); }
 });
 const xr = new XRControl(renderer, camera, rig, net, {onEnter(){ document.exitPointerLock?.(); document.body.classList.add('xr-active'); hud.hideOverlay(); input.reset(); }, onExit(){ document.body.classList.remove('xr-active'); if(state.playing) hud.showOverlay('VR SESSION ENDED', 'Re-enter VR or use desktop giant controls.', {renderer, net}); }});
@@ -63,13 +63,13 @@ async function start(create = false, practice = false, spectator = false){
   const m = await net.connect({create, practice, role:spectator ? 'spectator' : state.selectedRole, room:$('room-input').value.trim().toUpperCase(), name:$('name').value.trim() || 'RAIDER'});
   state.playing = true; document.body.classList.add('playing'); $('lobby').classList.add('hidden'); $('scene-caption').classList.add('hidden'); $('hud').classList.remove('hidden');
   const role = state.role;
-  $('controls').textContent = role === 'boss' ? 'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY' : role === 'spectator' ? 'WASD FLY · SPACE UP · C DOWN · SHIFT FAST · MOUSE LOOK' : 'WASD MOVE · SPACE FLY · F SOAR · SHIFT BOOST · E DODGE · CLICK FIRE · HOLD RIGHT CLICK: BREACH SHOT · V CAMERA · TAB SCORES';
+  $('controls').textContent = role === 'boss' ? 'WASD MOVE · MOUSE LOOK · HOLD CLICK SWEEP · SPACE SLAM · RIGHT CLICK / R MISSILE · Q QUALITY' : role === 'spectator' ? 'WASD FLY · SPACE UP · C DOWN · SHIFT FAST · MOUSE LOOK' : 'WASD MOVE · SPACE FLY · F SOAR · SHIFT BOOST · E DODGE · CLICK FIRE · RIGHT CLICK ROCKET · V CAMERA · TAB SCORES';
   $('flight-status').classList.toggle('hidden', role !== 'raider'); $('telemetry').classList.toggle('hidden', role !== 'raider'); $('aim').classList.toggle('hidden', role !== 'raider'); $('vr-button').classList.toggle('hidden', role !== 'boss');
   if(role === 'boss'){ $('vr-button').textContent = quest ? 'ENTER VR ↗' : 'ENTER VR / QUEST ↗'; hud.showOverlay('YOU ARE THE COLOSSUS.', 'Quest: close this panel, then select ENTER VR. Desktop: mouse + WASD, hold click to sweep, Space to slam, right click to fire missiles. Smash the base of a tower and it comes down.', {renderer, net}); $('resume').textContent = 'CONTINUE ↗'; }
   else if(role === 'spectator'){ hud.hideOverlay(); views.setVisible(true); }
-  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. F switches to fast soaring; mouse steers. E dodges. Hold RIGHT CLICK to charge a breach shot: it cracks columns and staggers the giant. Topple a tower onto the colossus for massive damage.', {renderer, net});
+  else hud.showOverlay('SMALL SQUAD. BIG PROBLEM.', 'Space lifts you. F switches to fast soaring; mouse steers. E dodges. RIGHT CLICK fires a rocket: it explodes on impact and blows the structure out of a building. Topple a tower onto the colossus for massive damage.', {renderer, net});
   const u = new URL(location.href); u.searchParams.set('room', net.room); history.replaceState({}, '', u); localStorage.setItem('colossus-name', $('name').value);
-  setTimeout(() => hud.feed(role === 'boss' ? 'OBJECTIVE · LEVEL THE CITY · SMASH TOWER BASES' : role === 'raider' ? 'OBJECTIVE · BREACH COLUMNS · DROP TOWERS ON THE COLOSSUS' : 'OBSERVING MIDTOWN', 'big'), 400);
+  setTimeout(() => hud.feed(role === 'boss' ? 'OBJECTIVE · LEVEL THE CITY · SMASH TOWER BASES' : role === 'raider' ? 'OBJECTIVE · ROCKET THE COLUMNS · DROP TOWERS ON THE COLOSSUS' : 'OBSERVING MIDTOWN', 'big'), 400);
  }catch(e){ notice(e.message); $('connection-label').textContent = 'CONNECTION FAILED'; }
  finally{ $('create').disabled = $('join').disabled = false; }
 }
@@ -141,7 +141,7 @@ function frame(now, xrFrame){
   for(const [id, p] of players) if(!ids.has(id)){ p.dispose(); players.delete(id); }
   for(const body of s.bodies){ if(rags.has(body.id)) rags.get(body.id).update(body.p, body.q); else cityView.poseDebris(body.id, body.p, body.q); }
   cityView.commit();
-  if(now - lastHUD > 100){ hud.refresh(s, now, {net, renderer:gr, input}); lastHUD = now; }
+  if(now - lastHUD > 100){ hud.refresh(s, now, {net, renderer:gr}); lastHUD = now; }
   const pilot = me(s), held = input.held();
   if(state.role === 'raider' && pilot){ const speed = Math.hypot(...pilot.v), thrust = (pilot.fuel > .01 && ((held.up > 0) || held.boost || (pilot.flags & F.SOAR))) ? 1 : speed > 3 ? .35 : 0; audio.ambient(state.paused ? 0 : thrust, Math.min(1, speed / 40)); }
   else audio.ambient(0, 0);
@@ -151,7 +151,7 @@ function frame(now, xrFrame){
   cameraRig.intro(now, city);
  }
  missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
- cityView.update(dt); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
+ cityView.update(dt); fx.update(dt); hud.frame(now); audio.setListener(listenerPosition());
  gr.render(scene, camera, dt);
  if(state.playing){ views.update(now); $('capture-status').classList.toggle('hidden', !views.active); }
 }
@@ -164,4 +164,4 @@ const artReady = Promise.all([cityView.ready, giant.ready, missiles.ready, insta
 if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.then(() => start(false, false, true));
 window.COLOSSUS_READY = true; notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test and profiling tools.
-window.__COLOSSUS = {renderer, gameRenderer:gr, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }};
+window.__COLOSSUS = {renderer, gameRenderer:gr, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, input, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }};

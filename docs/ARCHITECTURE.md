@@ -43,7 +43,7 @@ steps. Round resets send a fresh welcome before the reset event; clients clear i
 history and instances. Remote interpolation targets ~100 ms behind the newest state.
 
 Step order per tick: giant (locomotion, hand sweeps, torso shove) → raiders (flight, rifle,
-breach) → missiles → `world.step` → collision events (debris↔raider knockdowns, debris↔bay
+rocket) → missiles → `world.step` → collision events (debris↔raider knockdowns, debris↔bay
 damage, secondary fracture, crumble) → debris lifecycle and debris↔giant damage → due structural
 failures → new failure scheduling for dirty buildings → batched skin events → ragdoll expiry →
 end-of-round check.
@@ -57,7 +57,7 @@ snapshot **COL3** (`shared/protocol.js`):
 | Component | Bytes |
 | --- | ---: |
 | Header, boss state, stagger, towers down | 100 |
-| One raider (incl. `seq`, breach cooldown, score) | 64 |
+| One raider (incl. `seq`, rocket cooldown, score) | 64 |
 | One chunk or ragdoll body | 32 |
 
 At 144 chunks + 8 × 11 ragdoll parts + 8 raiders a snapshot is 8,036 bytes, ~161 KB/s per
@@ -66,8 +66,9 @@ client at 20 Hz before overhead. Sleeping bodies are still included until remove
 Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
 `skin` (batched `[id, glassMask, facadeMask]` changes), `strike` (a bay was hit; material,
 power, whether its frame failed), `creak` (a building has overloaded columns), `towerdown`,
-`combo`, `stomp`, `closecall`, `gianthit` (kind `debris`/`heavy`, damage), `shot`, `heavy`,
-`missile`, `detonate`, `dodge`, `rag`, `kill`, `impact`, `end` (with scoreboard), `reset`.
+`combo`, `stomp`, `closecall`, `gianthit` (kind `debris`/`rocket`, damage), `shot`,
+`missile` and `detonate` (both carry `owner`: 0 for the giant, otherwise the raider who fired),
+`dodge`, `rag`, `kill`, `impact`, `end` (with scoreboard), `reset`.
 Welcome packets carry cleared cells, damaged skins, live chunks, ragdolls, missiles and the
 roster so late joiners see the same city.
 
@@ -105,7 +106,7 @@ about the far edge of whatever still stands beneath them (`topple`). On a hard l
 splits into floor bands, bands into bays, and a lone bay that lands hard **crumbles** (body freed,
 cosmetic rubble on clients). Falling chunks damage bays they hit (domino collapses) and hurt the
 giant when they land on its head or core (`DEBRIS_GIANT_DAMAGE`, capped), which staggers it and
-exposes the core (+60 % rifle/breach damage while staggered). The giant's torso shoves through
+exposes the core (+60 % rifle damage while staggered). The giant's torso shoves through
 bays it walks into and is slowed by them.
 
 Budgets: 144 chunk bodies (coarse per-building islands under pressure, deferred breaks at the

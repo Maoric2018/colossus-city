@@ -8,7 +8,7 @@ export function encodeSnapshot(s){
  u(MAGIC); u(s.tick); f(s.time); f(s.bossHP); f(s.remaining); u(s.kills); u(p.length); u(b.length);
  for(const a of [s.head, s.left, s.right]) for(const x of a) f(x);
  f(s.bossYaw); f(s.bossX); f(s.bossZ); f(s.damage); f(s.phase); f(s.round); f(s.bossStagger || 0); u(s.towersDown || 0);
- for(const a of p){ u(a.id); u(a.flags); for(const x of a.p) f(x); for(const x of a.v) f(x); f(a.yaw); f(a.hp); f(a.fuel); f(a.seq); f(a.pitch); f(a.dodgeCooldown); f(a.heavyCooldown || 0); f(a.score || 0); }
+ for(const a of p){ u(a.id); u(a.flags); for(const x of a.p) f(x); for(const x of a.v) f(x); f(a.yaw); f(a.hp); f(a.fuel); f(a.seq); f(a.pitch); f(a.dodgeCooldown); f(a.rocketCooldown || 0); f(a.score || 0); }
  for(const a of b){ u(a.id); for(const x of a.p) f(x); for(const x of a.q) f(x); }
  return buffer;
 }
@@ -21,7 +21,7 @@ export function decodeSnapshot(buffer){
  s.head = [f(), f(), f()]; s.left = [f(), f(), f()]; s.right = [f(), f(), f()];
  s.bossYaw = f(); s.bossX = f(); s.bossZ = f(); s.damage = f(); s.phase = f(); s.round = f(); s.bossStagger = f(); s.towersDown = u();
  s.players = []; s.bodies = [];
- for(let i = 0; i < np; i++) s.players.push({id:u(), flags:u(), p:[f(), f(), f()], v:[f(), f(), f()], yaw:f(), hp:f(), fuel:f(), seq:f(), pitch:f(), dodgeCooldown:f(), heavyCooldown:f(), score:f()});
+ for(let i = 0; i < np; i++) s.players.push({id:u(), flags:u(), p:[f(), f(), f()], v:[f(), f(), f()], yaw:f(), hp:f(), fuel:f(), seq:f(), pitch:f(), dodgeCooldown:f(), rocketCooldown:f(), score:f()});
  for(let i = 0; i < nb; i++) s.bodies.push({id:u(), p:[f(), f(), f()], q:[f(), f(), f(), f()]});
  return s;
 }

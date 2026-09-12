@@ -2,7 +2,7 @@
 // audio files ship and the Quest browser has nothing to download. Distance attenuation is
 // computed from the listener position that the game sets every frame.
 const KINDS = {
- shot:{range:220, priority:1}, heavy:{range:320, priority:3}, charge:{range:60, priority:3}, hit:{range:40, priority:2}, headshot:{range:40, priority:3},
+ shot:{range:220, priority:1}, hit:{range:40, priority:2}, headshot:{range:40, priority:3},
  glass:{range:170, priority:2}, brick:{range:200, priority:2}, stone:{range:220, priority:2}, concrete:{range:220, priority:2}, steel:{range:240, priority:2},
  collapse:{range:600, priority:4}, creak:{range:260, priority:3}, explosion:{range:420, priority:4}, missile:{range:300, priority:2}, dodge:{range:60, priority:2},
  thud:{range:120, priority:2}, stomp:{range:320, priority:2}, closecall:{range:40, priority:3}, towerdown:{range:2000, priority:5}, kill:{range:2000, priority:4},
@@ -64,8 +64,6 @@ export class GameAudio {
  }
  track(node){ this.voices++; node.onended = () => { this.voices = Math.max(0, this.voices - 1); try{ node.disconnect(); }catch{} }; }
  _shot(g){ this.burst('bandpass', 1400, 500, .8, .22 * g, .003, .02, .09); this.tone('square', 220, 60, .07 * g, .002, .01, .06); }
- _heavy(g){ this.burst('lowpass', 2200, 120, .5, .5 * g, .004, .05, .5); this.tone('sawtooth', 520, 48, .28 * g, .003, .04, .45); this.tone('sine', 90, 30, .3 * g, .004, .08, .5); }
- _charge(g){ this.tone('sine', 180, 860, .08 * g, .5, .25, .05); this.burst('bandpass', 600, 2400, 2, .05 * g, .55, .2, .05); }
  _hit(g){ this.tone('sine', 1500, 1100, .09 * g, .002, .02, .06); }
  _headshot(g){ this.tone('triangle', 1800, 1800, .1 * g, .002, .05, .08); this.tone('triangle', 2400, 2400, .09 * g, .002, .04, .1, .05); }
  _glass(g){ for(let i = 0; i < 5; i++){ const d = Math.random() * .16; this.burst('highpass', 2600 + Math.random() * 2000, 1800, 1.2, (.16 + Math.random() * .12) * g, .002, .01, .09 + Math.random() * .12, d); if(i < 3) this.tone('sine', 3200 + Math.random() * 2200, 2400, .05 * g, .002, .01, .12, d); } }

@@ -9,8 +9,12 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
  const vr = () => xr.session;
  return function handle(e){
   switch(e.type){
-   case 'missile': missiles.add(e); audio.play('missile', {p:e.p}); if(state.role === 'boss') xr.haptic(.25, 60); return;
-   case 'detonate': missiles.remove(e.id); fx.impact(e.p, 1.5); audio.play('explosion', {p:e.p}); shake.add(near(e.p, 60) * .6); return;
+   case 'missile':
+    missiles.add(e); audio.play('missile', {p:e.p, power:e.owner === state.localId ? 1 : .6});
+    if(state.role === 'boss') xr.haptic(.25, 60);
+    if(e.owner === state.localId){ shake.recoil(.016); shake.add(.28); }
+    return;
+   case 'detonate': missiles.remove(e.id); fx.impact(e.p, 1.7, 'concrete'); audio.play('explosion', {p:e.p}); shake.add(near(e.p, 70) * .7); if(state.role === 'boss') xr.haptic(.5, 140); return;
    case 'dodge': fx.particle(fx.flares, e.p, {life:.25, size:2, color:new T.Color(0x8beaff), growth:2}); if(e.player === state.localId){ flightFX.dodge(); audio.play('dodge'); } return;
    case 'skin': for(const [id, glass, facade] of e.cells) city.setSkin(id, glass, facade); city.commit(); return;
    case 'strike': {
@@ -26,9 +30,12 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
    case 'rag': addRag(e); if(e.player === state.localId){ hud.toast('IMPACT / STABILIZING', 2); hud.flash(280); shake.add(.7); audio.play('thud', {power:1}); } else audio.play('thud', {p:e.parts[0].p}); return;
    case 'remove': if(rags.has(e.id)){ rags.get(e.id).dispose(); rags.delete(e.id); } else city.removeDebris(e.id); return;
    case 'shot': fx.shot(e); if(e.player === state.localId){ audio.play('shot', {power:.7}); shake.recoil(.004); if(e.hit){ hud.hit(e.weak); audio.play(e.weak ? 'headshot' : 'hit'); hud.damageNumber(e.to, Math.round(C.SHOT_DAMAGE * (e.weak ? 1.8 : 1)), e.weak); } } else audio.play('shot', {p:e.from, power:.5}); return;
-   case 'heavy': fx.shot(e, 0xffa640); fx.impact(e.to, .5); if(e.player === state.localId){ audio.play('heavy', {power:1}); shake.recoil(.02); shake.add(.35); if(e.hit){ hud.hit(e.weak); hud.damageNumber(e.to, Math.round(C.HEAVY_DAMAGE * (e.weak ? 1.8 : 1)), true); } if(e.structure) hud.feed('BREACH · STRUCTURE CRACKED', 'good'); } else audio.play('heavy', {p:e.from, power:.8}); return;
    case 'impact': fx.impact(e.p, e.power, e.material); if(state.role === 'boss') xr.haptic(e.power * .35, 70); else shake.add(near(e.p, 70) * e.power * .4); if(e.power > .8) audio.play('collapse', {p:e.p, power:e.power * .5}); return;
-   case 'gianthit': fx.impact(e.p, e.power * 1.2, 'steel'); audio.play('gianthit', {p:e.p, power:e.power}); if(state.role === 'boss'){ xr.flash(e.power); xr.haptic(Math.min(1, .4 + e.power), 180); shake.add(.5); hud.feed(e.kind === 'debris' ? `CRUSHED BY DEBRIS · -${e.damage}` : `BREACHED · -${e.damage}`, 'warn'); } else if(e.kind === 'debris') hud.feed(`COLOSSUS CRUSHED BY DEBRIS · ${e.damage} DMG`, 'good'); return;
+   case 'gianthit':
+    fx.impact(e.p, e.power * 1.2, 'steel'); audio.play('gianthit', {p:e.p, power:e.power});
+    if(state.role === 'boss'){ xr.flash(e.power); xr.haptic(Math.min(1, .4 + e.power), 180); shake.add(.5); hud.feed(e.kind === 'debris' ? `CRUSHED BY DEBRIS · -${e.damage}` : `ROCKET IMPACT · -${e.damage}`, 'warn'); }
+    else hud.feed(e.kind === 'debris' ? `COLOSSUS CRUSHED BY DEBRIS · ${e.damage} DMG` : `ROCKET HIT · ${e.damage} DMG`, 'good');
+    return;
    case 'closecall': if(e.player === state.localId){ hud.feed('CLOSE CALL · THRUST REFILLED', 'good'); audio.play('closecall'); flightFX.dodge(); } return;
    case 'stomp': audio.play('stomp', {p:e.p}); if(state.role !== 'boss') shake.add(near(e.p, 90) * .35); fx.dustRing(e.p, .8); return;
    case 'kill': if(e.player === state.localId){ hud.toast('PILOT DOWN / REDEPLOYING', C.RESPAWN_SECONDS); audio.play('lose', {power:.4}); } else if(state.role === 'boss'){ hud.toast('RAIDER NEUTRALIZED', 1.5); hud.feed('RAIDER NEUTRALIZED', 'good'); audio.play('kill'); xr.haptic(.6, 120); } else hud.feed('SQUADMATE DOWN', 'warn'); return;
