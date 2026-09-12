@@ -1,5 +1,11 @@
 # Validation record and acceptance gates
 
+## Colossus health scaling — September 12, 2026
+
+- **108 Node tests and 98 JavaScript modules: PASS.** Real-room tests cover one through eight raiders, the empty-room baseline, spectators, practice-drone replacement, death/respawn, repeated joins/departures, zero-health victory and full round resets. Membership changes preserve the remaining health fraction.
+- **Network and HUD checks: PASS.** COL6 transports current and maximum HP together, and interpolation retains the pair. Old COL5 packets are rejected. Quest and spectator drawing tests show 50% for 10,400 / 20,800 HP and clamp bar widths. The new fixed snapshot header is 140 bytes.
+- **Multiplayer/browser regression: PASS.** Two raiders produce 5,200 maximum colossus HP on both raider clients and the emulated Quest client. The desktop caption shows the scaled maximum and the bar remains within 100%. Live views, controls, fallback/reconnect and repeated XR entry/exit still pass without browser errors. All clients must refresh after the protocol update.
+
 ## Infinite city and expanded architecture — September 12, 2026
 
 - **102 Node tests and 96 JavaScript modules: PASS.** New coverage checks deterministic positive/negative block coordinates, disjoint cell IDs and building footprints, all 16 families, at least 75 component types per building, exact HP/skin/debris restoration, bounded pristine travel, separated players, distant VR poses and real giant/raider movement across the former boundary.

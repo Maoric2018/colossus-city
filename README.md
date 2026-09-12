@@ -82,6 +82,8 @@ Soaring animates the existing armored pilot: the helmet looks forward, the weapo
 
 **Missiles:** point a Touch controller and pull its trigger. Rockets travel at 55 m/s, explode on scenery or raiders and blow a hole through most bays. Shared 0.8 s cooldown, eight-projectile cap.
 
+**Colossus health:** 2,600 HP per raider: one = 2,600, two = 5,200, four = 10,400, eight = 20,800. Joining or leaving preserves the current health percentage. Practice drones count; spectators do not. A dead raider still counts while waiting to respawn, and each new round restores full scaled health.
+
 **Winning:** raiders win by reducing the core to zero within four minutes; the giant wins by surviving. Kills, towers down and city damage are tracked; the round-end scoreboard ranks raiders by score. Building debris does not damage or stagger the colossus. Raiders damage it with their weapons.
 
 **Spectator video:** Live Views shows each human player over WebRTC at up to 30 fps on desktop / 24 fps from the headset’s actual left-eye view. Failed video links use a bounded 15 fps image fallback. AI cameras are labeled simulated. Use one spectator for the demo; keep each player’s game visible on its device.
@@ -116,7 +118,7 @@ Client-side prediction runs the shared flight model locally against the held inp
 
 ## 3. Performance and verification
 
-Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders and 37 cars; a maximal snapshot for this map is 9,256 bytes. Parked and sleeping cars send no repeated poses.
+Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders and 37 cars; a maximal snapshot for this map is 9,260 bytes. Parked and sleeping cars send no repeated poses.
 
 Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1), `medium`, `high`. Adaptive resolution lowers the desktop pixel ratio under sustained load. All nearby blocks share the architectural detail batches; core geometry outside both headset views is removed from submitted instances. Render and physics neighborhoods follow players, while fog covers the distant cutoff. `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
 

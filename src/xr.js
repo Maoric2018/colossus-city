@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {C} from '../shared/config.js';
+import {bossHealthFraction} from '../shared/boss-health.js';
 import {clamp} from '../shared/math.js';
 const axis = new T.Vector3(0, 1, 0), q = new T.Quaternion(), euler = new T.Euler(0, 0, 0, 'YXZ');
 const HAPTICS = {glass:[.28, .35, 40], brick:[.45, .4, 70], stone:[.55, .4, 90], concrete:[.55, .4, 90], steel:[.8, .2, 120], body:[.6, .3, 80]};
@@ -104,7 +105,7 @@ export class XRControl {
  flash(power = .5){ this.flashLevel = Math.min(1, this.flashLevel + power); }
  paintHUD(s, tracking, now = performance.now()){
   const x = this.hudCanvas.getContext('2d'); x.clearRect(0, 0, 1024, 256); x.fillStyle = 'rgba(6,22,29,.85)'; x.fillRect(0, 0, 1024, 256); x.fillStyle = '#cfff94'; x.font = 'bold 38px Arial'; x.fillText('COLOSSUS', 35, 53); x.fillStyle = '#c5d7d8'; x.font = '24px monospace'; x.fillText(`ROOM ${this.net.room || '------'}`, 715, 50);
-  const hp = s ? Math.max(0, s.bossHP / C.BOSS_HP) : 1; x.fillStyle = '#31474b'; x.fillRect(35, 80, 955, 13); x.fillStyle = s?.bossStagger > .35 ? '#ffb070' : '#cfff94'; x.fillRect(35, 80, 955 * hp, 13);
+  const hp = bossHealthFraction(s); x.fillStyle = '#31474b'; x.fillRect(35, 80, 955, 13); x.fillStyle = s?.bossStagger > .35 ? '#ffb070' : '#cfff94'; x.fillRect(35, 80, 955 * hp, 13);
   x.font = '27px monospace'; x.fillStyle = '#e2eeee'; const sec = Math.ceil(s?.remaining || 0); x.fillText(`CORE ${Math.ceil(hp * 100)}%    ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}    TAKEDOWNS ${s?.kills || 0}    TOWERS ${s?.towersDown || 0}    CITY ${Math.round(s?.damage || 0)}%`, 35, 144);
   x.font = '20px monospace'; x.fillStyle = tracking ? '#99b7bd' : '#ffbc80';
   const status = !tracking ? 'CONTROLLER TRACKING LOST · HOLD STILL' : s?.phase === 1 ? 'RAIDERS WIN · NEW ROUND IN 20 SECONDS' : s?.phase === 2 ? 'COLOSSUS WINS · NEW ROUND IN 20 SECONDS' : s?.bossStagger > .35 ? 'STAGGERED · CORE EXPOSED' : 'LEFT: MOVE   RIGHT: TURN   TRIGGERS: MISSILES   SMASH THE BASE OF A TOWER';

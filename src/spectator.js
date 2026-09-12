@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {ViewStream} from './view-stream.js';
+import {bossHealthFraction} from '../shared/boss-health.js';
 // Feed pixels come from each player's renderer. XR is rendered with the actual
 // left-eye matrices; it is not reconstructed from delayed multiplayer snapshots.
 export class SpectatorViews{
@@ -74,7 +75,7 @@ export class SpectatorViews{
  }
  drawHUD(){
   const state=this.getState();if(!state)return;const p=state.players.find(p=>p.id===this.getPlayerId()),ctx=this.context;
-  ctx.fillStyle='#07191bcc';ctx.fillRect(0,369,640,31);ctx.fillStyle='#d3ff9d';ctx.font='12px monospace';ctx.fillText(p?`${Math.round(p.hp)} HP · ${Math.round(p.fuel*100)}% THRUST · ${p.flags&16?'SOARING':'HOVER'} · ${Math.round(Math.hypot(...p.v))} m/s`:`COLOSSUS · ${Math.round(state.bossHP/26)}% CORE`,14,389);
+  ctx.fillStyle='#07191bcc';ctx.fillRect(0,369,640,31);ctx.fillStyle='#d3ff9d';ctx.font='12px monospace';ctx.fillText(p?`${Math.round(p.hp)} HP · ${Math.round(p.fuel*100)}% THRUST · ${p.flags&16?'SOARING':'HOVER'} · ${Math.round(Math.hypot(...p.v))} m/s`:`COLOSSUS · ${Math.ceil(bossHealthFraction(state)*100)}% CORE`,14,389);
   if(p){ctx.strokeStyle='#d8ffb9';ctx.beginPath();ctx.moveTo(315,200);ctx.lineTo(325,200);ctx.moveTo(320,195);ctx.lineTo(320,205);ctx.stroke();}
   if(this.getPaused()){ctx.fillStyle='#07191b99';ctx.fillRect(0,0,640,45);ctx.fillStyle='white';ctx.fillText('PLAYER MENU OPEN',225,27);}
  }

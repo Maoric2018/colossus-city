@@ -6,10 +6,11 @@ the public surface of each module stable, and add tests next to the layer you ch
 ```text
 shared/            pure, dependency-free logic imported by BOTH server and browser
   config.js        every tunable constant (C), collision groups, player flag bits (F)
+  boss-health.js   per-raider maximum HP and shared health-bar fraction
   cars.js          stable vehicle IDs and shared intact/wreck collision dimensions
   raider-pose.js   articulated soaring pose shared by live rendering and ragdoll creation
   math.js          vectors, quaternions, sweeps, input sanitising
-  protocol.js      binary snapshot codec (COL5). Bump MAGIC when the layout changes.
+  protocol.js      binary snapshot codec (COL6). Bump MAGIC when the layout changes.
   flight.js        raider flight model (flightStep) used by the server AND client prediction
   environment.js   facade: the active district + re-exports of shared/city/*
   city/components.js  101 modeled part types and per-bay placement rules

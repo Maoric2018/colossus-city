@@ -50,16 +50,16 @@ end-of-round check.
 
 Control messages are JSON: join, input, pose, restart, ping. Entity and gameplay events are
 reliable JSON on the same ordered socket. Transforms use the versioned little-endian binary
-snapshot **COL5** (`shared/protocol.js`):
+snapshot **COL6** (`shared/protocol.js`):
 
 | Component | Bytes |
 | --- | ---: |
-| Header, boss state, stagger, blocked walking, towers down, wrist quaternions | 136 |
+| Header, boss state, stagger, blocked walking, towers down, wrist quaternions, maximum HP | 140 |
 | One raider (incl. `seq`, breach cooldown, score) | 64 |
 | One chunk, ragdoll part or moving car | 32 |
 
-At 144 chunks + 8 × 11 ragdoll parts + 37 awake cars + 8 raiders a snapshot is 9,256 bytes,
-185,120 bytes/s per client at 20 Hz before overhead. Sleeping cars and settled structural
+At 144 chunks + 8 × 11 ragdoll parts + 37 awake cars + 8 raiders a snapshot is 9,260 bytes,
+185,200 bytes/s per client at 20 Hz before overhead. Sleeping cars and settled structural
 debris send reliable final poses and leave the repeated snapshot list.
 
 Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
@@ -71,7 +71,7 @@ power, whether its frame failed), `creak` (a building has overloaded columns), `
 and remaining `burn` seconds). Welcome packets carry cleared cells, damaged skins, live and
 settled chunks, ragdolls, missiles, cars and the roster so late joiners see the same city.
 
-`block-load` and `block-unload` carry `key`, `x`, `z`, building `indices`, damaged `skins`, `clearedCells` and debris `entities`. Welcome `blocks` includes active generated blocks and archived damaged blocks. These events use JSON; streamed cell IDs can exceed 32 bits. The COL5 binary body-ID fields and snapshot layout are unchanged.
+`block-load` and `block-unload` carry `key`, `x`, `z`, building `indices`, damaged `skins`, `clearedCells` and debris `entities`. Welcome `blocks` includes active generated blocks and archived damaged blocks. These events use JSON; streamed cell IDs can exceed 32 bits. The COL6 binary body-ID fields are unchanged; COL6 adds the authoritative `bossMaxHP` float after the wrist quaternions, increasing the fixed header to 140 bytes. Clients must refresh when upgrading from COL5.
 
 `server/cars.js` owns 37 CCD dynamic vehicle bodies in the reserved `0x40000000` ID range. Shared
 `cars.js` supplies intact and crushed box dimensions for physics, camera and prediction.
@@ -97,7 +97,9 @@ After eight seconds without usable video, the viewer requests a per-publisher JP
 
 ## Giant and raider embodiment
 
-The giant walks at 13 m/s; normal raider flight is 11 m/s. Shared `giant-rig.js` dimensions drive the hand meshes, oriented collision sweeps and laser hitboxes. Wrist quaternions survive pose input, the COL5 snapshot and normalized interpolation. Raw tracked displacement (relative to the head, compensated for artificial yaw) controls strike energy; a contact blocks visible hands immediately and deliberate physical hand movement damages the contacted layers; holding still does no continuing damage. Entry/recenter/tracking recovery retain their no-attack grace period. The wrist offset attaches the forearm behind the palm; rigid upper/lower armor keeps fixed proportions.
+The colossus has 2,600 maximum HP per raider, with a one-raider minimum: 2,600 / 5,200 / 10,400 / 20,800 HP for one / two / four / eight raiders. The roster includes practice drones and dead or ragdolled players awaiting respawn; spectators and the giant seat do not count. Joins, departures and bot replacement preserve the remaining health fraction, including zero, so membership changes cannot heal the percentage or revive a defeated giant. A new round restores the scaled maximum. The server sends current and maximum HP together in each COL6 snapshot; desktop, Quest and spectator HUDs share the same clamped fraction.
+
+The giant walks at 13 m/s; normal raider flight is 11 m/s. Shared `giant-rig.js` dimensions drive the hand meshes, oriented collision sweeps and laser hitboxes. Wrist quaternions survive pose input, the COL6 snapshot and normalized interpolation. Raw tracked displacement (relative to the head, compensated for artificial yaw) controls strike energy; a contact blocks visible hands immediately and deliberate physical hand movement damages the contacted layers; holding still does no continuing damage. Entry/recenter/tracking recovery retain their no-attack grace period. The wrist offset attaches the forearm behind the palm; rigid upper/lower armor keeps fixed proportions.
 
 `giant-visibility.js` copies only torso/hip/leg materials for each giant instance; arms and hands keep their original materials. The local pilot's view direction smoothly reduces body opacity from 100% at 20° down to 18% at 55° down, with depth writes disabled during the fade. Looking up restores opacity, and nonlocal rendering restores the original material flags immediately. Both XR eyes and the exact spectator mirror use the same appearance. Head pitch stays local; no network payload or collision geometry changes.
 
@@ -137,7 +139,7 @@ carry less. Overloaded bays are scheduled to fail after `COLLAPSE_DELAY` (+ jitt
 Detachment: kicked bays fly as single chunks; a severed section becomes **one rigid island per
 building** (floors when small) so towers topple and pancake. Islands receive an angular velocity
 about the far edge of whatever still stands beneath them (`topple`). On a hard landing an island
-splits into floor bands, bands into bays, and a lone bay that lands hard gains damping and emits impact effects without disappearing. Once asleep after two seconds, debris becomes a fixed body, leaves the active snapshot list, and sends its final `settled` pose. Welcome state includes settled entities; clients ignore stale interpolated poses for them. Falling chunks can damage bays (domino collapses) and raiders, but never damage or stagger the colossus. Heavy weapon hits still stagger it and expose the core (+60 % rifle/breach damage while staggered). The giant slides along intact bays at torso height. Walking chips one contacted bay every 0.7 seconds, capped at 5% frame wear, and cannot demolish its way through. The COL5 blocked flag stops desktop camera dead reckoning at walls.
+splits into floor bands, bands into bays, and a lone bay that lands hard gains damping and emits impact effects without disappearing. Once asleep after two seconds, debris becomes a fixed body, leaves the active snapshot list, and sends its final `settled` pose. Welcome state includes settled entities; clients ignore stale interpolated poses for them. Falling chunks can damage bays (domino collapses) and raiders, but never damage or stagger the colossus. Heavy weapon hits still stagger it and expose the core (+60 % rifle/breach damage while staggered). The giant slides along intact bays at torso height. Walking chips one contacted bay every 0.7 seconds, capped at 5% frame wear, and cannot demolish its way through. The COL6 blocked flag stops desktop camera dead reckoning at walls.
 
 Budgets: 144 chunk bodies (coarse per-building islands under pressure, deferred breaks at the
 cap), eight ragdolls. Limits: graph/load are still a game model, not FEA — no bending moments,

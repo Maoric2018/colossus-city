@@ -86,6 +86,10 @@ try{
  await quest.waitForFunction(()=>window.__COLOSSUS.missiles.active.size>0);await quest.evaluate(()=>questDevice.controllers.right.updateButtonValue('trigger',0));
  await quest.screenshot({path:'artifacts/quest-missile.png'});checks.push('Touch trigger launches a replicated, rendered missile');
  const second=await pageFor(desktop);await second.locator('#name').fill('STRIKER');await second.locator('#room-input').fill(room);await second.locator('#join').click();await second.waitForFunction(()=>window.__COLOSSUS.state!==null);
+ for(const page of [raider,quest,second])await page.waitForFunction(()=>window.__COLOSSUS.net.latest.bossMaxHP===5200);
+ await raider.waitForFunction(()=>document.getElementById('boss-caption').textContent.includes('5,200'));
+ const scaledBar=await raider.locator('#boss-fill').evaluate(e=>parseFloat(e.style.width));assert.ok(scaledBar>0&&scaledBar<=100);
+ checks.push('Two raiders scale the colossus to 5,200 HP on all clients; the desktop health bar stays within 100%');
  const observerPromise=desktop.waitForEvent('page');await raider.bringToFront();await raider.keyboard.press('Escape');await raider.locator('#menu-spectator').click();const observer=await observerPromise;observer.on('pageerror',e=>errors.push(e.message));await observer.waitForFunction(()=>window.COLOSSUS_ART_READY===true);
  await observer.waitForFunction(()=>window.__COLOSSUS.views.cards.size===3&&[...window.__COLOSSUS.views.cards.values()].every(c=>c.frames>=2&&c.transport==='video'&&c.video.videoWidth===640));
  assert.ok(await observer.evaluate(()=>[...window.__COLOSSUS.views.cards.values()].some(c=>c.mode==='Headset left eye')));

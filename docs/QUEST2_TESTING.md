@@ -17,7 +17,8 @@ If no device appears, check Developer Mode, the cable and the headset's USB debu
 
 ## What passed locally
 
-- 102 automated Node tests, including real server physics, multiplayer, generated-block IDs, damage archives, distant movement and separated players.
+- 108 automated Node tests, including real server physics, multiplayer, generated-block IDs, damage archives, distant movement, separated players and colossus health scaling.
+- Colossus health scales by the raider roster; two-raider browser checks receive 5,200 maximum HP on every client. Quest and spectator HUD checks use the same scaled fraction and keep bars within their bounds. Joins/departures preserve damage percentage, and dead raiders awaiting respawn still count.
 - Movable-car checks: gentle pushes, hard strikes, missile blasts, matching crushed collision/rendering, persistent wrecks, sleeping pose traffic, late spectators and round reset.
 - Real Chromium rendering, mouse capture and keyboard movement with the downloaded visual upgrade.
 - Focused Quest rendering regression: arms and fists stay aligned in headset space through a complete joystick turn, including tilted head/wrists and an offset standing position. The giant’s own decorative reactor halo is hidden in its view and its spectator mirror.

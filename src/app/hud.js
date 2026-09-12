@@ -1,6 +1,7 @@
 // Desktop HUD: bars, telemetry, essential notices, breach-charge ring,
 // scoreboard and the pause overlay. Updated at 10 Hz except for the cheap per-frame bits.
 import {C, F} from '../../shared/config.js';
+import {bossHealthFraction} from '../../shared/boss-health.js';
 import {state, me, $} from './state.js';
 const escapeText = value => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export class HUD {
@@ -24,7 +25,8 @@ export class HUD {
  setScoreboardVisible(visible){ if(!visible){ $('scoreboard').classList.add('hidden'); return; } const s = state.current; if(!s) return; this.scoreboard(s.players.map(p => ({id:p.id, name:state.welcome?.roster?.find(r => r.id === p.id)?.name || `PILOT ${p.id}`, bot:!!(p.flags & F.BOT), kills:0, damage:Math.round(p.score), score:Math.round(p.score)})), null); }
  // Ten times per second.
  refresh(s, now, {net, renderer, input}){
-  $('boss-percent').textContent = `${Math.ceil(s.bossHP / C.BOSS_HP * 100)}%`; $('boss-fill').style.width = `${s.bossHP / C.BOSS_HP * 100}%`;
+  const core=bossHealthFraction(s);$('boss-percent').textContent = `${Math.ceil(core * 100)}%`; $('boss-fill').style.width = `${core * 100}%`;
+  $('boss-caption').textContent=`COLOSSUS / ${Math.ceil(s.bossHP).toLocaleString()} OF ${(s.bossMaxHP||C.BOSS_HP).toLocaleString()} HP`;
   $('boss-caption').classList.toggle('exposed', s.bossStagger > .35);
   const sec = Math.max(0, Math.ceil(s.remaining)); $('timer').textContent = `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
   $('destruction').textContent = `${Math.round(s.damage)}%`; $('kills').textContent = s.kills; $('towers').textContent = s.towersDown || 0;

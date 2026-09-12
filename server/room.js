@@ -9,6 +9,7 @@ import {staticProps} from '../shared/props.js';
 import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {C, F, group} from '../shared/config.js';
+import {bossMaxHealth,bossHealthFraction} from '../shared/boss-health.js';
 import {activeEnvironment as city, generateCells} from '../shared/environment.js';
 import {v, len, arr, vec, clamp, norm, sub, mul, finiteVector, sanitizeInput, quatEuler, dist} from '../shared/math.js';
 import {updateMissiles} from './abilities.js';
@@ -35,7 +36,7 @@ export class Room {
   this.world.integrationParameters.numSolverIterations = 5;
   this.queue = new RAPIER.EventQueue(true); this.colliderTags = new Map(); this.cells = generateCells(this.env);
   this.cellMap = new Map(); this.detached = new Set(); this.debris = new Map(); this.settled = new Map(); this.nextDebris = 1000; this.missiles = new Map(); this.nextMissile = 20000; this.rags = new Map(); this.events = [];
-  this.phase = 0; this.remaining = C.MATCH_SECONDS; this.bossHP = C.BOSS_HP; this.kills = 0; this.startTime = this.time; this.towersDown = 0; this.destroyedThisRound = 0;
+  this.phase = 0; this.remaining = C.MATCH_SECONDS; this.bossMaxHP = bossMaxHealth(this.players.size); this.bossHP = this.bossMaxHP; this.kills = 0; this.startTime = this.time; this.towersDown = 0; this.destroyedThisRound = 0;
   this.boss = initialBoss();
   this.ground = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -.3, 0));
   this.world.createCollider(RAPIER.ColliderDesc.cuboid(this.env.half + 60, .3, this.env.half + 60).setFriction(.82).setCollisionGroups(group(G.WORLD)), this.ground);
@@ -71,13 +72,19 @@ export class Room {
    const p = newPlayer(this, id, name, false); this.players.set(id, p); spawn(this, p);
   }
   if(this.practice && !this.players.size) addBots(this, 3);
-  this.emptySince = null; return client;
+  this.scaleBossHealth();this.emptySince = null; return client;
  }
  detach(id){
   const c = this.clients.get(id); if(!c) return;
   c.viewSocket?.close(1000, 'Player left'); this.clients.delete(id);
   if(this.bossClient === id){ this.bossClient = null; this.boss.input = noInput(); }
-  removePlayer(this, id); if(!this.clients.size) this.emptySince = Date.now();
+  removePlayer(this, id);this.scaleBossHealth(); if(!this.clients.size) this.emptySince = Date.now();
+ }
+ scaleBossHealth(){
+  const max=bossMaxHealth(this.players.size);if(max===this.bossMaxHP)return;
+  // Preserve progress through the fight, including zero HP. Roster changes cannot
+  // heal the health percentage, kill a living giant, or revive a defeated one.
+  this.bossHP=bossHealthFraction(this)*max;this.bossMaxHP=max;
  }
  hostId(){ return this.clients.keys().next().value; }
  roster(){ return [...this.clients.values()].map(c => ({id:c.id, name:c.name, role:c.role})).concat([...this.players.values()].filter(p => p.bot).map(p => ({id:p.id, name:p.name, role:'bot'}))); }
@@ -167,7 +174,7 @@ export class Room {
  scoreboard(){ return [...this.players.values()].map(p => ({id:p.id, name:p.name, bot:p.bot, kills:p.kills, damage:Math.round(p.damage), score:Math.round(p.score)})); }
  snapshot(){
   const b = this.boss;
-  return {tick:this.tick, time:this.time, bossHP:this.bossHP, remaining:this.remaining, kills:this.kills, head:arr(b.head), left:arr(b.left), right:arr(b.right), bossYaw:b.yaw, bossX:b.x, bossZ:b.z, leftQuaternion:b.leftQuaternion, rightQuaternion:b.rightQuaternion,
+  return {tick:this.tick, time:this.time, bossHP:this.bossHP, bossMaxHP:this.bossMaxHP, remaining:this.remaining, kills:this.kills, head:arr(b.head), left:arr(b.left), right:arr(b.right), bossYaw:b.yaw, bossX:b.x, bossZ:b.z, leftQuaternion:b.leftQuaternion, rightQuaternion:b.rightQuaternion,
    damage:this.detached.size / this.cells.length * 100, phase:this.phase, round:this.round, bossStagger:b.stagger, towersDown:this.towersDown, bossBlocked:b.pushing ? 1 : 0,
    players:[...this.players.values()].map(p => { const rb = p.body || this.rags.get(p.rag)?.parts[0].body; return {id:p.id, flags:(p.rag ? F.RAG : 0) | (p.hp <= 0 ? F.DEAD : 0) | (this.time < p.invulnerable ? F.SHIELD : 0) | (p.bot ? F.BOT : 0) | (p.soaring ? F.SOAR : 0) | (this.time < p.dodgeUntil ? F.DODGE : 0), p:rb ? arr(rb.translation()) : [0, -20, 0], v:rb ? arr(rb.linvel()) : [0, 0, 0], yaw:p.input.yaw, hp:p.hp, fuel:p.fuel, seq:p.input.seq, pitch:p.input.pitch, dodgeCooldown:Math.max(0, p.dodgeReady - this.time), heavyCooldown:Math.max(0, p.heavyReady - this.time), score:p.score}; }),
    bodies:[...carSnapshots(this), ...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
@@ -178,8 +185,8 @@ export class Room {
  updateBoss(){ return updateBoss(this); }
  updatePlayer(p){ return updatePlayer(this, p); }
  spawn(p, at){ return spawn(this, p, at); }
- removePlayer(id){ return removePlayer(this, id); }
- addBots(n){ return addBots(this, n); }
+ removePlayer(id){ removePlayer(this, id);this.scaleBossHealth(); }
+ addBots(n){ addBots(this, n);this.scaleBossHealth(); }
  breakCells(ids, kick, hint){ return breakCells(this, ids, kick, hint); }
  splitDebris(id){ return splitDebris(this, id); }
  crumble(id){ return crumble(this, id); }

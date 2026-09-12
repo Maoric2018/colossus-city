@@ -8,7 +8,7 @@ import {Connection} from '../src/network.js';
 import {C, group} from '../shared/config.js';
 const cells = generateCells(city), byId = new Map(cells.map(c => [c.id, c]));
 const near = (a, b, eps = 1e-5) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
-const base = () => ({tick:19, time:1.25, bossHP:2200, remaining:123, kills:2, head:[0, 23.8, 0], left:[-5, 15, 0], right:[5, 15, 0], bossYaw:.5, bossX:0, bossZ:0, damage:12, phase:0, round:1, players:[], bodies:[]});
+const base = () => ({tick:19, time:1.25, bossHP:2200, bossMaxHP:5200, remaining:123, kills:2, head:[0, 23.8, 0], left:[-5, 15, 0], right:[5, 15, 0], bossYaw:.5, bossX:0, bossZ:0, damage:12, phase:0, round:1, players:[], bodies:[]});
 const building = i => cells.filter(c => c.building === i);
 test('map generation is deterministic, unique and every tower is inside the district', () => {
  assert.deepEqual(generateCells(city), cells); assert.equal(byId.size, cells.length); assert.equal(cells.length, 5452); assert.equal(city.buildings.length, 169);
