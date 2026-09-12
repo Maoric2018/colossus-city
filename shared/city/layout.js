@@ -1,3 +1,4 @@
+import {chryslerBuilding} from './chrysler.js';
 // The only authoritative map definition. Visual assets never decide collisions.
 // MIDTOWN: a Manhattan-style grid of avenues (north-south) and streets (east-west) with
 // Dense blocks, landmark towers and street-front infill. Integer bay grids keep
@@ -15,7 +16,7 @@ export const midtown = {
   tower(-70,-70,'EMPIRE STATE','stone',[box(5,5,4), box(4,4,4,1,1), box(3,3,17,1,1), box(2,2,4,2,2), box(1,1,4,2,2)],{bay:4.8,story:3.4,spire:17,architecture:'empire',strength:1.2}),
   tower(-12,-78,'WORLD TRADE • NORTH','glass',[box(3,3,30)],{spire:15,architecture:'wtc',strength:1.15}),
   tower(70,-70,'HUDSON YARDS','concrete',[box(3,3,18)]),
-  tower(-70,0,'CHRYSLER','stone',[box(4,3,10), box(2,2,14,1,0)],{spire:16}),
+  chryslerBuilding(-70,0),
   tower(70,0,'ONE VANDERBILT','glass',[box(3,3,28)],{spire:10}),
   tower(-70,70,'TENEMENT ROW','brick',[box(4,2,7)],{waterTower:true}),
   tower(0,70,'GRAND CENTRAL','stone',[box(5,3,6)]),
@@ -103,7 +104,7 @@ export const homeBlock=(x,z)=>Math.abs(x)<=2&&Math.abs(z)<=2;
 export function blockCellBase(x,z){const a=zig(x),b=zig(z),s=a+b;return STREAM_CELL_BASE+(s*(s+1)/2+b)*CELL_STRIDE;}
 export function cellBlock(id){if(id<=STREAM_CELL_BASE)return null;const n=Math.floor((id-STREAM_CELL_BASE-1)/CELL_STRIDE),w=Math.floor((Math.sqrt(8*n+1)-1)/2),b=n-w*(w+1)/2;return [unzig(w-b),unzig(b)];}
 export function blockSeed(x,z,seed=90210){let h=(Math.imul(x,374761393)^Math.imul(z,668265263)^seed)>>>0;h=Math.imul(h^(h>>>13),1274126177);return (h^(h>>>16))>>>0;}
-export function generateBlock(x,z,seed=90210){
+export function generateBlock(x,z,seed=90210,{landmark}={}){
  const hash=blockSeed(x,z,seed);let state=hash||1;const random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
  const buildings=[],district=BUILDING_STYLES[Math.floor(random()*BUILDING_STYLES.length)].id;
  // Eight independent street addresses leave a central service courtyard and 2 m alleys.
@@ -116,7 +117,8 @@ export function generateBlock(x,z,seed=90210){
   const b=tower(x*70+px,z*70+pz,`${style.name} ${Math.abs(x*97+z*31)+i+1}`,style.material,tiers,{bay:width,story:style.id==='market'?4.2:3.2+random()*.55,architecture:style.id,variant,waterTower:['tenement','warehouse','industrial'].includes(style.id),streamed:true,district});
   buildings.push(b);
  }
- return {id:'city-block',key:blockKey(x,z),block:[x,z],cellBase:blockCellBase(x,z),seed,half:35,center:[x*70,z*70],plaza:0,buildings,props:[],spawns:[],textures:midtown.textures,sky:midtown.sky,roads:{avenues:[x*70-35,x*70+35],streets:[z*70-35,z*70+35],avenueWidth:16,streetWidth:12}};
+ if(landmark==='chrysler'||hash%29===7)buildings.push(chryslerBuilding(x*70,z*70,{bay:2.8,story:3.1,streamed:true,district,variant:hash}));
+ return {landmark:buildings.some(b=>b.architecture==='chrysler')?'chrysler':null,id:'city-block',key:blockKey(x,z),block:[x,z],cellBase:blockCellBase(x,z),seed,half:35,center:[x*70,z*70],plaza:0,buildings,props:[],spawns:[],textures:midtown.textures,sky:midtown.sky,roads:{avenues:[x*70-35,x*70+35],streets:[z*70-35,z*70+35],avenueWidth:16,streetWidth:12}};
 }
 // The original landmarks retain their special parts; ordinary home addresses now use the
 // same architectural families as the surrounding city, with stable per-building palettes.

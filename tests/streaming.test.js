@@ -16,7 +16,7 @@ test('procedural addresses are deterministic, disjoint, detailed and vary across
   env.buildings.forEach((b,i)=>{styles.add(b.architecture);const f=buildingFootprint(b);assert.ok(f[0]>=x*70-27&&f[2]<=x*70+27);assert.ok(f[1]>=z*70-29&&f[3]<=z*70+29);for(const a of env.buildings.slice(i+1)){const g=buildingFootprint(a);assert.ok(f[0]>=g[2]||f[2]<=g[0]||f[1]>=g[3]||f[3]<=g[1]);}assert.ok(new Set(cells.filter(c=>c.building===i).flatMap(c=>componentPlacements(c,{interiors:false}).map(p=>p.type))).size>=75);});
  }
  for(let x=3;x<24;x++)for(const b of generateBlock(x,7).buildings)styles.add(b.architecture);
- assert.equal(styles.size,BUILDING_STYLES.length);assert.notEqual(blockCellBase(3,0),blockCellBase(-3,0));
+ assert.deepEqual([...styles].sort(),[...BUILDING_STYLES.map(s=>s.id),'chrysler'].sort());assert.notEqual(blockCellBase(3,0),blockCellBase(-3,0));
 });
 test('unloaded blocks restore structural HP, open skins, persistent debris and stable cell IDs',()=>{
  const room=new Room('SAVE');try{

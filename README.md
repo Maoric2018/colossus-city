@@ -94,11 +94,17 @@ Soaring animates the existing armored pilot: the helmet looks forward, the weapo
 
 ### Midtown
 
-The original **169 buildings and 5,452 structural bays** form the center of a continuously generated city. Travel in any horizontal direction to discover more 70 m blocks, each with eight buildings, courtyards, alleys and connected streets. Sixteen building families vary footprints, heights, setbacks and facade details: brownstones, tenements, warehouses, cast-iron storefronts, Beaux-Arts, Art Deco, curtain-wall offices, terraces, brutalist buildings, hotels, apartments, factories, markets, Gothic buildings, copper-roofed buildings and modern offices. The custom twin towers and Empire State–style tower remain in Midtown.
+The original **169 buildings and 5,589 structural bays** form the center of a continuously generated city. Travel in any horizontal direction to discover more 70 m blocks, each with eight street-front buildings, courtyards, alleys and connected streets. Some courtyards contain a Chrysler-style landmark. Sixteen building families vary footprints, heights, setbacks and facade details: brownstones, tenements, warehouses, cast-iron storefronts, Beaux-Arts, Art Deco, curtain-wall offices, terraces, brutalist buildings, hotels, apartments, factories, markets, Gothic buildings, copper-roofed buildings and modern offices. The custom twin towers, Empire State–style tower and Chrysler Building remain in Midtown.
 
-The **101-type architectural kit** supplies at least **75 distinct component types per building**: detailed entrances and windows, stairs, fire escapes, interior services, ornamental masonry, balconies, roof machinery and family-specific parts. Downloaded photographic textures and roof models are reused. Fine geometry is concentrated nearby; simpler distant buildings blend into matching horizon fog (105–230 m on Quest, 140–340 m on desktop).
+The **136-type architectural kit** supplies at least **75 distinct component types per building**: detailed entrances and windows, stairs, fire escapes, interior services, ornamental masonry, balconies, roof machinery and family-specific parts. Downloaded photographic textures and roof models are reused. Fine geometry is concentrated nearby; simpler distant buildings blend into matching horizon fog (105–230 m on Quest, 140–340 m on desktop).
 
 Nearby blocks have full destruction and collision. Distant blocks unload, retaining a sparse record of damage, broken skins and rubble for the current round. Returning players and late spectators see the same destruction. Offscreen physics pauses and resumes when the block reloads; round reset starts a fresh city. Raiders who die far from the start respawn near the giant.
+
+### Spawn a Chrysler Building
+
+The host can open the pause menu and select **SPAWN CHRYSLER NEARBY**. It adds a tower in the nearest clear generated courtyard; the menu reports its location. Existing buildings and damage stay intact. The home district also has one west of the central plaza, and approximately one in 29 generated blocks gets another naturally.
+
+Each Chrysler has **313 destructible bays and 35 custom component types**, including seven curved steel crown shells with triangular window cutouts, a vertex spire, eagle heads, hubcaps and fenders, marble piers, brick patterns, revolving doors and terrace details. The crown and eagles have collision proxies and move with their broken supporting bays. Spawns and destruction replicate to all players and late spectators, survive block unloading, and reset with the round.
 
 ### Layered destruction with integrity
 

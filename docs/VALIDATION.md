@@ -1,5 +1,11 @@
 # Validation record and acceptance gates
 
+## Chrysler landmark — September 12, 2026
+
+- **127 Node tests and 114 JavaScript modules: PASS.** New coverage includes the 35 custom component types, supported 313-bay tower, deterministic natural/manual generation, clear courtyards, unchanged neighboring cell IDs, host authorization/cooldown, preserving existing live damage, unloaded pristine spawn metadata, moving crown collision and high-spire missile/hand queries.
+- **Rendered architecture and network spawn: PASS.** Actual host menu and WebSocket flow rebuild an existing generated block; a late spectator receives the same 313 bays, 35 custom types and crown cell ID. The custom crown's instance transform follows a fallen, rotated bay. The crown and its 23 contact shapes survive unload/return; reset clears custom layouts. No asset failures or browser errors. Reports: `artifacts/chrysler-report.json`, `artifacts/city-report.json`; screenshots include `chrysler-spawned.png` and `chrysler-quest-stereo.png`.
+- **Quest stereo rendering: PASS in emulation.** Both eyes show the crown and spire. The sampled view submitted 1,457,792 triangles and 222 draw calls across stereo. These are per-frame renderer counts, not a physical Quest frame-rate measurement. Distant crowns share one simplified instance batch; close copies share the 136-type city kit.
+
 ## Raider soaring breaches — September 12, 2026
 
 - **122 Node tests and 109 JavaScript modules: PASS.** Real-room tests cover entry/exit holes, preserved flight speed and health, narrow damage, persistent rubble/late joins, starting from rest against a wall, normal flight/dodge/fuel/stale-input exclusions, owner-only contact grace and expiry, and generated-block damage restoration. Shared sweep/prediction tests cover thin walls, props and settled rubble.

@@ -1,5 +1,6 @@
 // Real rendered architectural kits, collapse attachments and persistent skin fragments.
 import assert from 'node:assert/strict';
+import {COMPONENTS} from '../shared/city/components.js';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -14,7 +15,7 @@ try{
  const page=await browser.newPage({viewport:{width:1600,height:1000}});page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url+'/?quality=low');await page.waitForFunction(()=>window.COLOSSUS_ART_READY);await page.waitForLoadState('networkidle');
  await page.evaluate(()=>{const {renderer,rig}=window.__COLOSSUS;renderer.setAnimationLoop(null);rig.position.set(0,0,0);document.body.replaceChildren(renderer.domElement);});
- const views=[['dense-city',[230,195,220],[0,25,0]],['twin-towers',[100,100,-145],[0,55,-70]],['empire-state',[-130,95,-135],[-70,58,-70]],['building-components',[-54,15,95],[-70,11,70]]];
+ const views=[['dense-city',[230,195,220],[0,25,0]],['twin-towers',[100,100,-145],[0,55,-70]],['empire-state',[-130,95,-135],[-70,58,-70]],['chrysler-building',[-114,70,65],[-70,61,0]],['chrysler-crown',[-95,106,28],[-70,108,0]],['building-components',[-54,15,95],[-70,11,70]]];
  const stats={};
  for(const [name,p,target] of views){
   stats[name]=await page.evaluate(({p,target})=>{const {renderer,camera,scene}=window.__COLOSSUS;camera.position.set(...p);camera.lookAt(...target);renderer.info.reset();renderer.render(scene,camera);return {...renderer.info.render};},{p,target});
@@ -39,7 +40,7 @@ try{
   camera.position.set(-50,12,90);camera.lookAt(-66,3,70);renderer.render(scene,camera);
   return {buildings:city.env.buildings.length,bays:city.cells.length,componentTypes:kit.batches.size,attached,count,settled,persists,reset,lateJoin,finalPose,failedAssets:window.__COLOSSUS.assetStatus.failed};
  });
- assert.ok(checks.attached&&checks.settled&&checks.persists&&checks.reset&&checks.lateJoin&&checks.finalPose);assert.equal(checks.componentTypes,101);assert.deepEqual(checks.failedAssets,[]);
+ assert.ok(checks.attached&&checks.settled&&checks.persists&&checks.reset&&checks.lateJoin&&checks.finalPose);assert.equal(checks.componentTypes,Object.keys(COMPONENTS).length);assert.deepEqual(checks.failedAssets,[]);
  await page.screenshot({path:'artifacts/persistent-rubble.png'});assert.deepEqual(errors,[]);
  const report={result:'PASS',checks,stats,artifacts:[...views.map(v=>v[0]+'.png'),'persistent-rubble.png']};await writeFile('artifacts/city-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill('SIGTERM');}

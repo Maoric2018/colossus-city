@@ -12,7 +12,7 @@ import {facadeMaps, roofTexture} from './textures.js';
 const temp = new T.Object3D(), matrix = new T.Matrix4(), local = new T.Matrix4(), zero = new T.Matrix4().makeScale(0, 0, 0);
 const sphere=new T.Sphere(),projection=new T.Matrix4(),eyePosition=new T.Vector3();
 const white=new T.Color(0xffffff),wtcGlass=new T.Color(0x718087);
-const skinKey=c=>c.architecture==='empire'?'empire':c.material;
+const skinKey=c=>['empire','chrysler'].includes(c.architecture)?c.architecture:c.material;
 const wallLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .5, 0, -Math.cos(a) * .5), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
 // Masonry window panes sit just outside the facade box (which spans ±.011 around the wall plane).
 const paneLocal = [0, 1, 2, 3].map(side => { const a = side * Math.PI / 2; return new T.Matrix4().compose(new T.Vector3(Math.sin(a) * .514, 0, -Math.cos(a) * .514), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -a), new T.Vector3(1, 1, 1)); });
@@ -32,11 +32,11 @@ export class Buildings {
   this.roof = this.batch(roofGeometry, resources?.roof.material || surface(tier, {map:roofTexture(), color:0x8a8884, roughness:1}), cells.filter(c => c.roof).length);
   this.facade = {}; this.glass = {}; this.wallCount = {}; this.paneCount = {};
   const size = tier.textureSize;
-  for(const name of [...Object.keys(MATERIALS),'empire']){
+  for(const name of [...Object.keys(MATERIALS),'empire','chrysler']){
    const walls = cells.reduce((s, c) => s + (skinKey(c) === name ? c.walls.filter(Boolean).length : 0), 0); if(!walls) continue;
-   const maps = resources?.glass[name]?null:facadeMaps(name, size), m = MATERIALS[name==='empire'?'stone':name];
+   const maps = resources?.glass[name]?null:facadeMaps(name, size), m = MATERIALS[['empire','chrysler'].includes(name)?'stone':name];
    this.wallCount[name] = 0; this.paneCount[name] = 0;
-   if(m.facadeHP > 0) this.facade[name] = this.batch(resources?.facade[name]?.geometry||new T.BoxGeometry(1, .925, .022), resources?.facade[name]?.material||surface(tier, {map:maps.map, color:name==='empire'?0xf7f4ee:m.tint, roughness:.9}), walls);
+   if(m.facadeHP > 0) this.facade[name] = this.batch(resources?.facade[name]?.geometry||new T.BoxGeometry(1, .925, .022), resources?.facade[name]?.material||surface(tier, {map:maps.map, color:['empire','chrysler'].includes(name)?0xf7f4ee:m.tint, roughness:.9}), walls);
    this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * .45, color:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02}), walls);
    this.glass[name].castShadow = false;
   }

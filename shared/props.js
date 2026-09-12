@@ -1,3 +1,4 @@
+import {chryslerColliders} from './city/chrysler.js';
 import {seeded} from './math.js';
 import {propBounds} from './prop-bounds.js';
 export const ROOF_ASSETS=[['city-kit-industrial/water-tower',2.8],['space-kit/satelliteDish_detailed',2.4],['city-kit-industrial/detail-tank',1.1],['city-kit-industrial/solar-panel-flat',.25]];
@@ -14,10 +15,11 @@ export function roofProp(c){
  return {asset,height,scale,size,yaw:(c.roofYaw??c.building)*Math.PI/2};
 }
 export function roofColliders(c){
+ const crown=c.architecture==='chrysler'?chryslerColliders(c):[];
  const spire=c.spire?[[0,c.size[1]/2+c.spire/2,0,.9,c.spire/2,.9]]:[];
- const p=roofProp(c);if(!p)return spire;const [w,h,d]=p.size,swap=(c.roofYaw??c.building)%2,base=c.size[1]/2+(c.roofAsset?.04:.02);
+ const p=roofProp(c);if(!p)return [...spire,...crown];const [w,h,d]=p.size,swap=(c.roofYaw??c.building)%2,base=c.size[1]/2+(c.roofAsset?.04:.02);
  // Quarter-turn roof placements allow exact axis-aligned bounds in bay space.
- return [...spire,[0,base+h/2,0,(swap?d:w)/2,h/2,(swap?w:d)/2]];
+ return [...spire,...crown,[0,base+h/2,0,(swap?d:w)/2,h/2,(swap?w:d)/2]];
 }
 export function staticProps(env){
  const props=[];if(env.id==='midtown')return props.concat(midtownProps(env));if(env.id!=='harbor-district')return props;

@@ -14,7 +14,8 @@ shared/            pure, dependency-free logic imported by BOTH server and brows
   flight.js        raider flight model (flightStep) used by the server AND client prediction
   soar-breach.js   shared swept bay selection and prone capsule prediction bounds
   environment.js   facade: the active district + re-exports of shared/city/*
-  city/components.js  101 modeled part types and per-bay placement rules
+  city/chrysler.js    Chrysler factory, 35 custom parts, crown profiles and collision proxies
+  city/components.js  136 modeled part types and per-bay placement rules
   city/layout.js   Midtown + seeded infinite blocks, 16 families and stable coordinate IDs
   city/materials.js material table: glass/facade/frame HP, safety factor, tint, haptics
   city/cells.js    generateCells (bays, walls, stacks), cellColliders (skin-aware), initialSkin

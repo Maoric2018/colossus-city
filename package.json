@@ -27,6 +27,7 @@
     "test:giant": "node scripts/giant-contact-smoke.mjs",
     "profile": "node scripts/profile.mjs",
     "profile:optimization": "node scripts/optimization-profile.mjs",
+    "test:chrysler": "node scripts/chrysler-smoke.mjs",
     "test:city": "node scripts/city-smoke.mjs",
     "test:streaming": "node scripts/streaming-smoke.mjs",
     "test:cars": "node scripts/car-smoke.mjs",

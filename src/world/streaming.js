@@ -1,3 +1,4 @@
+import {chryslerLODGeometry} from '../render/chrysler-lod.js';
 import * as T from 'three';
 import {CityView} from './city.js';
 import {surface} from '../render/quality.js';
@@ -21,14 +22,17 @@ export class StreamedBlocks{
    `);
   };material.customProgramCacheKey=()=> 'streamed-facades-v1';
   this.lod=new T.InstancedMesh(new T.BoxGeometry(1,1,1),material,8192);this.lod.count=0;this.lod.frustumCulled=false;this.lod.receiveShadow=true;owner.root.add(this.lod);
+  this.landmarkLOD=new T.InstancedMesh(chryslerLODGeometry(),surface(owner.tier,{vertexColors:true,roughness:.45}),256);this.landmarkLOD.count=0;this.landmarkLOD.frustumCulled=false;owner.root.add(this.landmarkLOD);
  }
  record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
  state(meta){
   const r=this.record(meta.key);for(const id of r.entities.keys())this.entityOwners.delete(id);
   r.skins=new Map((meta.skins||[]).map(s=>[s[0],s.slice(1)]));r.cleared=new Set(meta.clearedCells||[]);r.entities=new Map((meta.entities||[]).map(e=>[e.id,e]));
   for(const e of r.entities.values())this.entityOwners.set(e.id,meta.key);
+  const previous=this.previews.get(meta.key),changed=!!meta.landmark&&previous?.landmark!==meta.landmark;r.landmark=meta.landmark;
+  if(changed){const view=this.views.get(meta.key);if(view){this.owner.handWorld.children.delete(view.handWorld);view.dispose();this.views.delete(meta.key);}this.previews.delete(meta.key);this.pending=this.pending.filter(e=>e.key!==meta.key);this.lastKey='';}
   const view=this.views.get(meta.key);if(view){this.owner.handWorld.children.delete(view.handWorld);view.reset();this.owner.handWorld.children.add(view.handWorld);this.apply(view,r);}
-  if(!r.skins.size&&!r.cleared.size&&!r.entities.size)this.records.delete(meta.key);
+  if(!r.landmark&&!r.skins.size&&!r.cleared.size&&!r.entities.size)this.records.delete(meta.key);
   this.needsLOD=true;
  }
  apply(view,r){view.hideCells([...r.cleared]);for(const [id,s]of r.skins)view.setSkin(id,...s,false);for(const e of r.entities.values())view.addDebris(e);view.commit();}
@@ -39,7 +43,7 @@ export class StreamedBlocks{
  removeDebris(id){const key=this.entityOwners.get(id),r=this.records.get(key),e=r?.entities.get(id);if(e){for(const c of e.cells)r.cleared.add(c);r.entities.delete(id);}this.views.get(key)?.removeDebris(id);this.entityOwners.delete(id);this.needsLOD=true;}
  crumble(e){this.hideCells(e.cells);if(e.id)this.removeDebris(e.id);}
  getCell(id){return this.views.get(keyOf(id))?.byId.get(id);}
- reset(){for(const view of this.views.values()){this.owner.handWorld.children.delete(view.handWorld);view.dispose();}this.views.clear();this.records.clear();this.entityOwners.clear();this.lastKey='';this.needsLOD=true;}
+ reset(){for(const view of this.views.values()){this.owner.handWorld.children.delete(view.handWorld);view.dispose();}this.views.clear();this.previews.clear();this.pending=[];this.records.clear();this.entityOwners.clear();this.lastKey='';this.needsLOD=true;}
  select(camera){
   const viewCamera=camera.cameras?.[0]||camera,p=this.position.setFromMatrixPosition(viewCamera.matrixWorld),[cx,cz]=blockAt(p.x,p.z),key=blockKey(cx,cz),now=performance.now();
   this.ground.update(p);this.owner.sky.position.copy(p);this.owner.sun.position.set(p.x-120,160,p.z-90);this.owner.sun.target.position.set(p.x,0,p.z);this.owner.sun.target.updateMatrixWorld();
@@ -48,7 +52,7 @@ export class StreamedBlocks{
    this.lastKey=key;this.needsLOD=true;
    for(const [k,env]of this.previews)if(Math.abs(env.block[0]-cx)>radius+1||Math.abs(env.block[1]-cz)>radius+1)this.previews.delete(k);
    for(const [k,v]of this.views)if(Math.abs(v.env.block[0]-cx)>1||Math.abs(v.env.block[1]-cz)>1){this.owner.handWorld.children.delete(v.handWorld);v.dispose();this.views.delete(k);}
-   for(let z=cz-radius;z<=cz+radius;z++)for(let x=cx-radius;x<=cx+radius;x++)if(!homeBlock(x,z)&&Math.hypot(x*70-p.x,z*70-p.z)<far+100){const k=blockKey(x,z);if(!this.previews.has(k))this.previews.set(k,generateBlock(x,z,this.owner.env.seed));}
+   for(let z=cz-radius;z<=cz+radius;z++)for(let x=cx-radius;x<=cx+radius;x++)if(!homeBlock(x,z)&&Math.hypot(x*70-p.x,z*70-p.z)<far+100){const k=blockKey(x,z);if(!this.previews.has(k))this.previews.set(k,generateBlock(x,z,this.owner.env.seed,{landmark:this.records.get(k)?.landmark}));}
    this.pending=[...this.previews.values()].filter(e=>Math.abs(e.block[0]-cx)<=1&&Math.abs(e.block[1]-cz)<=1&&!this.views.has(e.key)).sort((a,b)=>Math.hypot(a.center[0]-p.x,a.center[1]-p.z)-Math.hypot(b.center[0]-p.x,b.center[1]-p.z));
   }
   // One nearby block per rendered frame avoids building a complete district in one frame.
@@ -60,17 +64,22 @@ export class StreamedBlocks{
   for(const mesh of this.owner.batches)mesh.visible=homeVisible;
  }
  rebuildLOD(){
-  let index=0;
+  let index=0,landmarks=0;
   for(const env of this.previews.values()){
    if(this.views.has(env.key))continue;const record=this.records.get(env.key),gone=new Set([...(record?.cleared||[]),...[...(record?.entities.values()||[])].flatMap(e=>e.cells)]),collapsed=new Set();
    if(gone.size){const cells=generateCells(env);for(let i=0;i<env.buildings.length;i++){const mine=cells.filter(c=>c.building===i);if(mine.filter(c=>gone.has(c.id)).length>mine.length*.45)collapsed.add(i);}}
    for(const [i,b]of env.buildings.entries()){
+    if(b.architecture==='chrysler'&&!collapsed.has(i)&&landmarks<this.landmarkLOD.instanceMatrix.count){
+     const crown=gone.size?generateCells(env).find(c=>c.building===i&&c.chryslerCrown):null;
+     if(!crown||!gone.has(crown.id)){dummy.position.set(b.x,.15+(b.tiers.reduce((n,t)=>n+t.floors,0)-.5)*b.story,b.z);dummy.rotation.set(0,0,0);dummy.scale.set(b.bay,b.story,b.bay);dummy.updateMatrix();this.landmarkLOD.setMatrixAt(landmarks++,dummy.matrix);}
+    }
     const base=b.tiers[0];let floor=0;
     for(const t of b.tiers){const h=t.floors*b.story;dummy.position.set(b.x+(t.ix+(t.nx-base.nx)/2)*b.bay,.15+floor*b.story+h/2,b.z+(t.iz+(t.nz-base.nz)/2)*b.bay);dummy.rotation.set(0,0,0);dummy.scale.set(t.nx*b.bay,h,t.nz*b.bay);floor+=t.floors;
      if(collapsed.has(i))continue;if(index>=this.lod.instanceMatrix.count)break;dummy.updateMatrix();this.lod.setMatrixAt(index,dummy.matrix);this.lod.setColorAt(index++,new T.Color(palette[b.material][b.variant%3]));
     }
    }
   }
+  this.landmarkLOD.count=landmarks;this.landmarkLOD.instanceMatrix.needsUpdate=true;
   this.lod.count=index;this.lod.instanceMatrix.needsUpdate=true;if(this.lod.instanceColor)this.lod.instanceColor.needsUpdate=true;
  }
 }

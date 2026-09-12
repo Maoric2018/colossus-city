@@ -7,7 +7,7 @@ import {generateBlock,blockAt,blockKey,homeBlock,cellBlock} from '../shared/city
 import {box} from '../shared/giant-rig.js';
 import {addBuildings,removeBody,bodyPose,debrisMeta,detachCellColliders,restoreSkin,restoreDebris} from './destruction.js';
 export class CityStreaming{
- constructor(room){this.room=room;this.active=new Map();this.archive=new Map();this.free=[];this.lastFocus='';}
+ constructor(room){this.room=room;this.active=new Map();this.archive=new Map();this.free=[];this.landmarks=new Set();this.lastSpawn=-Infinity;this.lastFocus='';}
  ensureAround(x,z,wanted=new Set()){
   const [cx,cz]=blockAt(x,z);
   for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)if(!homeBlock(cx+dx,cz+dz)){const key=blockKey(cx+dx,cz+dz);wanted.add(key);if(!this.active.has(key))this.load(cx+dx,cz+dz);}
@@ -33,12 +33,12 @@ export class CityStreaming{
   }
  }
  load(x,z){
-  const r=this.room,env=generateBlock(x,z,r.env.seed),indices=env.buildings.map(b=>{const i=this.free.length?this.free.pop():r.env.buildings.length;r.env.buildings[i]={...b,index:i};return i;});
+  const r=this.room,env=generateBlock(x,z,r.env.seed,{landmark:this.landmarks.has(blockKey(x,z))?'chrysler':undefined}),indices=env.buildings.map(b=>{const i=this.free.length?this.free.pop():r.env.buildings.length;r.env.buildings[i]={...b,index:i};return i;});
   env.buildings=env.buildings.map((b,i)=>({...b,index:indices[i]}));const cells=generateCells(env);
   r.cells.push(...cells);addBuildings(r,cells,indices);r.handWorld.addCells(cells);
   const ground=r.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x*70,-.3,z*70));r.world.createCollider(RAPIER.ColliderDesc.cuboid(35,.3,35).setFriction(.82).setCollisionGroups(group(C.COLLISION.WORLD)),ground);
   const groundBox=box([x*70,-.3,z*70],[35,.3,35]);r.handWorld.fixed.push(groundBox);
-  const tile={key:env.key,x,z,indices,cells,cellIds:new Set(cells.map(c=>c.id)),ground,groundBox};this.active.set(tile.key,tile);
+  const tile={key:env.key,x,z,landmark:env.landmark,indices,cells,cellIds:new Set(cells.map(c=>c.id)),ground,groundBox};this.active.set(tile.key,tile);
   const saved=this.archive.get(tile.key);
   if(saved){
    for(const [id,skin]of saved.damage)restoreSkin(r,r.cellMap.get(id),skin);
@@ -49,15 +49,36 @@ export class CityStreaming{
   }
   r.world.invalidateSceneQueries();r.event({type:'block-load',...this.meta(tile)});return tile;
  }
+ spawnChrysler(client){
+  const r=this.room;if(client.id!==r.hostId()||r.time-this.lastSpawn<2)return null;
+  const at=r.players.get(client.id)?.body?.translation()||r.boss,[cx,cz]=blockAt(at.x,at.z),choices=[];
+  for(let dz=-4;dz<=4;dz++)for(let dx=-4;dx<=4;dx++){
+   const x=cx+dx,z=cz+dz,key=blockKey(x,z);if(homeBlock(x,z)||this.landmarks.has(key)||generateBlock(x,z,r.env.seed).landmark)continue;
+   // Courtyard footprint plus a safety margin for live players and the giant.
+   const occupied=Math.abs(r.boss.x-x*70)<14&&Math.abs(r.boss.z-z*70)<14||[...r.players.values()].some(p=>{const q=p.body?.translation();return q&&Math.abs(q.x-x*70)<10&&Math.abs(q.z-z*70)<10;})||[...r.debris.values(),...r.settled.values()].some(e=>{const q=e.body.translation();return Math.hypot(q.x-x*70,q.z-z*70)<18;});
+   if(!occupied)choices.push({x,z,key,d:(x*70-at.x)**2+(z*70-at.z)**2});
+  }
+  choices.sort((a,b)=>a.d-b.d);const choice=choices[0];if(!choice)return null;
+  const {x,z,key}=choice;this.lastSpawn=r.time;this.landmarks.add(key);let tile=this.active.get(key);
+  if(!tile)tile=this.load(x,z);
+  else{
+   const env=generateBlock(x,z,r.env.seed,{landmark:'chrysler'}),local=env.buildings.length-1,index=this.free.length?this.free.pop():r.env.buildings.length;
+   r.env.buildings[index]={...env.buildings[local],index};
+   const cells=generateCells(env).filter(c=>c.building===local);for(const c of cells)c.building=index;
+   tile.indices.push(index);tile.cells.push(...cells);for(const c of cells)tile.cellIds.add(c.id);tile.landmark='chrysler';
+   r.cells.push(...cells);addBuildings(r,cells,[index]);r.handWorld.addCells(cells);r.world.invalidateSceneQueries();r.event({type:'block-load',...this.meta(tile)});
+  }
+  return {x:x*70,z:z*70,distance:Math.round(Math.sqrt(choice.d))};
+ }
  capture(tile){
   const r=this.room,damage=[];
   for(const c of tile.cells){const s=initialSkin(c);if(c.skin.hp!==s.hp||c.skin.glass!==s.glass||c.skin.facade!==s.facade||c.skin.facadeHp.some((h,i)=>h!==s.facadeHp[i]))damage.push([c.id,{...c.skin,facadeHp:[...c.skin.facadeHp]}]);}
-  return {x:tile.x,z:tile.z,key:tile.key,damage,detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
+  return {x:tile.x,z:tile.z,key:tile.key,landmark:tile.landmark,damage,detached:tile.cells.filter(c=>r.detached.has(c.id)).map(c=>c.id),entities:[...r.debris.values(),...r.settled.values()].filter(e=>tile.cellIds.has(e.cells[0])).map(e=>({...debrisMeta(e),velocity:Object.values(e.body.linvel()),angular:Object.values(e.body.angvel())})),collapsed:tile.indices.flatMap((i,n)=>r.collapsed.has(i)?[n]:[]),failures:[...r.pendingFailures].filter(([id])=>tile.cellIds.has(id)).map(([id,t])=>[id,Math.max(0,t-r.time)])};
  }
  meta(tile){const saved=this.capture(tile);return this.publicState(saved,tile.indices);}
- publicState(saved,indices){const inDebris=new Set(saved.entities.flatMap(e=>e.cells));return {key:saved.key,x:saved.x,z:saved.z,indices,skins:saved.damage.map(([id,s])=>[id,s.glass,s.facade]),clearedCells:saved.detached.filter(id=>!inDebris.has(id)),entities:saved.entities};}
+ publicState(saved,indices){const inDebris=new Set(saved.entities.flatMap(e=>e.cells));return {key:saved.key,x:saved.x,z:saved.z,landmark:saved.landmark,indices,skins:saved.damage.map(([id,s])=>[id,s.glass,s.facade]),clearedCells:saved.detached.filter(id=>!inDebris.has(id)),entities:saved.entities};}
  unload(key){
-  const tile=this.active.get(key),r=this.room,saved=this.capture(tile);if(saved.damage.length||saved.detached.length)this.archive.set(key,saved);
+  const tile=this.active.get(key),r=this.room,saved=this.capture(tile);if(saved.damage.length||saved.detached.length||this.landmarks.has(key))this.archive.set(key,saved);
   r.event({type:'block-unload',...this.publicState(saved,tile.indices)});
   for(const e of saved.entities){const entity=r.debris.get(e.id)||r.settled.get(e.id);removeBody(r,entity.body);r.debris.delete(e.id);r.settled.delete(e.id);}
   for(const i of tile.indices){removeBody(r,r.buildingBodies[i]);r.buildingBodies[i]=null;r.cellsByBuilding[i]=[];r.floors[i]=[];r.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];r.buildingColumns[i]=null;r.env.buildings[i]=null;r.dirtyBuildings.delete(i);r.lastCreak.delete(i);r.collapsed.delete(i);this.free.push(i);}

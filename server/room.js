@@ -120,6 +120,7 @@ export class Room {
    b.target = {head, left:l, right:r, leftQuaternion:handQuaternion(m.leftQuaternion, m.yaw), rightQuaternion:handQuaternion(m.rightQuaternion, m.yaw)}; b.yaw = clamp(m.yaw, -1e5, 1e5); b.lastPose = this.time; b.desktop = false;
    b.moveX = clamp(Number(m.moveX) || 0, -1, 1); b.moveZ = clamp(Number(m.moveZ) || 0, -1, 1);
   }
+  if(m.type==='spawn-building'&&m.building==='chrysler'&&client.id===this.hostId()){const position=this.stream?.spawnChrysler(client);if(position)client.ws.send(JSON.stringify({type:'building-spawned',building:'chrysler',...position}));}
   if(m.type === 'restart' && client.id === this.hostId() && this.phase !== 0){ this.round++; this.initWorld(); this.event({type:'reset'}); }
  }
  event(e){ this.events.push(e); }

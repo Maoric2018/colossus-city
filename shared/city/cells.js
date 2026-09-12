@@ -35,6 +35,7 @@ export function generateCells(env){
   const assets=[['city-kit-industrial/water-tower',3.2],['space-kit/satelliteDish_detailed',2.6],['city-kit-industrial/detail-tank',1.3],['city-kit-industrial/solar-panel-flat',.3]];
   for(const c of mine) if(c.roof){const type=(c.ix+c.iz*2+(env.cellBase?localIndex:c.building)+c.tier)%5;if(b.waterTower && c.ix===0 && c.iz===0)c.roofAsset=assets[0];else if(!b.spire && type>=1 && type<=3)c.roofAsset=assets[type];}
   if(b.spire){const top=mine.filter(c=>c.roof).sort((a,b)=>b.p[1]-a.p[1])[0];if(top)top.spire=b.spire;}
+  if(b.architecture==='chrysler'){const top=mine.find(c=>c.floor===totalFloors-1&&c.ix===2&&c.iz===2);if(top)top.chryslerCrown=true;for(const c of mine)delete c.roofAsset;}
   for(const c of mine){ let n = 0, up = c.above; while(up){ n++; up = byId.get(up).above; } c.stackAbove = n; }
  });
  return cells;

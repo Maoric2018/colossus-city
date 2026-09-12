@@ -10,6 +10,7 @@ function canvasTexture(size, draw){
 const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
 // Window rectangles for one bay wall in UV space: [x, y, w, h] fractions.
 export const WINDOWS = {
+ chrysler:[[.13,.14,.16,.7],[.42,.14,.16,.7],[.71,.14,.16,.7]],
  empire:[[.13,.15,.16,.71],[.42,.15,.16,.71],[.71,.15,.16,.71]],
  brick:[[.1, .28, .2, .42], [.4, .28, .2, .42], [.7, .28, .2, .42]],
  stone:[[.12, .22, .3, .5], [.58, .22, .3, .5]],
@@ -35,6 +36,11 @@ export function facadeMaps(material, size = 512, seed = 7){
   }else if(material==='empire'){
    x.fillStyle='#e2dfd2';x.fillRect(0,0,s,s);x.fillStyle='#cbc8bc';for(let i=1;i<7;i++)x.fillRect(0,i*s/7,s,1);
    windows(x,s,WINDOWS.empire,rand,0,'','#3e4850');x.fillStyle='#959787';for(const [wx,wy,ww,wh] of WINDOWS.empire)x.fillRect(wx*s,(wy+wh)*s,ww*s,s*.015);
+  }else if(material === 'chrysler'){
+   x.fillStyle='#eeeae0';x.fillRect(0,0,s,s);
+   for(let row=0;row<20;row++)for(let col=-1;col<12;col++){const tone=218+rand()*22;x.fillStyle=rgb(tone,tone,tone-5);x.fillRect((col+(row%2)*.5)*s/12+1,row*s/20+1,s/12-2,s/20-2);}
+   for(const [wx,,ww]of WINDOWS.chrysler){x.fillStyle='#6e7576';x.fillRect(wx*s,0,ww*s,s);}
+   windows(x,s,WINDOWS.chrysler,rand,0,'','#263d49');
   }else if(material === 'stone'){
    x.fillStyle = rgb(206, 194, 168); x.fillRect(0, 0, s, s);
    const rows = 6, cols = 4, bh = s / rows, bw = s / cols;

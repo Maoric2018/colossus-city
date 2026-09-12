@@ -23,14 +23,17 @@ export function buildCity(room){
 export function addBuildings(room,cells,indices){
  for(const i of indices){room.buildingBodies[i]=room.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());room.cellsByBuilding[i]=[];room.floors[i]=[];room.buildingBounds[i]=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];room.buildingColumns[i]={merged:true,handles:[]};}
  for(const c of cells){
-  c.skin = initialSkin(c); c.lastHit = -100; c.entity = 0; c.lastHitBy = 0; c.handles = []; c.wallHandles = [[], [], [], []]; c.structureHandles = []; c.roofHandles = [];
+  c.queryHalf=c.size.map(v=>v/2);c.skin = initialSkin(c); c.lastHit = -100; c.entity = 0; c.lastHitBy = 0; c.handles = []; c.wallHandles = [[], [], [], []]; c.structureHandles = []; c.roofHandles = [];
   room.cellsByBuilding[c.building].push(c); room.cellMap.set(c.id, c);
   const b = room.buildingBounds[c.building];
   for(let k = 0; k < 3; k++){ b[k] = Math.min(b[k], c.p[k] - c.size[k] / 2); b[k + 3] = Math.max(b[k + 3], c.p[k] + c.size[k] / 2); }
   const floors = room.floors[c.building]; if(!floors[c.floor]) floors[c.floor] = {building:c.building, floor:c.floor, cells:[], structureMerged:false, wallsMerged:[false, false, false, false], structure:[], walls:[[], [], [], []]};
   floors[c.floor].cells.push(c);
  }
- for(const c of cells) for(const a of roofColliders(c)) c.roofHandles.push(staticCollider(room, room.buildingBodies[c.building], [c.p[0]+a[0],c.p[1]+a[1],c.p[2]+a[2],...a.slice(3)], {cell:c.id}));
+ for(const c of cells)for(const a of roofColliders(c)){
+  c.roofHandles.push(staticCollider(room,room.buildingBodies[c.building],[c.p[0]+a[0],c.p[1]+a[1],c.p[2]+a[2],...a.slice(3)],{cell:c.id}));
+  const b=room.buildingBounds[c.building];for(let k=0;k<3;k++){c.queryHalf[k]=Math.max(c.queryHalf[k],Math.abs(a[k])+a[k+3]);b[k]=Math.min(b[k],c.p[k]+a[k]-a[k+3]);b[k+3]=Math.max(b[k+3],c.p[k]+a[k]+a[k+3]);}
+ }
  for(const i of indices) for(const f of room.floors[i]) if(f) mergeFloor(room, f);
  // Intact columns are continuous vertical runs. Split a building's runs only when its
  // first structural bay fails; this keeps the dense undamaged city cheap to simulate.
@@ -153,7 +156,9 @@ export function damageCell(room, c, energy, sides = ALL_SIDES, by = 0){
 export function damageSphere(room, center, radius, energy, by = 0, limit = 12){
  const hit = [];
  for(const c of cellsNear(room, center, radius + 4)){
-  const d = dist(vec(c.p), center); if(d > radius + 3) continue;
+  let d=dist(vec(c.p),center);
+  if(c.chryslerCrown)for(const a of roofColliders(c))d=Math.min(d,Math.hypot(Math.max(0,Math.abs(center.x-c.p[0]-a[0])-a[3]),Math.max(0,Math.abs(center.y-c.p[1]-a[1])-a[4]),Math.max(0,Math.abs(center.z-c.p[2]-a[2])-a[5])));
+  if(d > radius + 3) continue;
   const e = energy * clamp(1 - d / (radius + 3), .35, 1);
   if(damageCell(room, c, e, ALL_SIDES, by)) hit.push(c.id);
   if(hit.length >= limit) break;
@@ -164,7 +169,7 @@ export function cellsNear(room, point, radius){
  const out = [];
  room.buildingBounds.forEach((b, i) => {
   if(point.x < b[0] - radius || point.x > b[3] + radius || point.y < b[1] - radius || point.y > b[4] + radius || point.z < b[2] - radius || point.z > b[5] + radius) return;
-  for(const c of room.cellsByBuilding[i]) if(!room.detached.has(c.id) && Math.abs(c.p[0] - point.x) < radius + c.size[0] && Math.abs(c.p[1] - point.y) < radius + c.size[1] && Math.abs(c.p[2] - point.z) < radius + c.size[2]) out.push(c);
+  for(const c of room.cellsByBuilding[i]){const reach=c.chryslerCrown?c.queryHalf:c.size;if(!room.detached.has(c.id)&&Math.abs(c.p[0]-point.x)<radius+reach[0]&&Math.abs(c.p[1]-point.y)<radius+reach[1]&&Math.abs(c.p[2]-point.z)<radius+reach[2])out.push(c);}
  });
  return out;
 }

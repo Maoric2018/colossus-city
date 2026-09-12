@@ -1,3 +1,4 @@
+import {CHRYSLER_COMPONENTS,chryslerPlacements} from './chrysler.js';
 // Architectural kit in normalized bay coordinates. Parts have distinct geometry and jobs;
 // structural assemblies share a physics bay, while facade/glass pieces follow their own skin.
 // All of these same assemblies remain attached when their bay falls or comes to rest.
@@ -6,6 +7,7 @@ const rail=(y,z=-.51)=>[box([.9,.024,.022],[0,y,z]),...[-.42,-.21,0,.21,.42].map
 const beam=(x=0,z=0)=>[box([.1,.86,.025],[x,-.025,z]),...[-.075,.075].map(d=>box([.1,.86,.02],[x,-.025,z+d]))];
 const kit=(label,material,parts)=>({label,material,parts});
 export const COMPONENTS=Object.freeze({
+ ...CHRYSLER_COMPONENTS,
  slabEdge:kit('Precast slab edge','stone',[box([1,.075,.07],[0,.46,-.48])]),
  iBeam:kit('Steel I girder','steel',[box([.96,.09,.024],[0,.38,-.38]),...[-.05,.05].map(y=>box([.96,.018,.075],[0,.38+y,-.38]))]),
  hColumn:kit('Flanged steel column','steel',beam(-.46,-.46)),
@@ -149,12 +151,13 @@ export function componentPlacements(c,{interiors=true}={}){
   if(interiors||c.floor<3||c.roof)for(const t of styleParts[c.architecture]||[])put(t,side,layer);
   if(c.roof&&['copper','beauxarts','hotel'].includes(c.architecture))put('copperRoof',side);
  }
- if(c.roof){
+ if(c.roof&&!(c.architecture==='chrysler'&&c.floor===24)){
   for(const t of ['roofHatch','ductFan','roofWalkway','solarRack','utilityTank','lightningRod','chimneyCap','planter','louverScreen'])put(t);
   if(['industrial','warehouse','market'].includes(c.architecture))put('sawtooth');
   if(c.architecture==='wtc')put('wtcHatTruss');
   for(const t of ['chimney','duct','skylight','roofVent'])put(t);
   if(c.architecture==='empire'&&c.spire)put('empireMast');
  }
+ if(c.architecture==='chrysler')chryslerPlacements(c,put);
  return out;
 }
