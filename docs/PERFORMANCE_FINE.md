@@ -64,8 +64,8 @@ as synchronous preparation; integration checks cover streaming and damage restor
 - **Travel:** one optional module worker prepares generated cells and component placements
   for queued blocks. Scene/GPU construction remains on the main thread. Teleports or worker
   failure use the original synchronous path; reset/unload/landmark replacement ignores
-  stale results. The separately requested final range is 240 m Quest / 260 m desktop, with
-  up to 81 detailed blocks and no simplified distant ring.
+  stale results. The separately requested final range is 150 m on both Quest and desktop, with
+  up to 49 detailed blocks and no simplified distant ring.
 - **Network:** opt-in `eventFormat:1` packs shard event rows and consecutive piece IDs
   without quantization or dropped events. Original objects and order are restored before
   dispatch. Legacy peers and COL6 snapshots remain compatible. Remote interpolation starts

@@ -12,5 +12,8 @@ export function installDistanceFog(){
  // metres, including for sprites and particles that only expose mvPosition.
  ShaderChunk.fog_vertex=ShaderChunk.fog_vertex.replace('vFogDepth = - mvPosition.z;',
   'vCityFogPosition = mvPosition.xyz / length(viewMatrix[0].xyz);');
+ // Stay clear until fogNear and concentrate the fade near the far cutoff.
+ ShaderChunk.fog_fragment=ShaderChunk.fog_fragment.replace('float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );',
+  'float t=clamp((vFogDepth-fogNear)/max(1.,fogFar-fogNear),0.,1.); float fogFactor=smoothstep(0.,1.,t*t);');
  ShaderChunk.fog_fragment=ShaderChunk.fog_fragment.replace('#ifdef USE_FOG','#ifdef USE_FOG\n float vFogDepth = length(vCityFogPosition);');
 }

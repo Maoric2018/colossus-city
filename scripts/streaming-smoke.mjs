@@ -21,7 +21,7 @@ try{
    const a=performance.now();for(let i=0;i<20;i++){renderer.info.reset();renderer.render(scene,camera);renderer.getContext().finish();}const renderMS=(performance.now()-a)/20;
    const simplifiedMeshes=!!(city.stream.lod||city.stream.catalogLOD||city.stream.landmarkLOD);
    return {views:city.stream.views.size,previews:city.stream.previews.size,detailBatches:city.buildings.components.batches.size,detailRadius:city.buildings.components.radius,simplifiedMeshes,fogNear:scene.fog.near,fogFar:scene.fog.far,triangles:renderer.info.render.triangles,calls:renderer.info.render.calls,renderMS,geometries:renderer.info.memory.geometries};
-  },{position,target});stats.push({name,...sample});assert.ok(sample.views<=81&&sample.views>9);assert.ok(sample.previews<=81);assert.equal(sample.simplifiedMeshes,false);assert.equal(sample.fogFar,260);assert.ok(sample.detailRadius>=sample.fogFar);await page.screenshot({path:`artifacts/${name}.png`});
+  },{position,target});stats.push({name,...sample});assert.ok(sample.views<=49&&sample.views>9);assert.ok(sample.previews<=49);assert.equal(sample.simplifiedMeshes,false);assert.equal(sample.fogFar,150);assert.ok(sample.detailRadius>=sample.fogFar);await page.screenshot({path:`artifacts/${name}.png`});
  }
  const culling=await page.evaluate(async()=>{
   const T=await import('three'),{camera,city,renderer,scene}=window.__COLOSSUS,original=camera.clone(),far=scene.fog.far;
@@ -56,8 +56,8 @@ try{
  // A large plane must stay clear nearby but fade at the corners according to
  // true distance. This catches both depth-only fog and interpolated vertex lengths.
  const fogPixels=await page.evaluate(async()=>{
-  const T=await import('three'),{renderer}=window.__COLOSSUS,scene=new T.Scene();scene.fog=new T.Fog(0x000000,80,130);
-  const plane=new T.Mesh(new T.PlaneGeometry(1000,1000),new T.MeshBasicMaterial({color:0xffffff,toneMapped:false}));plane.position.z=-80;scene.add(plane);
+  const T=await import('three'),{renderer}=window.__COLOSSUS,scene=new T.Scene();scene.fog=new T.Fog(0x000000,110,150);
+  const plane=new T.Mesh(new T.PlaneGeometry(1000,1000),new T.MeshBasicMaterial({color:0xffffff,toneMapped:false}));plane.position.z=-100;plane.material.onBeforeCompile=shader=>{if(shader.uniforms.citySkyReady)shader.uniforms.citySkyReady.value=0;};scene.add(plane);
   const camera=new T.PerspectiveCamera(90,1,.1,400),target=new T.WebGLRenderTarget(64,64),pixels=new Uint8Array(64*64*4),previous=renderer.getRenderTarget();
   renderer.setRenderTarget(target);renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,64,64,pixels);
   const sample=(x,y)=>pixels[(y*64+x)*4],result={center:sample(32,32),edge:sample(62,32),corner:sample(62,62)},normal=pixels.slice();
@@ -74,7 +74,7 @@ try{
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',1,0));await quest.waitForFunction(()=>window.__COLOSSUS.state.bossX>34);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,-1));await quest.waitForFunction(()=>window.__COLOSSUS.state.bossZ < -190);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,0));await quest.waitForTimeout(400);await quest.screenshot({path:'artifacts/infinite-quest-stereo.png'});
- const xr=await quest.evaluate(()=>{const g=window.__COLOSSUS;return {x:g.state.bossX,z:g.state.bossZ,eyes:g.renderer.xr.getCamera().cameras.length,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls,fogNear:g.scene.fog.near,fogFar:g.scene.fog.far};});assert.equal(xr.eyes,2);assert.ok(xr.blocks>0);assert.ok(xr.z < -190);assert.equal(xr.fogNear,128);assert.equal(xr.fogFar,240);
+ const xr=await quest.evaluate(()=>{const g=window.__COLOSSUS;return {x:g.state.bossX,z:g.state.bossZ,eyes:g.renderer.xr.getCamera().cameras.length,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls,fogNear:g.scene.fog.near,fogFar:g.scene.fog.far};});assert.equal(xr.eyes,2);assert.ok(xr.blocks>0);assert.ok(xr.z < -190);assert.equal(xr.fogNear,110);assert.equal(xr.fogFar,150);
  // Visit naturally generated world landmarks through the actual stereo streaming
  // path. Physics traversal above uses game controls; this section isolates rendering.
  const worldTours=await quest.evaluate(async()=>{
@@ -90,6 +90,6 @@ try{
   worldXR.push(await quest.evaluate(({id,type})=>{const g=window.__COLOSSUS;return {id,eyes:g.renderer.xr.getCamera().cameras.length,tier:g.city.tier.name,instances:g.city.buildings.components.batches.get(type).count,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};},tour));
   await quest.screenshot({path:`artifacts/${tour.id}-quest-stereo.png`});
  }
- for(const f of worldXR){assert.equal(f.eyes,2);assert.equal(f.tier,'QUEST');assert.ok(f.instances>0&&f.blocks<=81);}
+ for(const f of worldXR){assert.equal(f.eyes,2);assert.equal(f.tier,'QUEST');assert.ok(f.instances>0&&f.blocks<=49);}
  assert.deepEqual(errors,[]);const report={result:'PASS',stats,culling,persistence,worldDamage,fogPixels,xr,worldXR,browserErrors:errors};console.log(JSON.stringify(report,null,2));await writeFile('artifacts/streaming-report.json',JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill('SIGTERM');}
