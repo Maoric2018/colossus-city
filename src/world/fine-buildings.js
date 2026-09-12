@@ -40,10 +40,11 @@ export class FineBuildings{
  }
  poseShard(id,position,rotation){const e=this.shards.get(id);if(!e)return false;if(e.settled)return true;e.p.fromArray(position);e.q.fromArray(rotation);this.write(e);return true;}
  write(e){const pose=e.pose||e;matrix.compose(pose.p,pose.q,one);if(e.offset)matrix.multiply(offset.makeTranslation(-e.offset.x,-e.offset.y,-e.offset.z));for(const d of e.parts)d.pool.mesh.setMatrixAt(d.index,matrix);}
- select(camera){
+ select(camera,far=0){
   const view=camera.cameras?.[0]||camera;eye.setFromMatrixPosition(view.matrixWorld);
-  for(const e of this.cells.values()){const visible=!e.pose.hidden&&e.pose.p.distanceToSquared(eye)<230**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
-  for(const e of this.shards.values()){const visible=e.p.distanceToSquared(eye)<170**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
+  const visibleRange=Number.isFinite(far)?far+12:0;
+  for(const e of this.cells.values()){const visible=!e.pose.hidden&&e.pose.p.distanceToSquared(eye)<Math.max(230,visibleRange)**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
+  for(const e of this.shards.values()){const visible=e.p.distanceToSquared(eye)<Math.max(170,visibleRange)**2;for(const d of e.parts)d.pool.mesh.setVisibleAt(d.index,visible);}
  }
  update(dt){this.time+=dt;for(const e of this.active){const pose=shardBallistic(e.meta,this.time);e.p.fromArray(pose.p);e.q.fromArray(pose.q);this.write(e);}this.commit();}
  commit(){for(const p of this.pools.values())p.mesh.visible=p.count>0;}

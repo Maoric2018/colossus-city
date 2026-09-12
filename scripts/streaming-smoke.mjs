@@ -21,7 +21,7 @@ try{
    const a=performance.now();for(let i=0;i<20;i++){renderer.info.reset();renderer.render(scene,camera);renderer.getContext().finish();}const renderMS=(performance.now()-a)/20;
    const simplifiedMeshes=!!(city.stream.lod||city.stream.catalogLOD||city.stream.landmarkLOD);
    return {views:city.stream.views.size,previews:city.stream.previews.size,detailBatches:city.buildings.components.batches.size,detailRadius:city.buildings.components.radius,simplifiedMeshes,fogNear:scene.fog.near,fogFar:scene.fog.far,triangles:renderer.info.render.triangles,calls:renderer.info.render.calls,renderMS,geometries:renderer.info.memory.geometries};
-  },{position,target});stats.push({name,...sample});assert.ok(sample.views<=25&&sample.views>9);assert.ok(sample.previews<=25);assert.equal(sample.simplifiedMeshes,false);assert.equal(sample.fogFar,130);assert.ok(sample.detailRadius>=sample.fogFar);await page.screenshot({path:`artifacts/${name}.png`});
+  },{position,target});stats.push({name,...sample});assert.ok(sample.views<=81&&sample.views>9);assert.ok(sample.previews<=81);assert.equal(sample.simplifiedMeshes,false);assert.equal(sample.fogFar,260);assert.ok(sample.detailRadius>=sample.fogFar);await page.screenshot({path:`artifacts/${name}.png`});
  }
  const culling=await page.evaluate(async()=>{
   const T=await import('three'),{camera,city,renderer,scene}=window.__COLOSSUS,original=camera.clone(),far=scene.fog.far;
@@ -47,7 +47,7 @@ try{
  const worldDamage=await page.evaluate(async()=>{
   const T=await import('three'),{generateBlock}=await import('/shared/city/layout.js'),{generateCells}=await import('/shared/city/cells.js'),g=window.__COLOSSUS;let env,b;
   for(let x=8;x<2000;x++){env=generateBlock(x,3,g.city.env.seed);b=env.buildings.find(b=>b.architecture==='swfc');if(b)break;}
-  const cells=generateCells(env).filter(c=>c.architecture==='swfc'),hit=cells.find(c=>c.floor===8&&c.ix===1&&c.iz===0);g.city.hideCells([hit.id]);g.camera.position.set(b.x,55,b.z+240);g.camera.lookAt(b.x,55,b.z);g.camera.updateMatrixWorld(true);for(let i=0;i<12;i++){g.renderer.render(g.scene,g.camera);await new Promise(r=>requestAnimationFrame(r));}
+  const cells=generateCells(env).filter(c=>c.architecture==='swfc'),hit=cells.find(c=>c.floor===8&&c.ix===1&&c.iz===0);g.city.hideCells([hit.id]);g.camera.position.set(b.x,55,b.z+g.scene.fog.far+140);g.camera.lookAt(b.x,55,b.z);g.camera.updateMatrixWorld(true);for(let i=0;i<12;i++){g.renderer.render(g.scene,g.camera);await new Promise(r=>requestAnimationFrame(r));}
   const distant=!g.city.stream.views.has(env.key)&&!g.city.stream.previews.has(env.key);
   g.camera.position.set(b.x,55,b.z+30);g.camera.lookAt(b.x,55,b.z);g.camera.updateMatrixWorld(true);for(let i=0;i<12;i++){g.renderer.render(g.scene,g.camera);await new Promise(r=>requestAnimationFrame(r));}
   const view=g.city.stream.views.get(env.key),aperture=[b.x,.15+26.5*b.story,b.z-b.bay*.5*(1-.24*26/30)];
@@ -74,7 +74,7 @@ try{
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',1,0));await quest.waitForFunction(()=>window.__COLOSSUS.state.bossX>34);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,-1));await quest.waitForFunction(()=>window.__COLOSSUS.state.bossZ < -190);
  await quest.evaluate(()=>questDevice.controllers.left.updateAxes('thumbstick',0,0));await quest.waitForTimeout(400);await quest.screenshot({path:'artifacts/infinite-quest-stereo.png'});
- const xr=await quest.evaluate(()=>{const g=window.__COLOSSUS;return {x:g.state.bossX,z:g.state.bossZ,eyes:g.renderer.xr.getCamera().cameras.length,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls,fogNear:g.scene.fog.near,fogFar:g.scene.fog.far};});assert.equal(xr.eyes,2);assert.ok(xr.blocks>0);assert.ok(xr.z < -190);assert.equal(xr.fogNear,64);assert.equal(xr.fogFar,120);
+ const xr=await quest.evaluate(()=>{const g=window.__COLOSSUS;return {x:g.state.bossX,z:g.state.bossZ,eyes:g.renderer.xr.getCamera().cameras.length,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls,fogNear:g.scene.fog.near,fogFar:g.scene.fog.far};});assert.equal(xr.eyes,2);assert.ok(xr.blocks>0);assert.ok(xr.z < -190);assert.equal(xr.fogNear,128);assert.equal(xr.fogFar,240);
  // Visit naturally generated world landmarks through the actual stereo streaming
  // path. Physics traversal above uses game controls; this section isolates rendering.
  const worldTours=await quest.evaluate(async()=>{
@@ -90,6 +90,6 @@ try{
   worldXR.push(await quest.evaluate(({id,type})=>{const g=window.__COLOSSUS;return {id,eyes:g.renderer.xr.getCamera().cameras.length,tier:g.city.tier.name,instances:g.city.buildings.components.batches.get(type).count,blocks:g.city.stream.views.size,triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};},tour));
   await quest.screenshot({path:`artifacts/${tour.id}-quest-stereo.png`});
  }
- for(const f of worldXR){assert.equal(f.eyes,2);assert.equal(f.tier,'QUEST');assert.ok(f.instances>0&&f.blocks<=25);}
+ for(const f of worldXR){assert.equal(f.eyes,2);assert.equal(f.tier,'QUEST');assert.ok(f.instances>0&&f.blocks<=81);}
  assert.deepEqual(errors,[]);const report={result:'PASS',stats,culling,persistence,worldDamage,fogPixels,xr,worldXR,browserErrors:errors};console.log(JSON.stringify(report,null,2));await writeFile('artifacts/streaming-report.json',JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill('SIGTERM');}

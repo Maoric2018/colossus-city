@@ -8,7 +8,7 @@ const keyOf=id=>{const p=cellBlock(id);return p?blockKey(...p):null;};
 export class StreamedBlocks{
  constructor(owner){
   this.owner=owner;this.views=new Map();this.previews=new Map();this.records=new Map();this.entityOwners=new Map();this.lastKey='';this.lastBuild=-Infinity;this.pending=[];this.position=new T.Vector3();
-  this.ground=streamGround(owner.root,owner.tier,owner.textures);
+  this.ground=streamGround(owner.root,owner.tier,owner.textures,owner.scene.fog.far);
   this.preparation=new BlockPreparation(!owner.tier.lambert);
  }
  record(key){let r=this.records.get(key);if(!r){r={key,skins:new Map(),fractures:new Map(),shards:new Map(),cleared:new Set(),entities:new Map()};this.records.set(key,r);}return r;}
