@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
 import {bakedModel, instances, assetStatus} from './assets.js';
-import {carPlacements,roofProp,ROOF_ASSETS} from '../shared/props.js';
+import {roofProp,ROOF_ASSETS} from '../shared/props.js';
 import {seeded} from '../shared/math.js';
 const base = '/assets/imported/';
 // Downloaded dressing around the destructible district: HDR sky, far skyline, street traffic,
@@ -25,8 +25,7 @@ export async function installDistrict(view, renderer){
   const places = []; for(let j = 0; j < perType; j++){ const angle = (type + j * skylineNames.length) * 2.39996, r = half + 60 + rand() * 160, h = (tall ? 48 : 20) + rand() * (tall ? 70 : 28); places.push({position:[Math.cos(angle) * r, -.15, Math.sin(angle) * r], yaw:Math.round(rand() * 4) * Math.PI / 2, height:h}); }
   tasks.push(bakedModel(base + `city-kit-commercial/${name}.glb`).then(model => { for(const p of places) p.scale = p.height / model.size.y; for(const part of model.parts) part.material.color.setHex(0x9aafb9); instances(root, model, places, {castShadow:false}); }));
  });
- // Street traffic sits in the avenue lanes, clear of intersections.
- const cars=carPlacements(env);for(const asset of new Set(cars.map(p=>p.asset)))tasks.push(bakedModel(base+asset+'.glb').then(model=>instances(root,model,cars.filter(p=>p.asset===asset))));
+ // Movable street traffic and wrecks are owned by CityView.cars.
  // Roof props follow the bay underneath them, including rotations, removal and round resets.
  const roofAssets = [['city-kit-industrial/water-tower', 3.2], ['space-kit/satelliteDish_detailed', 2.6], ['city-kit-industrial/detail-tank', 1.3], ['city-kit-industrial/solar-panel-flat', .3]];
  roofAssets.forEach(([name, height], type) => tasks.push(bakedModel(base + name + '.glb').then(model => {

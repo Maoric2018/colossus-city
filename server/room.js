@@ -3,6 +3,7 @@
 // and abilities.js so they can be changed and tested independently.
 import {GIANT, handQuaternion, identity} from '../shared/giant-rig.js';
 import {HandWorld} from '../shared/hand-world.js';
+import {buildCars,carMeta,updateCars,crashCar,carSnapshots} from './cars.js';
 import {staticProps} from '../shared/props.js';
 import {randomBytes} from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
@@ -39,6 +40,7 @@ export class Room {
   buildCity(this); this.handWorld = new HandWorld(this.env, this.cells);
   this.props = staticProps(this.env);
   for(const prop of this.props){ const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(...prop.position).setRotation({x:0, y:Math.sin(prop.yaw / 2), z:0, w:Math.cos(prop.yaw / 2)})); for(const a of prop.boxes){const co=this.world.createCollider(RAPIER.ColliderDesc.cuboid(...a.slice(3)).setTranslation(...a.slice(0, 3)).setCollisionGroups(group(G.WORLD)), body);this.colliderTags.set(co.handle,{prop:prop.id});} }
+  buildCars(this);
   for(const prop of this.env.props){ if(!prop.collider) continue;
    const p = prop.position || [0, 0, 0], scale = prop.scale || 1, half = prop.collider.half, rotation = quatEuler(...(prop.rotation || [0, 0, 0]));
    if(!finiteVector(half) || half.some(x => x <= 0) || !Number.isFinite(scale) || scale <= 0) throw Error('Invalid prop collider');
@@ -78,6 +80,7 @@ export class Room {
  roster(){ return [...this.clients.values()].map(c => ({id:c.id, name:c.name, role:c.role})).concat([...this.players.values()].filter(p => p.bot).map(p => ({id:p.id, name:p.name, role:'bot'}))); }
  welcome(client){
   return {type:'welcome', id:client.id, viewKey:client.viewKey, role:client.role, room:this.code, practice:this.practice, environment:this.env.id, round:this.round, host:this.hostId(),
+   cars:[...this.cars.values()].map(c=>carMeta(this,c)),
    missiles:[...this.missiles.values()].map(m => ({...m, time:this.time, p:arr(m.p)})),
    clearedCells:this.cells.filter(c => this.detached.has(c.id) && !this.debris.has(c.entity) && !this.settled.has(c.entity)).map(c => c.id),
    skins:damagedSkins(this), collapsed:[...this.collapsed],
@@ -116,18 +119,20 @@ export class Room {
  // ---- simulation ----
  step(){
   this.tick++; this.time += C.TICK;
-  if(this.phase){ this.world.step(this.queue); this.queue.drainCollisionEvents(() => {}); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
+  if(this.phase){ this.world.step(this.queue); this.queue.drainCollisionEvents(() => {}); updateCars(this); if(this.time - this.endedAt > 20){ this.round++; this.initWorld(); this.event({type:'reset'}); } return; }
   // Wait for at least one raider. An AI giant fills an empty boss seat; it is not a second authority.
   if(this.players.size) this.remaining = Math.max(0, C.MATCH_SECONDS - (this.time - this.startTime)); else this.startTime = this.time;
   updateBoss(this);
   for(const p of this.players.values()) updatePlayer(this, p);
   for(const e of this.debris.values()) e.preImpactSpeed = len(e.body.linvel());
+  for(const c of this.cars.values())if(c.body)c.preImpactSpeed=len(c.body.linvel());
   updateMissiles(this);
   this.world.step(this.queue);
   const hits = [], fractures = new Set(), crumbles = new Set();
   this.queue.drainCollisionEvents((a, b, started) => {
    if(!started) return;
    const ta = this.colliderTags.get(a), tb = this.colliderTags.get(b);
+   if(ta?.car&&!tb?.player)crashCar(this,ta.car);if(tb?.car&&!ta?.player)crashCar(this,tb.car);
    const pt = ta?.player ? ta : tb?.player ? tb : null;
    for(const [tag, other] of [[ta, tb], [tb, ta]]){
     if(!tag?.cell) continue;
@@ -149,7 +154,7 @@ export class Room {
    }
   });
   for(const [p, kick, damage] of hits) if(p.body) knockdown(this, p, kick, damage, -1);
-  updateDebris(this, hits, fractures, crumbles);
+  updateCars(this);updateDebris(this, hits, fractures, crumbles);
   processFailures(this); scheduleFailures(this); flushSkinEvents(this);
   for(const [id, r] of this.rags) if(this.time - r.born > 9) removeRag(this, id);
   if(this.bossHP <= 0 || this.remaining <= 0){ this.missiles.clear(); this.phase = this.bossHP <= 0 ? 1 : 2; this.endedAt = this.time; this.event({type:'end', winner:this.phase === 1 ? 'raiders' : 'giant', players:this.scoreboard()}); }
@@ -160,7 +165,7 @@ export class Room {
   return {tick:this.tick, time:this.time, bossHP:this.bossHP, remaining:this.remaining, kills:this.kills, head:arr(b.head), left:arr(b.left), right:arr(b.right), bossYaw:b.yaw, bossX:b.x, bossZ:b.z, leftQuaternion:b.leftQuaternion, rightQuaternion:b.rightQuaternion,
    damage:this.detached.size / this.cells.length * 100, phase:this.phase, round:this.round, bossStagger:b.stagger, towersDown:this.towersDown, bossBlocked:b.pushing ? 1 : 0,
    players:[...this.players.values()].map(p => { const rb = p.body || this.rags.get(p.rag)?.parts[0].body; return {id:p.id, flags:(p.rag ? F.RAG : 0) | (p.hp <= 0 ? F.DEAD : 0) | (this.time < p.invulnerable ? F.SHIELD : 0) | (p.bot ? F.BOT : 0) | (p.soaring ? F.SOAR : 0) | (this.time < p.dodgeUntil ? F.DODGE : 0), p:rb ? arr(rb.translation()) : [0, -20, 0], v:rb ? arr(rb.linvel()) : [0, 0, 0], yaw:p.input.yaw, hp:p.hp, fuel:p.fuel, seq:p.input.seq, pitch:p.input.pitch, dodgeCooldown:Math.max(0, p.dodgeReady - this.time), heavyCooldown:Math.max(0, p.heavyReady - this.time), score:p.score}; }),
-   bodies:[...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
+   bodies:[...carSnapshots(this), ...[...this.debris.values()].map(e => ({id:e.id, ...bodyPose(e.body)})), ...[...this.rags.values()].flatMap(r => r.parts.map(p => ({id:p.id, ...bodyPose(p.body)})))]
   };
  }
  dispose(){ this.world.free(); this.queue.free(); }

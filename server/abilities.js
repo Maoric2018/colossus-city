@@ -2,6 +2,7 @@
 import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {C, group} from '../shared/config.js';
 import {v, add, sub, mul, norm, dist, arr, vec, clamp} from '../shared/math.js';
+import {blastCars} from './cars.js';
 import {flightStep, flightRotation} from '../shared/flight.js';
 import {damageSphere, breakCells} from './destruction.js';
 const G = C.COLLISION;
@@ -27,7 +28,7 @@ export function updateMissiles(room){
   m.p = add(m.p, mul(direction, distance));
   if(m.p.y < 0 || Math.hypot(m.p.x, m.p.z) > room.env.half + 40) hit = true;
   if(!hit){if(room.tick%3===0){m.time=room.time;room.event({type:'missile-pose',id,p:arr(m.p),direction:m.direction,time:room.time});}continue;}
-  room.missiles.delete(id); room.event({type:'detonate', id, p:arr(m.p)});
+  room.missiles.delete(id); room.event({type:'detonate', id, p:arr(m.p)});blastCars(room,m.p,C.MISSILE_RADIUS);
   for(const p of room.players.values()) if(p.body && room.time >= p.invulnerable){
    const at = p.body.translation(), d = dist(at, m.p); if(d > C.MISSILE_RADIUS) continue;
    const toward = norm(sub(at, m.p)), wall = room.world.castRay(new RAPIER.Ray(add(m.p, mul(toward, .08)), toward), Math.max(0, d - .45), true, undefined, group(G.GIANT, G.WORLD | G.DEBRIS));

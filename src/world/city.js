@@ -12,6 +12,7 @@ import {rayAABB} from '../../shared/math.js';
 import {Buildings} from './buildings.js';
 import {buildGround} from './ground.js';
 import {Rubble} from './rubble.js';
+import {CarsView} from './cars.js';
 import {Fragments} from './fragments.js';
 const skyVertex = `varying vec3 vDir; void main(){vDir=position;vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}`;
 const skyFragment = `varying vec3 vDir;uniform vec3 topColor;uniform vec3 horizon;void main(){vec3 d=normalize(vDir);float h=max(d.y,0.);vec3 c=mix(horizon,topColor,pow(h,.42));vec3 sun=normalize(vec3(-.8,.22,-.65));float s=max(dot(d,sun),0.);c+=vec3(1.,.51,.22)*pow(s,18.)*.37;c+=vec3(1.,.82,.48)*smoothstep(.9986,.9995,s)*2.;gl_FragColor=vec4(c,1.);}`;
@@ -34,7 +35,7 @@ export class CityView {
   scene.onBeforeRender=(_renderer,_scene,camera)=>{this.buildings.components.select(camera);this.buildings.commit();};
   this.batches.push(...this.buildings.batches);
   for(const c of this.cells){ const s = this.skins.get(c.id); this.buildings.setSkin(c.id, s.glass, s.facade); }
-  this.buildings.commit(); this.rubble = new Rubble(scene, tier); this.fragments=new Fragments(this.root,this.cells,tier); this.ready = this.loadCustomAssets();
+  this.buildings.commit(); this.rubble = new Rubble(scene, tier); this.fragments=new Fragments(this.root,this.cells,tier); this.cars=new CarsView(this.root,env,tier); this.ready = Promise.all([this.loadCustomAssets(),this.cars.ready]);
  }
  texture(url, repeat = 1, srgb = true){ const t = this.loader.load(url); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = this.quest ? 2 : 4; if(srgb) t.colorSpace = T.SRGBColorSpace; return t; }
  makeSkyAndLights(){
@@ -83,8 +84,9 @@ export class CityView {
   }
   if(ev.id) this.moving.delete(ev.id);
  }
- reset(){ this.fragments.reset(); this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
+ reset(){ this.cars.reset(); this.fragments.reset(); this.handWorld = new HandWorld(this.env,this.cells); this.moving.clear(); this.detached.clear(); for(const c of this.cells){ const s = initialSkin(c); this.skins.set(c.id, s); this.colliderCache.set(c.id, cellColliders(c)); this.buildings.setSkin(c.id, s.glass, s.facade); this.buildings.setCell(c.id, tp.set(c.p[0], c.p[1], c.p[2]), tq.identity(), false); } this.commit(); }
  commit(){ this.buildings.commit(); }
+ *solidProps(){yield* this.handWorld.fixed;yield* this.cars.boxes();}
  update(dt){ this.ground.update(dt); this.rubble.update(dt); this.fragments.update(dt); }
  // ---- spatial queries ----
  rayBuilding(origin, direction, maxDistance){
@@ -110,7 +112,7 @@ export class CityView {
     for(const a of this.colliderCache.get(cId)){ tc.set(a[0], a[1], a[2]); th.set(a[3], a[4], a[5]); result = Math.min(result, rayAABB(to, td, tc, th, result, padding)); }
    }
   }
-  for(const b of this.handWorld.fixed){const x=origin.x-b.center[0],y=origin.y-b.center[1],z=origin.z-b.center[2],a=b.basis;to.set(x*a[0][0]+y*a[0][1]+z*a[0][2],x*a[1][0]+y*a[1][1]+z*a[1][2],x*a[2][0]+y*a[2][1]+z*a[2][2]);td.set(direction.x*a[0][0]+direction.y*a[0][1]+direction.z*a[0][2],direction.x*a[1][0]+direction.y*a[1][1]+direction.z*a[1][2],direction.x*a[2][0]+direction.y*a[2][1]+direction.z*a[2][2]);tc.set(0,0,0);th.set(...b.half);result=Math.min(result,rayAABB(to,td,tc,th,result,padding));}
+  for(const b of this.solidProps()){const x=origin.x-b.center[0],y=origin.y-b.center[1],z=origin.z-b.center[2],a=b.basis;to.set(x*a[0][0]+y*a[0][1]+z*a[0][2],x*a[1][0]+y*a[1][1]+z*a[1][2],x*a[2][0]+y*a[2][1]+z*a[2][2]);td.set(direction.x*a[0][0]+direction.y*a[0][1]+direction.z*a[0][2],direction.x*a[1][0]+direction.y*a[1][1]+direction.z*a[1][2],direction.x*a[2][0]+direction.y*a[2][1]+direction.z*a[2][2]);tc.set(0,0,0);th.set(...b.half);result=Math.min(result,rayAABB(to,td,tc,th,result,padding));}
   return result;
  }
  // First static collider box overlapping an axis-aligned box (for client prediction).
@@ -122,7 +124,7 @@ export class CityView {
     for(const a of this.colliderCache.get(c.id)){ const cx = c.p[0] + a[0], cy = c.p[1] + a[1], cz = c.p[2] + a[2]; if(Math.abs(center.x - cx) < half.x + a[3] && Math.abs(center.y - cy) < half.y + a[4] && Math.abs(center.z - cz) < half.z + a[5]) return {center:{x:cx, y:cy, z:cz}, half:{x:a[3], y:a[4], z:a[5]}}; }
    }
   }
-  for(const b of this.handWorld.fixed){if(b.center[1]<0)continue;if(b.center.every((v,i)=>Math.abs([center.x,center.y,center.z][i]-v)<[half.x,half.y,half.z][i]+b.extent[i]))return {center:{x:b.center[0],y:b.center[1],z:b.center[2]},half:{x:b.extent[0],y:b.extent[1],z:b.extent[2]}};}
+  for(const b of this.solidProps()){if(b.center[1]<0)continue;if(b.center.every((v,i)=>Math.abs([center.x,center.y,center.z][i]-v)<[half.x,half.y,half.z][i]+b.extent[i]))return {center:{x:b.center[0],y:b.center[1],z:b.center[2]},half:{x:b.extent[0],y:b.extent[1],z:b.extent[2]}};}
   return null;
  }
  // Intact bays whose envelope a segment crosses (local pre-impact effects for tracked hands).

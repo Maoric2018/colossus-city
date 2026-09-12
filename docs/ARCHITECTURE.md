@@ -56,18 +56,27 @@ snapshot **COL5** (`shared/protocol.js`):
 | --- | ---: |
 | Header, boss state, stagger, blocked walking, towers down, wrist quaternions | 136 |
 | One raider (incl. `seq`, breach cooldown, score) | 64 |
-| One chunk or ragdoll body | 32 |
+| One chunk, ragdoll part or moving car | 32 |
 
-At 144 chunks + 8 × 11 ragdoll parts + 8 raiders a snapshot is 8,068 bytes, 161,360 bytes/s per
-client at 20 Hz before overhead. Sleeping bodies are still included until removed.
+At 144 chunks + 8 × 11 ragdoll parts + 37 awake cars + 8 raiders a snapshot is 9,256 bytes,
+185,120 bytes/s per client at 20 Hz before overhead. Sleeping cars and settled structural
+debris send reliable final poses and leave the repeated snapshot list.
 
 Reliable events: `debris`, `remove`, `crumble` (a bay or chunk became cosmetic rubble),
 `skin` (batched `[id, glassMask, facadeMask]` changes), `strike` (a bay was hit; material,
 power, whether its frame failed), `creak` (a building has overloaded columns), `towerdown`,
 `combo`, `stomp`, `closecall`, `gianthit` (kind `heavy`, damage), `shot`, `heavy`,
-`missile`, `detonate`, `dodge`, `rag`, `kill`, `impact`, `end` (with scoreboard), `reset`.
-Welcome packets carry cleared cells, damaged skins, live chunks, ragdolls, missiles and the
-roster so late joiners see the same city.
+`missile`, `detonate`, `dodge`, `rag`, `kill`, `impact`, `end` (with scoreboard), `reset`,
+`car-state` and `car-explode` (both carry `id`, `prop`, `p`, `q`, `wreck`, `sleeping`, `removed`
+and remaining `burn` seconds). Welcome packets carry cleared cells, damaged skins, live and
+settled chunks, ragdolls, missiles, cars and the roster so late joiners see the same city.
+
+`server/cars.js` owns 37 CCD dynamic vehicle bodies in the reserved `0x40000000` ID range. Shared
+`cars.js` supplies intact and crushed box dimensions for physics, camera and prediction.
+Vehicles replace the old fixed car proxies. Resolved hand sweeps, foot-level movement and
+missile impacts apply impulses and damage; destructive hits emit one explosion and shrink
+the collider to the persistent crushed model. Sleeping wrecks remain dynamic so later hits
+can move them again. Car explosions are visual effects and never call colossus damage.
 
 Outgoing buffers above 128 KiB skip snapshots; above 1 MiB the client is dropped. Input is
 limited to ~30 messages/s per client (server ceiling 100/s, 8 KiB). Same-origin WebSocket

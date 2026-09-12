@@ -414,6 +414,31 @@
       "file": "public/assets/imported/textures/sky-2k.hdr",
       "bytes": 5451493,
       "sha256": "5244534e9cf5b606f2ff513aa00ddb161b0a4826ffd88a0d3bd03ac29247d198"
+    },
+    {
+      "file": "public/assets/imported/car-kit/debris-door.glb",
+      "bytes": 7052,
+      "sha256": "c62ab01c07be9be5dfc0f940dbc933fa836019ea1bc8fd0baa2d0e52cd764ea2"
+    },
+    {
+      "file": "public/assets/imported/car-kit/debris-bumper.glb",
+      "bytes": 11312,
+      "sha256": "dac8b9a01766f187c4f116eb7070e13485b642120f4d53ec611bf987100a1792"
+    },
+    {
+      "file": "public/assets/imported/car-kit/debris-tire.glb",
+      "bytes": 26548,
+      "sha256": "7c3f5968244e2c617c698820e943493b8480c7bef8535fbab04d4a501b3489e9"
+    },
+    {
+      "file": "public/assets/imported/car-kit/debris-drivetrain.glb",
+      "bytes": 36896,
+      "sha256": "4a93bba25d3004b028f8494105d1774a91797d116dcb136fde00b4882bfec652"
+    },
+    {
+      "file": "public/assets/imported/car-kit/debris-plate-a.glb",
+      "bytes": 5048,
+      "sha256": "3ecb3242d9e984dadd149fcdd0ded5f43e803b6370b6ddf2b7ab24876aa361ae"
     }
   ]
 }

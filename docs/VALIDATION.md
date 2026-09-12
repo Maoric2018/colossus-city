@@ -1,5 +1,17 @@
 # Validation record and acceptance gates
 
+## Movable cars — September 12, 2026
+
+- **93 Node tests: PASS.** Includes movable car bodies, no leftover static proxies, gentle pushes, tracked hard hits, cover blocking punches, recenter protection, footsteps and missile destruction, single explosions, sleeping wrecks, late joins and round resets.
+- **86 JavaScript modules and 64 bundled assets: PASS.** Five additional wreck components come from the already downloaded Kenney Car Kit.
+- **Rendered car check: PASS.** All six vehicle/wreck pairs inspected. Actual Rapier poses drive the crushed model; camera queries follow the moved car and leave its old position clear. Stale snapshots cannot move a sleeping wreck. Late join and reset restore the correct model. Explosion and smoke sprites render without asset failures.
+- **Multiplayer and emulated Quest browser smoke: PASS.** No browser errors; stereo, tracked controls, missiles, camera modes and live spectator feeds pass with dynamic cars present. The sampled emulated stereo scene submitted about 2.13 million triangles. This is not a physical headset performance measurement.
+- **Existing visual and giant contact regressions: PASS.** Imported attachments, current car collision, raider lasers and aligned robot wrists remain correct.
+- **Server benchmark with dynamic cars present:** intact city p95 2.43 ms; staged collapses and ragdolls p95 7.17 ms (28.21 ms maximum); active hand contact p95 4.55 ms. The largest collapse spike still exceeds the 16.67 ms tick budget. Parked cars produced no repeated pose records.
+- Three concurrent local human video feeds delivered 24.0–29.5 presented fps, with capture-to-display p95 of 46–94 ms. This does not establish cross-device Wi-Fi latency.
+
+The vehicle screenshots and report are `artifacts/cars-intact-and-wrecks.png`, `artifacts/car-explosion.png` and `artifacts/car-report.json`.
+
 ## Dense city and persistent destruction — September 12, 2026
 
 Built on main's merged Midtown overhaul. Local environment: macOS, Apple M5 Pro, Node 22.19.0. No physical headset attached. The map has 169 buildings, 5,452 structural bays and a 45-type architectural kit, with at least 30 modeled component types used by each building.
@@ -11,7 +23,7 @@ Built on main's merged Midtown overhaul. Local environment: macOS, Apple M5 Pro,
 - **New architectural render test: PASS.** District, twin towers, Empire State–style tower, part attachments, persistent fragments, reset, exact late-join fragment placement and settled-pose immunity to stale snapshots.
 - Reports and screenshots are in `artifacts/`. These are software and local-machine checks, not physical Quest performance measurements.
 
-## Local performance measurements
+## Dense-city performance measurements before dynamic cars
 
 Three simultaneous human video feeds delivered 23.9–29.3 presented fps; capture-to-display p95 was 63–86 ms. Encoded timestamp measurements exclude physical tracking and the work before capture. Same-machine results do not establish Wi-Fi or headset latency.
 
@@ -44,7 +56,7 @@ npm start
 
 ## Two-laptop acceptance
 
-Create a giant room in one browser and join from a second laptop as a raider. Confirm matching room/round, the raider's own movement is immediate (prediction) while remote players interpolate, mouse aim, core/head damage, occlusion behind buildings, fuel, hold-Shift soar/release-to-hover, E dodge, the breach shot (charge ring, cooldown, cracked bay), first/third-person cameras and spectator feeds. Shatter windows with rifle fire and confirm the opening lets you fly inside. Break a brick base bay and watch the creak → delayed failure → cascade. Knock out enough of a tower base for it to tip as one island, split on landing and keep its rubble. Join late and confirm the same wreckage remains. Drop structure on the giant and confirm its health and stagger do not change. Use a charged weapon hit to check stagger and the exposed-core bonus. Reset rounds after collapses; no building should return on join.
+Create a giant room in one browser and join from a second laptop as a raider. Confirm matching room/round, the raider's own movement is immediate (prediction) while remote players interpolate, mouse aim, core/head damage, occlusion behind buildings, fuel, hold-Shift soar/release-to-hover, E dodge, the breach shot (charge ring, cooldown, cracked bay), first/third-person cameras and spectator feeds. Shatter windows with rifle fire and confirm the opening lets you fly inside. Break a brick base bay and watch the creak → delayed failure → cascade. Knock out enough of a tower base for it to tip as one island, split on landing and keep its rubble. Join late and confirm the same wreckage remains. Drop structure on the giant and confirm its health and stagger do not change. Push and destroy cars; verify synchronized moving wrecks, late spectator state and clean round resets. Use a charged weapon hit to check stagger and the exposed-core bonus. Reset rounds after collapses; no building should return on join.
 
 ## Quest 2 acceptance
 

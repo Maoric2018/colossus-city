@@ -6,6 +6,7 @@ the public surface of each module stable, and add tests next to the layer you ch
 ```text
 shared/            pure, dependency-free logic imported by BOTH server and browser
   config.js        every tunable constant (C), collision groups, player flag bits (F)
+  cars.js          stable vehicle IDs and shared intact/wreck collision dimensions
   math.js          vectors, quaternions, sweeps, input sanitising
   protocol.js      binary snapshot codec (COL5). Bump MAGIC when the layout changes.
   flight.js        raider flight model (flightStep) used by the server AND client prediction
@@ -20,6 +21,7 @@ server/            authoritative simulation (Node + Rapier). Nothing here render
   index.js         HTTP static hosting, WebSocket upgrade, rate limits, tick loop, snapshots
   room.js          one match: world creation, membership, input routing, step order, snapshot
   boss.js          giant locomotion (VR pose / desktop / AI), hand sweeps, torso shove, combos
+  cars.js          dynamic vehicles, impact damage, explosions, wreck and sleep replication
   players.js       raider spawn/lifecycle, per-tick input, practice drones
   combat.js        rifle + breach shot, knockdowns, ragdolls
   abilities.js     flight (calls shared/flight.js), missiles
@@ -41,11 +43,12 @@ src/               browser client (Three.js). Reads snapshots/events; never deci
   render/renderer.js WebGL renderer, bloom composer, adaptive resolution, Q toggle
   world/city.js    CityView: sky, lights, ground, buildings, debris poses, skins, rubble,
                    spatial queries (rayDistance, overlapBox, cellsAlongSegment)
+  world/cars.js    instanced imported cars and crushed wrecks, moving query boxes, smoke
   world/buildings.js instanced bays: frame + per-material facade/glass batches, roof caps
   world/ground.js  avenues/streets/sidewalks/plaza/spawn pads/lamps/water/bridges
   world/textures.js procedural brick/stone/concrete/glass facade maps
   world/rubble.js  cosmetic instanced bricks/shards (client only, bounded per tier)
-  district.js      downloaded dressing: HDR sky, skyline ring, cars, roof props, spires
+  district.js      downloaded dressing: HDR sky, skyline ring, roof props, spires
   avatars.js       giant (mech armour), raiders, ragdoll parts
   effects.js       sprite particle pools and tracers
   audio.js         procedural Web Audio synth (no audio files)

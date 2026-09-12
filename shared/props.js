@@ -20,7 +20,7 @@ export function roofColliders(c){
  return [...spire,[0,base+h/2,0,(swap?d:w)/2,h/2,(swap?w:d)/2]];
 }
 export function staticProps(env){
- const props=carPlacements(env);if(env.id==='midtown')return props.concat(midtownProps(env));if(env.id!=='harbor-district')return props;
+ const props=[];if(env.id==='midtown')return props.concat(midtownProps(env));if(env.id!=='harbor-district')return props;
  const add=(id,kind,position,half)=>props.push({id,kind,position,yaw:0,boxes:[[0,0,0,...half]]});
  for(const x of [-44,-7,7,44])for(let z=-68;z<=68;z+=20){add(`lamp-${x}-${z}`,'lamp',[x,2.6,z],[.09,2.5,.09]);add(`lamp-arm-${x}-${z}`,'lamp',[x+.6,5.1,z],[.7,.045,.045]);add(`lamp-bulb-${x}-${z}`,'lamp',[x+1,5.03,z],[.375,.02,.14]);}
  env.buildings.forEach((b,i)=>{const w=b.nx*b.bay,d=b.nz*b.bay;add('walk-'+i,'pavement',[b.x,.08,b.z],[(w+3)/2,.08,(d+3)/2]);for(const sign of [-1,1]){const z=b.z+sign*(d/2+.12);add(`sign-${i}-${sign}`,'sign',[b.x,1.4,z],[w*.42,.45,.04]);for(const dx of [-1,1])add(`signpost-${i}-${sign}-${dx}`,'sign',[b.x+dx*w*.36,.93,z],[.035,.925,.035]);}});

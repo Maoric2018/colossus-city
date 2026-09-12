@@ -52,6 +52,11 @@ export class Effects{
   }
   this.particle(this.flares, p, {life:.25, size:5 * power, color:new T.Color(material === 'glass' ? 0xbfe9ff : 0xffc989), growth:2});
  }
+ carExplosion(p){
+  this.impact(p,1.2,'steel');
+  for(let i=0;i<7;i++)this.particle(this.flashes,p,{v:new T.Vector3((Math.random()-.5)*5,1+Math.random()*3,(Math.random()-.5)*5),life:.25+Math.random()*.25,size:2+Math.random()*2,color:new T.Color(i%2?0xff7424:0xffd470),growth:1.7});
+  for(let i=0;i<8;i++)this.particle(this.smoke,p,{v:new T.Vector3((Math.random()-.5)*4,2+Math.random()*4,(Math.random()-.5)*4),life:2+Math.random(),size:1.5,color:new T.Color(0x24292c),growth:3,opacity:.75});
+ }
  // Low rolling dust ring for collapses and stomps. (this.dust is the pool; hence the name.)
  dustRing(p, power = .5){
   const n = Math.floor(10 + power * 18);

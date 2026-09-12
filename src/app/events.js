@@ -9,6 +9,8 @@ export function makeEventHandler({city, fx, audio, hud, shake, xr, missiles, fli
  const vr = () => xr.session;
  return function handle(e){
   switch(e.type){
+   case 'car-state': city.cars.setState(e); return;
+   case 'car-explode': city.cars.setState(e);fx.carExplosion(e.p);audio.play('explosion',{p:e.p,power:.8});if(state.role==='boss')xr.haptic(near(e.p,35)*.4,100);else shake.add(near(e.p,45)*.5);return;
    case 'missile-pose': missiles.pose(e); return;
    case 'missile': missiles.add(e); audio.play('missile', {p:e.p}); if(state.role === 'boss') xr.haptic(.25, 60); return;
    case 'detonate': missiles.remove(e.id); fx.impact(e.p, 1.5); audio.play('explosion', {p:e.p}); shake.add(near(e.p, 60) * .6); return;

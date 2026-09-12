@@ -98,6 +98,8 @@ Broken bays stay as visible, collidable debris. Islands tip and split on hard im
 
 Robot missiles gently correct toward visible raiders inside a 22° forward cone, up to 75 m away, at no more than 27.5°/second. They ignore protected players and targets behind solid cover. The server sends curved-path corrections at 20 Hz; aiming and dodging still matter.
 
+The 37 street cars have independent physics bodies. Gentle hand pushes move them; hard punches, full-speed footsteps, crashes after a shove and missile blasts make them explode. Each of the six vehicle models has its own crushed wreck with downloaded torn doors, bumpers, tires and engine parts. Fire and smoke fade; the solid wreck remains movable until the round resets. Moving cars, final resting poses and wreck state are shared with all players and late spectators. These explosions do not damage the colossus.
+
 This is a game structural model, not engineering analysis: no bending moments, fatigue, rebar or arbitrary cracks; bays are rigid compounds; the skyline ring is decoration.
 
 ### Game feel
@@ -106,7 +108,7 @@ Client-side prediction runs the shared flight model locally against the held inp
 
 ## 3. Performance and verification
 
-Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders; a maximal snapshot is 8,072 bytes.
+Physics runs at 60 fixed steps/s, snapshots at 20/s, inputs/poses at 30/s. Remote objects interpolate ~100 ms behind; the local raider is predicted. Caps: 144 debris bodies, eight ragdolls, eight raiders and 37 cars; a maximal snapshot for this map is 9,256 bytes. Parked and sleeping cars send no repeated poses.
 
 Rendering picks a quality tier from the GPU: `quest`, `low` (integrated GPUs such as Intel Iris Xe: Lambert shading, no shadows/bloom, pixel ratio 1, low-poly skyline), `medium`, `high`. Adaptive resolution lowers the pixel ratio under sustained load. Towers render as a handful of instanced batches regardless of size (~120 draw calls in play on `low`). `Q` toggles cinematic extras; `?quality=low|medium|high|quest` forces a tier.
 
@@ -119,6 +121,7 @@ npm run test:xr        # VR lifecycle/input regressions (fake frames, real Three
 npm run test:all       # All Node tests
 npm run test:giant     # Rendered hand anatomy and real Midtown contact in Quest emulation
 npm run test:city
+npm run test:cars      # Moving cars, crushed models, explosions, collision queries and late joins
 npm run test:visual    # Imported art, roof movement, props and lasers
 npm run test:ragdoll   # Matching pilot/ragdoll skin and physics
 npm run test:xr-view   # Smooth yaw, hand orientation and rigid armor

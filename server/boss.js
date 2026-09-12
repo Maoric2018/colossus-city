@@ -4,6 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat/rapier.es.js';
 import {GIANT, handQuaternion, resolveHand, identity} from '../shared/giant-rig.js';
 import {C} from '../shared/config.js';
 import {v, add, sub, mul, len, norm, dist, arr, vec, clamp, rotateYaw, segmentDistance, segmentAABB, lookDir} from '../shared/math.js';
+import {strikeCars,pushCarsWithBody} from './cars.js';
 import {launchMissile} from './abilities.js';
 import {knockdown} from './combat.js';
 import {damageCell, breakCells, buildingsAlong} from './destruction.js';
@@ -64,6 +65,7 @@ export function updateBoss(room){
    if(!b.desktop&&Math.abs(b.turnDelta||0)>.001)hand.setTranslation(speed>.2?collisionPrev:b[key],true);
    hand.setNextKinematicTranslation(b[key]);hand.setNextKinematicRotation(q);
    const stoppedDisplacement=sub(b[key],collisionPrev);
+   if(!b.desktop||b.input.fire||b.input.up>0)strikeCars(room,collisionPrev,b[key],rotation,speed);
    for(const p of room.players.values())if(p.body&&!(b.turnDelta&&speed<.2)&&len(sub(mul(displacement,1/C.TICK),p.body.linvel()))>4){
     // Sweep the same oriented fist against the raider's actual capsule shape.
     const hit=p.body.collider(0).castShape(v(),new RAPIER.Cuboid(...GIANT.handHalf),collisionPrev,q,stoppedDisplacement,0,1,true);
@@ -85,6 +87,7 @@ export function updateBoss(room){
   }
  // A walking body chips a single contacted bay; it cannot grind its frame to failure.
  const moved = dist(v(b.x, 0, b.z), before) / C.TICK;
+ if(canAttack)pushCarsWithBody(room,before,v(b.x,0,b.z),moved);
  if(canAttack && b.walkContacts?.length && room.time-(b.lastWalkChip || -10)>C.WALK_CHIP_INTERVAL){
   const c=b.walkContacts[0],hp=c.skin.hp; b.lastWalkChip=room.time;
   if(hp>c.skin.maxHp*.95){damageCell(room,c,C.WALK_CHIP,sideBit(facingSide(c,[b.x,8,b.z])),0);c.skin.hp=Math.max(c.skin.hp,c.skin.maxHp*.95);}

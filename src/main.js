@@ -79,7 +79,7 @@ function onMessage(m){
  if(m.type === 'welcome'){
   state.welcome = m; state.role = m.role; state.localId = m.id; views.connect(m); missiles.reset(); for(const missile of m.missiles || []) missiles.add(missile);
   state.current = null; state.previousPhase = 0; xr.resetPose(); cityView.reset(); for(const r of rags.values()) r.dispose(); rags.clear(); for(const p of players.values()) p.dispose(); players.clear();
-  cityView.hideCells(m.clearedCells || []); for(const s of m.skins || []) cityView.setSkin(s[0], s[1], s[2], false); for(const e of m.entities) cityView.addDebris(e); for(const r of m.rags) addRag(r); cityView.commit();
+  for(const car of m.cars||[])cityView.cars.setState(car);cityView.hideCells(m.clearedCells || []); for(const s of m.skins || []) cityView.setSkin(s[0], s[1], s[2], false); for(const e of m.entities) cityView.addDebris(e); for(const r of m.rags) addRag(r); cityView.commit();
   $('room-label').textContent = `ROOM / ${m.room}`; $('connection-label').textContent = m.practice ? 'PRACTICE / SERVER ONLINE' : 'SERVER CONNECTED';
   const spawn = city.spawns[(m.id - 1) % city.spawns.length]; input.yaw = state.role === 'raider' ? (spawn[3] ?? Math.atan2(spawn[0], spawn[2])) : 0; input.pitch = 0; cameraRig.reset(spawn); prediction.reset(null); lastReconciled = -1; hud.lastHP = 100; hud.clearFeed(); $('scoreboard').classList.add('hidden'); return;
  }
@@ -142,7 +142,7 @@ function frame(now, xrFrame){
    else players.get(p.id).update(p, isLocal, state.firstPerson);
   }
   for(const [id, p] of players) if(!ids.has(id)){ p.dispose(); players.delete(id); }
-  for(const body of s.bodies){ if(rags.has(body.id)) rags.get(body.id).update(body.p, body.q); else cityView.poseDebris(body.id, body.p, body.q); }
+  for(const body of s.bodies){ if(rags.has(body.id)) rags.get(body.id).update(body.p, body.q); else if(cityView.cars.entries.has(body.id))cityView.cars.pose(body.id,body.p,body.q);else cityView.poseDebris(body.id, body.p, body.q); }
   cityView.commit();
   if(now - lastHUD > 100){ hud.refresh(s, now, {net, renderer:gr, input}); lastHUD = now; }
   const pilot = me(s), held = input.held();
@@ -154,7 +154,7 @@ function frame(now, xrFrame){
   cameraRig.intro(now, city);
  }
  missiles.update((net.latest?.time || 0) + Math.min(.15, (now - net.receivedAt) / 1000)); flightFX.update(dt, me(state.current), state.playing && state.role === 'raider' && !state.paused && !renderer.xr.isPresenting);
- cityView.update(dt); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
+ cityView.update(dt);cityView.cars.update(dt,fx); fx.update(dt); hud.frame(now, input); audio.setListener(listenerPosition());
  renderer.info.reset();
  if(!(state.playing && state.role === 'spectator' && views.visible)) gr.render(scene, camera, dt);
  if(state.playing){ views.update(now); $('capture-status').classList.toggle('hidden', !views.active); }
