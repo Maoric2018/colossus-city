@@ -8,7 +8,7 @@ export function flightStep(p, pos, vel, i, time){
  let movement = i.world ? v(i.x, 0, i.z) : rotateYaw(v(i.x, 0, i.z), i.yaw);
  if(len(movement) > 1) movement = norm(movement);
  const wasSoaring=!!p.soaring;
- p.soaring = !!i.soar && pos.y > 2;
+ p.soaring = !!i.soar;
  let dodge = null;
  if(i.dodge > p.lastDodgeSeq){
   p.lastDodgeSeq = i.dodge;
