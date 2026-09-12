@@ -6,6 +6,7 @@ import {ComponentBatches} from '../render/component-batches.js';
 import * as T from 'three';
 import {mergeParts} from '../art.js';
 import {surface} from '../render/quality.js';
+import {surfaceMap} from '../render/surface-art.js';
 import {COMPONENTS,componentPlacements} from '../../shared/city/components.js';
 const zero=new T.Matrix4().makeScale(0,0,0),scale=new T.Vector3(),position=new T.Vector3(),rotation=new T.Quaternion(),rotationMatrix=new T.Matrix4();
 const sides=Array.from({length:4},(_,side)=>new T.Matrix4().makeRotationY(-side*Math.PI/2));
@@ -16,9 +17,10 @@ export class Components{
   this.nearIndex=new CellIndex();this.landmarkIndex=new CellIndex();this.landmarks=new Set();this.candidates=new Set();
   this.buildings=buildings;this.tier=tier;this.radius=tier.name==='QUEST'?64:tier.lambert?85:115;this.lastPosition=null;this.lastRotation=new T.Quaternion();this.entries=new Map();this.cells=new Map();this.poses=new Map();this.batches=new Map();this.capacities=new Map();this.active=new Map();this.activeCells=new Set();
   const colors={stone:0xd2c9b8,steel:0x465059,concrete:0x999d99,bronze:0x8c7047,silver:0xc5cac9,chrome:0xdde7eb,marble:0xeeeae0,slate:0x29363d,crownGlass:0x162f3e,blueGlass:0x7095a9,terracotta:0xc9bfac,clearGlass:0xa8cede,jade:0x538a79,copper:0xad7351,ruby:0x863d32,darkBronze:0x514436};
-  this.materials=Object.fromEntries(Object.entries(colors).map(([k,color])=>[k,surface(tier,{color,roughness:k==='blueGlass'?.22:k==='chrome'?.28:k==='silver'?.5:.86,metalness:k==='blueGlass'?.45:k==='chrome'?.75:0,map:k==='stone'||k==='concrete'?concrete:null})]));
+  this.materials=Object.fromEntries(Object.entries(colors).map(([k,color])=>[k,surface(tier,{color,roughness:k==='blueGlass'?.22:k==='chrome'?.28:k==='silver'?.5:.86,metalness:k==='blueGlass'?.45:k==='chrome'?.75:0,map:k==='concrete'?concrete:['stone','marble','terracotta','jade','ruby'].includes(k)?surfaceMap('stone',tier.textureSize):['steel','bronze','silver','copper','darkBronze','slate'].includes(k)?surfaceMap('metal',tier.textureSize):null})]));
   this.materials.blueGlass.dispose();this.materials.blueGlass=new T.MeshStandardMaterial({color:0x89aaba,roughness:.24,metalness:.5,envMapIntensity:.9});
   this.materials.clearGlass.dispose();this.materials.clearGlass=new T.MeshStandardMaterial({color:0xb7d7e4,roughness:.15,metalness:.2,transparent:true,opacity:.3,depthWrite:false,side:T.DoubleSide});
+  this.ventMaterial=surface(tier,{color:0xc7d2d6,map:surfaceMap('vent',tier.textureSize),roughness:.65,metalness:.25});
   this.register(buildings,cells);
  }
  register(buildings,cells){for(const _ of this.prepare(buildings,cells)){} }
@@ -32,7 +34,7 @@ export class Components{
  reserve(type,count){
   if((this.capacities.get(type)||0)>=count)return;
   const old=this.batches.get(type),spec=COMPONENTS[type],geometry=old?.geometry||mergeParts(spec.parts.map(p=>[componentGeometry(p),p.p,p.r])),capacity=2**Math.ceil(Math.log2(Math.max(32,count)));
-  const mesh=this.buildings.batch(geometry,this.materials[spec.material],capacity);mesh.count=this.active.get(type).length;mesh.castShadow=false;mesh.userData.component=true;mesh.visible=mesh.count>0;
+  const mesh=this.buildings.batch(geometry,(['roofVent','acUnit','louverScreen'].includes(type)?this.ventMaterial:this.materials[spec.material]),capacity);mesh.count=this.active.get(type).length;mesh.castShadow=false;mesh.userData.component=true;mesh.visible=mesh.count>0;
   if(old){mesh.instanceMatrix.array.set(old.instanceMatrix.array);old.removeFromParent();old.dispose();this.buildings.dirty.delete(old);this.buildings.batches=this.buildings.batches.filter(b=>b!==old);}
  this.batches.set(type,mesh);this.capacities.set(type,capacity);
   if(this.materialBatches){mesh.userData.batchedSource=true;mesh.removeFromParent();}

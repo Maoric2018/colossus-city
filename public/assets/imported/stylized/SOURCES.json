@@ -1,0 +1,86 @@
+{
+  "description": "Selected downloaded base colors. Only resized to 512px and encoded as WebP; game materials compose the final facades at the device texture tier.",
+  "packs": {
+    "brick": {
+      "archive": "brick.zip",
+      "author": "JulioVII",
+      "source": "https://juliovii.itch.io/ftp-bricks-pavement",
+      "license": "CC-BY (creator listing)"
+    },
+    "metal": {
+      "archive": "metal.zip",
+      "author": "JulioVII",
+      "source": "https://juliovii.itch.io/ftp-stylized-metal-panels",
+      "license": "CC-BY (creator listing)"
+    },
+    "paint": {
+      "archive": "pack2.zip",
+      "author": "rubberduck",
+      "source": "https://opengameart.org/content/8-handpainted-style-textures-2",
+      "download": "https://opengameart.org/sites/default/files/handpainted-style-textures-2.zip",
+      "license": "CC0"
+    }
+  },
+  "files": [
+    {
+      "file": "brick.webp",
+      "pack": "brick",
+      "archivePath": "JPEG/Stylized_Bricks_Red_01/Stylized_Bricks_Red_01_basecolor.jpg",
+      "sourceSha256": "397705fa70cea1bd880f5917b58806b679e54af0f961f81c2241ad8100d19f7e",
+      "sha256": "097c8dcc95287f40438a5a00db550e0efcd93c22695179e17ddd6488fe0a3004",
+      "bytes": 56608,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "paving.webp",
+      "pack": "brick",
+      "archivePath": "JPEG/Stylized_BricksPavement_02/Stylized_BricksPavement_02_basecolor.jpg",
+      "sourceSha256": "17ec4cc5389c7ba822525adec760b8f1c849f99e8c5b8a944d82fc50256d5430",
+      "sha256": "55d29aea0cbc1f16fd1544205d49ce1ee8eaad7b42ad2a95df2a04ef1dfcf02c",
+      "bytes": 58566,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "metal.webp",
+      "pack": "metal",
+      "archivePath": "JPEG/Stylized_MetalPanels_01/Stylized_MetalPanels_01_basecolor.jpg",
+      "sourceSha256": "ef3a74da8bff8bc07ad9ff833473d5dc06a046a5eadb69584d3fa35d6d76fd40",
+      "sha256": "764171682e5830bb7086f5652f21e15a721115022158e554bd45c3432c28d3c0",
+      "bytes": 61118,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "vent.webp",
+      "pack": "metal",
+      "archivePath": "JPEG/Stylized_MetalPanels_04/Stylized_MetalPanels_04_basecolor.jpg",
+      "sourceSha256": "d0f7c97f0489b26d11307571de3982ab8eafea71cce325deee9711e7457992b7",
+      "sha256": "a6e0084123a4775795b526f696235af8fa356b18f17ae988a12690c5da1b45eb",
+      "bytes": 51336,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "concrete.webp",
+      "pack": "paint",
+      "archivePath": "hp_concrete.png",
+      "sourceSha256": "b53d02c22cc7059ef1c5140ad968331c9db57ac94ffe707620c0cb8b864f3db6",
+      "sha256": "e4d72f447aaf4c0e6f41bae603bdca0632965d23fc881def8715c23dd7398ce4",
+      "bytes": 21936,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "marble.webp",
+      "pack": "paint",
+      "archivePath": "hp_marble.png",
+      "sourceSha256": "bd60fbe4f27ddca56cd6ad201e04341e9a605cbb7b6bd561bd391523c63a2e0c",
+      "sha256": "3e45713d65f90b8e6fda15b063f21543e6ce1d4d33b93a3484a7fc9467ab678c",
+      "bytes": 14470,
+      "width": 512,
+      "height": 512
+    }
+  ]
+}

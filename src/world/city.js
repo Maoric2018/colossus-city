@@ -12,6 +12,7 @@ import {generateCells, cellColliders, initialSkin} from '../../shared/environmen
 import {MATERIALS, sideBit} from '../../shared/city/materials.js';
 import {rayAABB} from '../../shared/math.js';
 import {Buildings} from './buildings.js';
+import {surfaceMap} from '../render/surface-art.js';
 import {buildGround} from './ground.js';
 import {Rubble} from './rubble.js';
 import {CarsView} from './cars.js';
@@ -48,11 +49,11 @@ export class CityView {
    }yield;
   }
   this.loader = parent?.loader || new T.TextureLoader();
-  const t = env.textures, tex = (url, repeat, srgb = true) => url ? this.texture(url, repeat, srgb) : null;
-  this.textures = parent?.textures || {concrete:tex(t.concrete, 30), concreteNormal:tex(tier.normalMaps&&t.concreteNormal, 30, false), concreteRoughness:tex(!tier.lambert&&t.concreteRoughness, 30, false), asphalt:tex(t.asphalt, 38), asphaltNormal:tex(tier.normalMaps&&t.asphaltNormal, 38, false), asphaltRoughness:tex(!tier.lambert&&t.asphaltRoughness, 38, false)};
+  // Painted albedo carries the detail; no extra normal/roughness sampling on the city.
+  this.textures = parent?.textures || {concrete:surfaceMap('paving',tier.textureSize),asphalt:surfaceMap('asphalt',tier.textureSize)};
   if(!parent)this.makeSkyAndLights(); this.ground = parent ? {update(){}} : buildGround(this.root, env, tier, this.textures);
   yield;
-  this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || this.texture(t.concrete, 1),resources:parent?.buildings,components:parent?.buildings.components,deferComponents:!!parent});
+  this.buildings = new Buildings(this.root, this.cells, tier, {concrete:parent?.buildings.frame.material.map || surfaceMap('concrete',tier.textureSize),resources:parent?.buildings,components:parent?.buildings.components,deferComponents:!!parent});
   if(parent)yield* this.buildings.components.prepare(this.buildings,this.cells);
   if(!parent&&env.infinite)this.buildings.components.radius=Math.max(this.buildings.components.radius,this.scene.fog.far+12);
   this.buildings.attachments=this.attachments;this.transforms = this.buildings.entries;

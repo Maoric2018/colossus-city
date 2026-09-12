@@ -30,9 +30,9 @@ export class Buildings {
    ...[-1, 1].flatMap(x => [-1, 1].map(z => [colored(column(), 0x2e363c), [x * .472, -.012, z * .472]]))
   ]);
   this.frame = this.batch(frameGeometry, resources?.frame.material || surface(tier, {map:concrete, vertexColors:true, roughness:.85}), cells.length);
-  this.empireFrame=this.batch(frameGeometry,resources?.empireFrame.material||surface(tier,{color:0xe2ded1,roughness:.8}),cells.filter(c=>c.architecture==='empire').length);
+  this.empireFrame=this.batch(frameGeometry,resources?.empireFrame.material||surface(tier,{map:concrete,color:0xe2ded1,roughness:.8}),cells.filter(c=>c.architecture==='empire').length);
   const roofGeometry = resources?.roof.geometry || mergeParts([[new T.BoxGeometry(1, .05, .04), [0, .525, -.48]], [new T.BoxGeometry(1, .05, .04), [0, .525, .48]], [new T.BoxGeometry(.04, .05, 1), [-.48, .525, 0]], [new T.BoxGeometry(.04, .05, 1), [.48, .525, 0]], [new T.BoxGeometry(.96, .012, .96), [0, .505, 0]]]);
-  this.roof = this.batch(roofGeometry, resources?.roof.material || surface(tier, {map:roofTexture(), color:0x8a8884, roughness:1}), cells.filter(c => c.roof).length);
+  this.roof = this.batch(roofGeometry, resources?.roof.material || surface(tier, {map:roofTexture(tier.textureSize), color:0xffffff, roughness:1}), cells.filter(c => c.roof).length);
   this.facade = {}; this.glass = {}; this.wallCount = {}; this.paneCount = {};
   const size = tier.textureSize;
   for(const name of [...Object.keys(MATERIALS),'empire','chrysler','hudson30','vanderbilt','worldGlass']){
@@ -41,8 +41,8 @@ export class Buildings {
    const walls = cells.reduce((s, c) => s + (skinKey(c) === name ? c.walls.filter(Boolean).length : 0), 0); if(!walls&&(name!=='worldGlass'||resources)) continue;
    const maps = resources?.glass[name]?null:facadeMaps(name, size), m = MATERIALS[['empire','chrysler'].includes(name)?'stone':['hudson30','vanderbilt','worldGlass'].includes(name)?'glass':name];
    this.wallCount[name] = 0; this.paneCount[name] = 0;
-   if(m.facadeHP > 0) this.facade[name] = this.batch(resources?.facade[name]?.geometry||new T.BoxGeometry(1, .925, .022), resources?.facade[name]?.material||surface(tier, {map:maps.map, color:['empire','chrysler'].includes(name)?0xf7f4ee:m.tint, roughness:.9}), walls);
-   this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * (name==='worldGlass'?.08:.45), color:name==='worldGlass'?0xffffff:['hudson30','vanderbilt'].includes(name)?0xe4f0f4:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02,...(['hudson30','vanderbilt','worldGlass'].includes(name)?{transparent:false,opacity:1,depthWrite:true,side:T.DoubleSide,metalness:.5,roughness:.24,envMapIntensity:.9}: {})}), walls);
+   if(m.facadeHP > 0) this.facade[name] = this.batch(resources?.facade[name]?.geometry||new T.BoxGeometry(1, .925, .022), resources?.facade[name]?.material||surface(tier, {map:maps.map, color:0xffffff, roughness:.9}), walls);
+   this.glass[name] = this.batch(resources?.glass[name]?.geometry||new T.PlaneGeometry(1, .925), resources?.glass[name]?.material||glassMaterial(tier, {map:maps.panes, emissiveMap:maps.emissive, emissive:0xffd9a0, emissiveIntensity:m.lit * (name==='worldGlass'?.08:.45), color:name==='worldGlass'?0xffffff:['hudson30','vanderbilt'].includes(name)?0xe4f0f4:m.facadeHP > 0 ? 0xd6ecf6 : m.tint, alphaTest:.02,...(m.facadeHP>0?{transparent:false,opacity:1,depthWrite:true,metalness:.2,roughness:.34,envMapIntensity:.6}:{}),...(['hudson30','vanderbilt','worldGlass'].includes(name)?{transparent:false,opacity:1,depthWrite:true,side:T.DoubleSide,metalness:.5,roughness:.24,envMapIntensity:.9}: {})}), walls);
    this.glass[name].castShadow = false;
   }
 

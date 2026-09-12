@@ -2,6 +2,7 @@ import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {bakedModel} from '../assets.js';
 import {surface} from '../render/quality.js';
+import {surfaceMap,ensureSurfaceUV} from '../render/surface-art.js';
 import {carPlacements} from '../../shared/props.js';
 import {CAR_ID_START,carBox} from '../../shared/cars.js';
 const dummy=new T.Object3D(),zero=new T.Matrix4().makeScale(0,0,0);
@@ -19,8 +20,8 @@ export class CarsView {
   const scraps=await Promise.all(scrapNames.map(n=>bakedModel(`/assets/imported/car-kit/${n}.glb`)));
   for(const asset of new Set(this.placements.map(p=>p.asset))){
    const model=await bakedModel(`/assets/imported/${asset}.glb`),entries=[...this.entries.values()].filter(e=>e.prop.asset===asset),prop=entries[0].prop;
-   for(const part of model.parts){const geo=part.geometry.clone().scale(prop.scale,prop.scale,prop.scale).translate(0,-prop.size[1]/2,0),batch=this.batch(geo,part.material,entries.length,'car-intact:'+asset);entries.forEach((e,index)=>e.parts.push({batch,index,wreck:false}));}
-   const wreck=this.batch(wreckGeometry(model,scraps,prop),surface(this.tier,{color:0xffffff,vertexColors:true,roughness:.92,metalness:.3}),entries.length,'car-wreck:'+asset);
+   for(const part of model.parts){const geo=part.geometry.clone().scale(prop.scale,prop.scale,prop.scale).translate(0,-prop.size[1]/2,0),material=part.material.clone();if(!material.map){material.map=surfaceMap('armor',this.tier.textureSize);ensureSurfaceUV(geo,.4);}const batch=this.batch(geo,material,entries.length,'car-intact:'+asset);entries.forEach((e,index)=>e.parts.push({batch,index,wreck:false}));}
+   const wreck=this.batch(ensureSurfaceUV(wreckGeometry(model,scraps,prop),.6),surface(this.tier,{map:surfaceMap('metal',this.tier.textureSize),color:0xffffff,vertexColors:true,roughness:.92,metalness:.3}),entries.length,'car-wreck:'+asset);
    entries.forEach((e,index)=>{e.parts.push({batch:wreck,index,wreck:true});this.apply(e);});
   }
  }

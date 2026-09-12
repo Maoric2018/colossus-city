@@ -8,6 +8,7 @@ import {raySphere, vec, lookDir} from '../shared/math.js';
 import {installDistrict} from './district.js';
 import {assetStatus, bakedModel, loadModel} from './assets.js';
 import {CityView} from './world/city.js';
+import {loadSurfaceArt,surfaceArtStatus} from './render/surface-art.js';
 import {GiantView, RaiderView, RagView} from './avatars.js';
 import {Effects} from './effects.js';
 import {Connection} from './network.js';
@@ -34,6 +35,8 @@ let gr; try{ gr = new GameRenderer(canvas, {quest, touch}); }catch(e){ notice(e.
 const renderer = gr.renderer, tier = gr.tier;
 const scene = new T.Scene(); scene.background = new T.Color(city.sky.horizon);
 const camera = new T.PerspectiveCamera(72, innerWidth / innerHeight, .05, tier.far), rig = new T.Group(); rig.add(camera); scene.add(rig);
+notice('PREPARING CITY SURFACES…');
+await loadSurfaceArt(tier.textureSize);
 const cityView = new CityView(scene, city, {tier, quest:quest || touch});
 const giant = new GiantView(scene), fx = new Effects(scene, {tier, quest}), missiles = new MissileView(scene, fx), flightFX = new FlightFX(scene), audio = new GameAudio(), shake = new Shake(), prediction = new Prediction(cityView);
 const net = new Connection(onMessage, onDisconnect), hud = new HUD(), cameraRig = new CameraRig(camera, rig, cityView, shake, prediction);
@@ -192,4 +195,4 @@ if(lobby.params.get('spectator') === '1' && lobby.params.get('room')) artReady.t
 if(lobby.params.get('practice') === '1') artReady.then(() => start(true, true));
 window.COLOSSUS_READY = true; notice('LOADING CITY ASSETS…');
 // Read-only diagnostics for the included Playwright smoke test and profiling tools.
-window.__COLOSSUS = {renderer, gameRenderer:gr, input, touch, touchControls, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, ending, artReady, assetStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};
+window.__COLOSSUS = {renderer, gameRenderer:gr, input, touch, touchControls, scene, net, city:cityView, camera, rig, xr, giant, fx, missiles, views, flightFX, audio, prediction, ending, artReady, assetStatus, surfaceArtStatus, get state(){ return state.current; }, get role(){ return state.role; }, get firstPerson(){ return state.firstPerson; }};

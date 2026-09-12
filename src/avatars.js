@@ -7,6 +7,7 @@ import {SelfBodyVisibility} from './giant-visibility.js';
 import {GIANT,handQuaternion,resolveHand} from '../shared/giant-rig.js';
 import {resolveBreakableHand,handSurfaceKey} from '../shared/hand-break.js';
 import {loadModel,bakedModel} from './assets.js';
+import {surfaceMap,ensureSurfaceUV} from './render/surface-art.js';
 import {TEAM_COLORS} from '../shared/config.js';
 import {rounded,mesh,glow,coloredGeometry,up} from './art.js';
 const metal=new T.MeshStandardMaterial({color:0x536978,metalness:.78,roughness:.34});
@@ -27,6 +28,7 @@ function segment(parent,a,b,width,depth,material=metal){const g=new T.Group();pa
 }};}
 export class GiantView{
  constructor(scene){
+  for(const material of [metal,dark,trim]){material.map=surfaceMap('armor');material.needsUpdate=true;}
   this.selfBody=new SelfBodyVisibility();
   this.root=new T.Group();scene.add(this.root);this.body=new T.Group();this.head=new T.Group();this.root.add(this.body,this.head);
   const torso=new T.Shape();torso.moveTo(-3.1,4);torso.lineTo(3.1,4);torso.lineTo(3.8,2);torso.lineTo(2.25,-3.5);torso.lineTo(-2.25,-3.5);torso.lineTo(-3.8,2);torso.closePath();
@@ -137,13 +139,17 @@ function flightPack(parent,offset=new T.Vector3()){
  for(const sign of [-1,1]){const nozzle=new T.Group();nozzle.position.set(sign*.25,-.07,.05);pack.add(nozzle);pack.thrusters.push(nozzle);mesh(new T.CylinderGeometry(.095,.13,.48,10),metal,nozzle);mesh(new T.CylinderGeometry(.065,.065,.05,10),cyan,nozzle,[0,-.26,0]);}return pack;
 }
 function equipRifle(parent,rifle,mount,offset=new T.Vector3()){
- return rifle.parts.map(part=>{const material=part.material.clone();material.color.set(0x587486);material.metalness=.6;const gun=new T.Mesh(part.geometry,material);gun.scale.setScalar(1.2);gun.position.fromArray(mount).add(new T.Vector3(0,-1.25,-.13)).sub(offset);gun.castShadow=true;parent.add(gun);return material;});
+ return rifle.parts.map(part=>{const material=part.material.clone();if(!material.map){material.map=surfaceMap('metal');ensureSurfaceUV(part.geometry,1.5);}material.color.set(0x587486);material.metalness=.6;const gun=new T.Mesh(part.geometry,material);gun.scale.setScalar(1.2);gun.position.fromArray(mount).add(new T.Vector3(0,-1.25,-.13)).sub(offset);gun.castShadow=true;parent.add(gun);return material;});
 }
+// Prepare the one shared bind-pose model before either live or ragdoll clones.
+function raiderModel(){return loadModel('/assets/imported/raider/armored-ragdoll.glb').then(model=>{
+ if(!model.userData.surfaceArt){model.traverse(o=>{if(o.isSkinnedMesh){ensureSurfaceUV(o.geometry,.9);for(const m of Array.isArray(o.material)?o.material:[o.material])if(!m.map){m.map=surfaceMap('armor');m.roughness=.48;m.needsUpdate=true;}}});model.userData.surfaceArt=true;}return model;
+});}
 export class RaiderView{
  constructor(scene,id){
   this.id=id;this.weaponMaterials=[];this.root=new T.Group();scene.add(this.root);const color=TEAM_COLORS[(id-1)%TEAM_COLORS.length];
   this.mesh=new T.Mesh(suitGeometry(color),new T.MeshStandardMaterial({vertexColors:true,metalness:.4,roughness:.56}));this.mesh.castShadow=true;this.root.add(this.mesh);
-  this.flight={blend:0,dodge:0,time:0};this.disposed=false;this.ready=Promise.all([loadModel('/assets/imported/raider/armored-ragdoll.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([source,rifle])=>{
+  this.flight={blend:0,dodge:0,time:0};this.disposed=false;this.ready=Promise.all([raiderModel(),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([source,rifle])=>{
    if(this.disposed)return;this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.removeFromParent();
    this.mesh=cloneSkeleton(source);this.mesh.traverse(part=>{if(part.isSkinnedMesh){this.skin=part;part.castShadow=true;part.frustumCulled=false;}});
    this.bones=new Map(this.skin.skeleton.bones.map(b=>[b.name.replace('rag_',''),b]));
@@ -171,7 +177,7 @@ export class RaiderView{
 export class RagView{
  constructor(scene,rag){
   this.root=new T.Group();scene.add(this.root);this.parts=new Map(rag.parts.map(p=>[p.id,{...p}]));this.weaponMaterials=[];
-  this.ready=Promise.all([loadModel('/assets/imported/raider/armored-ragdoll.glb'),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([source,rifle])=>{
+  this.ready=Promise.all([raiderModel(),bakedModel('/assets/imported/space-kit/weapon_rifle.glb')]).then(([source,rifle])=>{
    if(this.disposed)return;const model=cloneSkeleton(source);this.root.add(model);model.traverse(o=>{if(o.isSkinnedMesh){this.skin=o;o.castShadow=true;o.frustumCulled=false;}});
    this.bones=new Map(this.skin.skeleton.bones.map(b=>[b.name.replace('rag_',''),b]));
    this.pack=flightPack(this.bones.get('chest'),new T.Vector3(...raiderParts.find(p=>p.name==='chest').o));

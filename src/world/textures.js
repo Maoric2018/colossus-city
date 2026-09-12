@@ -1,87 +1,89 @@
-// Procedural facade textures. Each material gets a colour map (with window openings drawn as
-// dark recesses) and an emissive map of randomly lit windows. Everything is generated once on
-// a canvas so nothing extra is downloaded and the Quest can use a smaller size.
+// Compose the downloaded painted surfaces around the actual window layout. The
+// existing facade/pane draws also carry recesses, reflections and lit interiors.
 import * as T from 'three';
 import {seeded} from '../../shared/math.js';
-function canvasTexture(size, draw){
- const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d'); draw(x, size);
- const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.ClampToEdgeWrapping; t.anisotropy = 4; return t;
-}
-const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
-// Window rectangles for one bay wall in UV space: [x, y, w, h] fractions.
+import {canvasMap,paintImported,surfaceMap} from '../render/surface-art.js';
+const cache=new Map();
 export const WINDOWS = {
  chrysler:[[.13,.14,.16,.7],[.42,.14,.16,.7],[.71,.14,.16,.7]],
  empire:[[.13,.15,.16,.71],[.42,.15,.16,.71],[.71,.15,.16,.71]],
- brick:[[.1, .28, .2, .42], [.4, .28, .2, .42], [.7, .28, .2, .42]],
- stone:[[.12, .22, .3, .5], [.58, .22, .3, .5]],
- concrete:[[.06, .3, .88, .36]],
- glass:[[0, 0, 1, 1]]
+ brick:[[.1,.28,.2,.42],[.4,.28,.2,.42],[.7,.28,.2,.42]],
+ stone:[[.12,.22,.3,.5],[.58,.22,.3,.5]],
+ concrete:[[.06,.3,.88,.36]],
+ glass:[[0,0,1,1]]
 };
-function windows(x, s, list, rand, lit, color, dark){
- for(const [wx, wy, ww, wh] of list){
-  x.fillStyle = dark; x.fillRect(wx * s, wy * s, ww * s, wh * s);
-  if(lit){ const on = rand() < lit; x.fillStyle = on ? color : 'rgb(0,0,0)'; x.fillRect((wx + .04 * ww) * s, (wy + .05 * wh) * s, ww * .92 * s, wh * .9 * s); }
- }
+function fill(x,color,a,b,w,h){x.fillStyle=color;x.fillRect(a,b,w,h);}
+function gradient(x,a,b,w,h,top,bottom){const g=x.createLinearGradient(a,b,a+w*.35,b+h);g.addColorStop(0,top);g.addColorStop(1,bottom);fill(x,g,a,b,w,h);}
+function recess(x,s,[u,v,w,h],slim=false){
+ const a=u*s,b=v*s,ww=w*s,hh=h*s,pad=s*(slim?.006:.012);
+ fill(x,'rgba(26,37,45,.28)',a-pad*1.5,b-pad,ww+pad*3,hh+pad*3);
+ fill(x,'#b9bbad',a-pad,b-pad,ww+pad*2,hh+pad*2);
+ fill(x,'#203746',a,b,ww,hh);
+ fill(x,'rgba(240,237,211,.85)',a-pad,b+hh,ww+pad*2,pad*.8);
 }
-export function facadeMaps(material, size = 512, seed = 7){
- const curtain=['glass','hudson30','vanderbilt','worldGlass'].includes(material),modern=['hudson30','vanderbilt','worldGlass'].includes(material);
- const rand = seeded(seed + material.length);
- const map = canvasTexture(size, (x, s) => {
-  if(material === 'brick'){
-   x.fillStyle = rgb(112, 92, 84); x.fillRect(0, 0, s, s);
-   const rows = 30, cols = 12, bh = s / rows, bw = s / cols;
-   for(let r = 0; r < rows; r++) for(let c = -1; c < cols; c++){ const shade = 138 + rand() * 40, ox = (r % 2) * bw / 2; x.fillStyle = rgb(shade + 18, shade * .55 + 8, shade * .42); x.fillRect(c * bw + ox + 1, r * bh + 1, bw - 2, bh - 2); }
-   x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(0, 0, s, s * .06); x.fillRect(0, s * .94, s, s * .06);
-   windows(x, s, WINDOWS.brick, rand, 0, '', rgb(28, 32, 38));
-   x.fillStyle = rgb(190, 178, 160); for(const [wx, wy, ww, wh] of WINDOWS.brick) x.fillRect((wx - .02) * s, (wy + wh) * s, (ww + .04) * s, s * .02);
-  }else if(material==='empire'){
-   x.fillStyle='#e2dfd2';x.fillRect(0,0,s,s);x.fillStyle='#cbc8bc';for(let i=1;i<7;i++)x.fillRect(0,i*s/7,s,1);
-   windows(x,s,WINDOWS.empire,rand,0,'','#3e4850');x.fillStyle='#959787';for(const [wx,wy,ww,wh] of WINDOWS.empire)x.fillRect(wx*s,(wy+wh)*s,ww*s,s*.015);
-  }else if(material === 'chrysler'){
-   x.fillStyle='#eeeae0';x.fillRect(0,0,s,s);
-   for(let row=0;row<20;row++)for(let col=-1;col<12;col++){const tone=218+rand()*22;x.fillStyle=rgb(tone,tone,tone-5);x.fillRect((col+(row%2)*.5)*s/12+1,row*s/20+1,s/12-2,s/20-2);}
-   for(const [wx,,ww]of WINDOWS.chrysler){x.fillStyle='#6e7576';x.fillRect(wx*s,0,ww*s,s);}
-   windows(x,s,WINDOWS.chrysler,rand,0,'','#263d49');
-  }else if(material === 'stone'){
-   x.fillStyle = rgb(206, 194, 168); x.fillRect(0, 0, s, s);
-   const rows = 6, cols = 4, bh = s / rows, bw = s / cols;
-   for(let r = 0; r < rows; r++) for(let c = -1; c < cols; c++){ const shade = 196 + rand() * 26, ox = (r % 2) * bw / 2; x.fillStyle = rgb(shade + 6, shade - 6, shade - 30); x.fillRect(c * bw + ox + 2, r * bh + 2, bw - 4, bh - 4); }
-   x.fillStyle = rgb(160, 148, 122); x.fillRect(0, s * .1, s, s * .025); x.fillRect(0, s * .9, s, s * .03);
-   for(let i = 0; i < 6; i++) x.fillRect((.05 + i * .18) * s, s * .12, s * .012, s * .76);
-   windows(x, s, WINDOWS.stone, rand, 0, '', rgb(30, 34, 40));
-  }else if(material === 'concrete'){
-   x.fillStyle = rgb(172, 170, 162); x.fillRect(0, 0, s, s);
-   for(let i = 0; i < 4000; i++){ x.fillStyle = `rgba(${60 + rand() * 60 | 0},${60 + rand() * 60 | 0},${55 + rand() * 60 | 0},.12)`; x.fillRect(rand() * s, rand() * s, 2, 2); }
-   x.fillStyle = rgb(120, 118, 112); for(let i = 0; i < 4; i++) x.fillRect(i * s / 4, 0, 3, s); x.fillRect(0, s * .22, s, 3); x.fillRect(0, s * .72, s, 3);
-   windows(x, s, WINDOWS.concrete, rand, 0, '', rgb(24, 30, 38));
-   x.fillStyle = rgb(90, 96, 100); for(let i = 1; i < 6; i++) x.fillRect((.06 + i * .88 / 6) * s, s * .3, 3, s * .36);
-  }else if(modern){
-   // Two office levels per structural bay; restrained blue glass and thin joints.
-   x.fillStyle=material==='worldGlass'?'#bacdd5':material==='hudson30'?'#7098ad':'#819da6';x.fillRect(0,0,s,s);
-   for(let row=0;row<2;row++)for(let col=0;col<8;col++){const v=rand();x.fillStyle=v>.8?'rgba(190,216,221,.26)':v>.45?'rgba(216,228,230,.12)':'rgba(22,59,78,.11)';x.fillRect(col*s/8,row*s/2,s/8-1,s/2-2);}
-   x.fillStyle='#a8bec5';for(let i=0;i<=8;i++)x.fillRect(i*s/8,0,Math.max(1,s/512),s);
-   x.fillStyle=material==='worldGlass'?'#61727c':material==='hudson30'?'#365263':'#c2b9a6';for(let row=0;row<2;row++)x.fillRect(0,(row*.5+.44)*s,s,s*(material==='hudson30'?.045:.05));
+function pane(x,s,rect,style,{modern=false,columns=1}={}){
+ const [u,v,w,h]=rect,a=u*s,b=v*s,ww=w*s,hh=h*s;
+ gradient(x,a,b,ww,hh,style.lit?'#b9a482':modern?'#8ab8c9':'#6796ac',style.lit?'#5e625e':modern?'#386479':'#294656');
+ x.save();x.beginPath();x.rect(a,b,ww,hh);x.clip();
+ // Broad graphic reflections remain legible on low resolution headset maps.
+ x.fillStyle=style.lit?'rgba(255,228,170,.12)':'rgba(208,240,242,.18)';
+ x.beginPath();x.moveTo(a+ww*.06,b);x.lineTo(a+ww*.3,b);x.lineTo(a+ww*.9,b+hh);x.lineTo(a+ww*.68,b+hh);x.closePath();x.fill();
+ if(style.blind){fill(x,'#768c96',a,b,ww,hh*style.blind);for(let i=1;i<5;i++)fill(x,'rgba(222,225,204,.28)',a,b+hh*style.blind*i/5,ww,Math.max(1,s*.002));}
+ gradient(x,a,b,ww,hh*.16,'rgba(17,31,43,.5)','rgba(17,31,43,0)');
+ x.restore();
+ const line=Math.max(1,s*.004);fill(x,'rgba(205,226,221,.6)',a,b,ww,line);
+ for(let i=1;i<columns;i++){fill(x,'#253e4b',a+ww*i/columns,b,line,hh);fill(x,'#abc4ca',a+ww*i/columns+line,b,line*.4,hh);}
+ if(!modern&&h>.38)fill(x,'rgba(26,48,62,.8)',a,b+hh*.53,ww,line);
+}
+export function facadeMaps(material,size=512,seed=7){
+ const key=material+':'+size+':'+seed;if(cache.has(key))return cache.get(key);
+ const curtain=['glass','hudson30','vanderbilt','worldGlass'].includes(material),modern=curtain&&material!=='glass',rand=seeded(seed+material.length*101);
+ const list=curtain?Array.from({length:modern?16:3},(_,i)=>{const cols=modern?8:3,rows=modern?2:1;return [(i%cols)/cols+.003,Math.floor(i/cols)/rows+.012,1/cols-.007,1/rows-(modern?.07:.18)];}):material==='concrete'?Array.from({length:6},(_,i)=>[.06+i*.88/6+.002,.3,.88/6-.004,.36]):WINDOWS[material];
+ const styles=list.map(()=>({lit:rand()<(curtain?.12:.25),blind:rand()<.3?.12+rand()*.26:0}));
+ const map=canvasMap(size,(x,s)=>{
+  if(material==='brick'){
+   fill(x,'#b5674b',0,0,s,s);
+   if(!paintImported(x,s,'brick',{repeat:2})){
+    for(let r=0;r<32;r++)for(let c=-1;c<12;c++)fill(x,`hsl(15,42%,${43+rand()*9}%)`,(c+(r%2)*.5)*s/12+1,r*s/32+1,s/12-2,s/32-2);
+   }
+  }else if(material==='stone'){
+   fill(x,'#dbd1b9',0,0,s,s);paintImported(x,s,'marble',{alpha:.18,filter:'grayscale(1) brightness(1.5)'});
+   for(let r=0;r<6;r++){fill(x,'rgba(94,87,69,.23)',0,r*s/6,s,Math.max(1,s*.002));for(let col=0;col<4;col++)fill(x,'rgba(94,87,69,.18)',(col+(r%2)*.5)*s/4,r*s/6,Math.max(1,s*.002),s/6);}
+   fill(x,'#b9ae93',0,s*.1,s,s*.02);fill(x,'#f0e4ca',0,s*.12,s,s*.009);
+  }else if(material==='empire'||material==='chrysler'){
+   fill(x,material==='empire'?'#e7dfc9':'#e7e8db',0,0,s,s);
+   paintImported(x,s,'concrete',{alpha:.13,filter:'grayscale(1) brightness(1.5)'});
+   const rows=material==='empire'?8:20;for(let r=0;r<rows;r++)fill(x,'rgba(77,85,85,.14)',0,r*s/rows,s,Math.max(1,s*.0015));
+   if(material==='chrysler')for(const [u,,w]of WINDOWS.chrysler)gradient(x,u*s,0,w*s,s,'#81939c','#4d6470');
+  }else if(material==='concrete'){
+   x.drawImage(surfaceMap('concrete',size).image,0,0,s,s);
+   for(let col=0;col<4;col++){const a=col*s/4;fill(x,'rgba(69,91,104,.2)',a,0,Math.max(1,s*.003),s);fill(x,'rgba(255,255,244,.5)',a+2,0,1,s);}
+   fill(x,'#84959d',0,s*.22,s,s*.012);fill(x,'#b6c2c6',0,s*.73,s,s*.008);
   }else{
-   // Glass: pane alpha only inside the grid; mullions are opaque dark metal.
-   x.clearRect(0, 0, s, s); x.fillStyle = 'rgba(150,200,225,.62)'; x.fillRect(0, 0, s, s);
-   x.fillStyle = rgb(38, 46, 54); for(let i = 0; i <= 3; i++){ x.fillRect(i * s / 3 - 3, 0, 6, s); } x.fillRect(0, 0, s, 8); x.fillRect(0, s * .82, s, s * .18);
-   x.fillStyle = 'rgba(70,84,96,.9)'; x.fillRect(0, s * .82, s, s * .18);
+   fill(x,material==='hudson30'?'#314d5d':material==='vanderbilt'?'#9da69f':'#536f7d',0,0,s,s);
+   for(let i=0;i<list.length;i++)pane(x,s,list[i],styles[i],{modern:true});
+   fill(x,'rgba(204,225,221,.6)',0,s*.985,s,s*.006);
   }
- });
- const emissive = canvasTexture(size, (x, s) => {
-  x.fillStyle = 'rgb(0,0,0)'; x.fillRect(0, 0, s, s);
-  if(curtain){ for(let i = 0; i < 3; i++) if(rand() < .35) x.fillStyle = `rgba(255,${190 + rand() * 40 | 0},${120 + rand() * 60 | 0},${.5 + rand() * .3})`, x.fillRect(i * s / 3 + 8, 12, s / 3 - 16, s * .78); }
-  else windows(x, s, WINDOWS[material], rand, .45, rgb(255, 205, 140), 'rgb(0,0,0)');
- });
- if(curtain) map.premultiplyAlpha = false;
- // Window panes for masonry: transparent except inside the openings, drawn just outside the facade.
- const panes = curtain ? map : canvasTexture(size, (x, s) => {
-  x.clearRect(0, 0, s, s);
-  for(const [wx, wy, ww, wh] of WINDOWS[material]){ x.fillStyle = 'rgba(150,200,225,.6)'; x.fillRect(wx * s, wy * s, ww * s, wh * s); x.fillStyle = 'rgba(40,48,56,.95)'; x.fillRect((wx + ww / 2 - .008) * s, wy * s, .016 * s, wh * s); x.fillRect(wx * s, (wy + wh / 2 - .008) * s, ww * s, .016 * s); }
- });
- return {map, emissive, panes};
+  if(!curtain){
+   // A gentle recess at slab edges replaces the former heavy dark banding.
+   gradient(x,0,0,s,s*.065,'rgba(42,49,52,.26)','rgba(42,49,52,0)');
+   fill(x,'rgba(248,239,214,.5)',0,s*.985,s,s*.009);
+   for(const rect of list)recess(x,s,rect,material==='chrysler'||material==='empire');
+  }
+ },'facade:'+material);
+ const emissive=canvasMap(size,(x,s)=>{
+  fill(x,'#000',0,0,s,s);for(let i=0;i<list.length;i++)if(styles[i].lit){const [u,v,w,h]=list[i],blind=styles[i].blind;fill(x,'#d7ac72',(u+w*.07)*s,(v+h*Math.max(.08,blind))*s,w*.86*s,h*(1-Math.max(.08,blind)-.08)*s);}
+ },'windows-lit:'+material);
+ const panes=curtain?map:canvasMap(size,(x,s)=>{for(let i=0;i<list.length;i++)pane(x,s,list[i],styles[i],{columns:material==='brick'||material==='stone'?2:1});},'panes:'+material);
+ for(const t of new Set([map,panes,emissive]))t.wrapS=t.wrapT=T.ClampToEdgeWrapping;
+ const result={map,emissive,panes};cache.set(key,result);return result;
 }
-export function roofTexture(size = 256){
- const rand = seeded(31);
- return canvasTexture(size, (x, s) => { x.fillStyle = 'rgb(88,86,82)'; x.fillRect(0, 0, s, s); for(let i = 0; i < 2500; i++){ const g = 70 + rand() * 60; x.fillStyle = `rgb(${g},${g},${g - 6})`; x.fillRect(rand() * s, rand() * s, 2, 2); } });
+export function roofTexture(size=256){
+ const key='roof:'+size;if(cache.has(key))return cache.get(key);
+ const texture=canvasMap(size,(x,s)=>{
+  fill(x,'#85939c',0,0,s,s);paintImported(x,s,'concrete',{alpha:.45,filter:'grayscale(1) brightness(1.1)'});
+  // Membrane seams and parapet contact shade, with no extra rooftop objects.
+  for(let i=0;i<4;i++){const a=i*s/4;fill(x,'rgba(30,46,56,.35)',a,0,Math.max(1,s*.005),s);fill(x,'rgba(215,225,216,.2)',a+s*.006,0,1,s);}
+  x.strokeStyle='rgba(26,41,51,.28)';x.lineWidth=s*.035;x.strokeRect(s*.017,s*.017,s*.966,s*.966);
+ },'surface:roof');cache.set(key,texture);return texture;
 }

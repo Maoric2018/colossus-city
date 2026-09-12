@@ -31,12 +31,18 @@ export function streetMaterial(tier,textures,sidewalk=false){
     tint=mix(tint,vec3(.94,.93,.85),curb);
     float joint=max(streetStripe(p.x,1.6,.016),streetStripe(p.y,1.6,.016));
     float fade=1.-smoothstep(.12,.5,max(fwidth(p.x),fwidth(p.y)));
-    tint*=1.-joint*fade*walk*.30;
+    tint*=1.-joint*fade*curb*.22;
     tint*=mix(.64,1.,abs(cityGroundNormal.y));
     diffuseColor.rgb*=mix(vec3(.70),grain,.48)*tint;
    `:`
     float dx=${STREET.block/2}.-abs(block.x),dz=${STREET.block/2}.-abs(block.y);
     diffuseColor.rgb*=grain*.53;
+    // Inset utility covers live in the road paint layer, so they cannot z-fight.
+    vec2 service=dx<dz?vec2(block.x-${STREET.block/2-2.4},block.y-11.):vec2(block.y-${STREET.block/2-2.4},block.x+11.);
+    float radius=length(service),lid=1.-streetAfter(radius,.46),rim=streetBand(radius-.48,.025);
+    float hatch=streetStripe(service.x+service.y,.16,.013);
+    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.085,.12,.15)*(1.-hatch*.3),lid);
+    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.14,.18,.21),rim*.35);
     float yellow=max(streetBand(dx-.3,.07)*streetAfter(dz,7.),streetBand(dz-.3,.07)*streetAfter(dx,9.));
     float dash=max(streetBand(dx-4.,.07)*streetAfter(dz,10.)*streetStripe(p.y,8.,1.5),streetBand(dz-3.,.07)*streetAfter(dx,12.)*streetStripe(p.x,8.,1.5));
     float walk=max(streetBand(dz-8.,1.3)*streetAfter(dx,1.5)*(1.-streetAfter(dx,6.))*streetStripe(p.x,1.3,.35),streetBand(dx-10.,1.3)*streetAfter(dz,1.5)*(1.-streetAfter(dz,4.5))*streetStripe(p.y,1.3,.35));
@@ -45,6 +51,6 @@ export function streetMaterial(tier,textures,sidewalk=false){
    `}
   `);
  };
- material.customProgramCacheKey=()=>sidewalk?'city-sidewalk-v1':'city-road-v2';
+ material.customProgramCacheKey=()=>sidewalk?'city-sidewalk-painted-v2':'city-road-painted-v3';
  return material;
 }
